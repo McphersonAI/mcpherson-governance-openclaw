@@ -1,0 +1,117 @@
+{
+  "id": "mcpherson-governance-connector",
+  "name": "McPherson Governance Connector",
+  "description": "Shadow-only OpenClaw plugin that observes configured tool activity, sends metadata-minimized governance requests, and records local attempt and completion receipts. It does not block or alter tool execution; remote decisions have no execution authority.",
+  "version": "0.5.0",
+  "license": "Apache-2.0",
+  "homepage": "https://mcphersonai.com",
+  "repository": "https://github.com/McphersonAI/mcpherson-governance-openclaw",
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "mcpherson_connection_test",
+      "mcpherson_governance_canary"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": false
+      },
+      "apiUrl": {
+        "type": "string",
+        "pattern": "^https://"
+      },
+      "deploymentId": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+      },
+      "agentId": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+      },
+      "policyVersion": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "observationBudgetMs": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 500
+      },
+      "connectTimeoutMs": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5000
+      },
+      "maxInFlight": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 4
+      },
+      "maxQueue": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 16
+      },
+      "stateDir": {
+        "type": "string"
+      },
+      "receiptDir": {
+        "type": "string"
+      },
+      "caFile": {
+        "type": "string"
+      },
+      "toolMetadata": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "schemaHash",
+            "actionClass"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "type": "string"
+            },
+            "schemaHash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "actionClass": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            "resourceClass": {
+              "type": "string"
+            },
+            "recipientType": {
+              "type": "string"
+            },
+            "recipientCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "attachmentIndicator": {
+              "type": "boolean"
+            },
+            "dataSensitivityLabel": {
+              "type": "string"
+            },
+            "reversibilityLabel": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

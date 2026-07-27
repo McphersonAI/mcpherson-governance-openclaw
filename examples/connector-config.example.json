@@ -1,0 +1,38 @@
+{
+  "enabled": false,
+
+  "apiUrl": "https://governance.example.invalid:8443",
+
+  "deploymentId": "REPLACE-WITH-YOUR-DEPLOYMENT-ID",
+  "agentId": "REPLACE-WITH-YOUR-AGENT-ID",
+  "policyVersion": 1,
+
+  "observationBudgetMs": 150,
+  "connectTimeoutMs": 2000,
+  "maxInFlight": 4,
+  "maxQueue": 16,
+
+  "stateDir": "/REPLACE-WITH-ABSOLUTE-PATH/.openclaw/mcpherson-governance-connector",
+  "receiptDir": "/REPLACE-WITH-ABSOLUTE-PATH/.openclaw/mcpherson-governance-connector/receipts",
+  "caFile": "/REPLACE-WITH-ABSOLUTE-PATH/your-governance-ca.crt",
+
+  "toolMetadata": {
+    "REPLACE_WITH_YOUR_TOOL_ID": {
+      "schemaVersion": "1.0.0",
+      "schemaHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "actionClass": "read_only_internal",
+      "resourceClass": "internal_document",
+      "reversibilityLabel": "reversible"
+    },
+    "REPLACE_WITH_ANOTHER_TOOL_ID": {
+      "schemaVersion": "1.0.0",
+      "schemaHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "actionClass": "external_outbound",
+      "recipientType": "external",
+      "recipientCount": 1,
+      "attachmentIndicator": false,
+      "dataSensitivityLabel": "confidential",
+      "reversibilityLabel": "irreversible"
+    }
+  }
+}
