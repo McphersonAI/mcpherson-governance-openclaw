@@ -1,6 +1,6 @@
 # Privacy and Metadata Boundary
 
-**Connector v0.5.0.** This document describes exactly what can leave your host,
+**Connector v0.5.1.** This document describes exactly what can leave your host,
 what cannot, and where the boundary's limits are.
 
 ## Summary

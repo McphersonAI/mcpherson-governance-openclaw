@@ -1,16 +1,34 @@
 # Verification
 
-**Connector v0.5.0.** How to confirm that what you have is what was released,
+**Connector v0.5.1.** How to confirm that what you have is what was released,
 and that it behaves as claimed. Everything here runs locally.
 
-## 1. Verify the release archive
+## 1. Verify the ClawHub artifact
+
+The public artifact is the ClawHub `.tgz`, not a GitHub release tarball:
 
 ```sh
-shasum -a 256 mcpherson-governance-openclaw-v0.5.0.tar.gz
+clawhub package verify \
+  ./mcphersonai-mcpherson-governance-openclaw-0.5.1.tgz \
+  --package @mcphersonai/mcpherson-governance-openclaw \
+  --version 0.5.1
+```
+
+It must report `verified: true`. To check the digest yourself:
+
+```sh
+shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.5.1.tgz
 ```
 
 Compare against the published release manifest value. Do not install on a
 mismatch.
+
+The remaining checks run against the installed package. With a profile install,
+that is:
+
+```sh
+cd "$HOME/.openclaw-<profile>/extensions/mcpherson-governance-connector"
+```
 
 ## 2. Verify every file in the package
 
@@ -20,43 +38,52 @@ shasum -a 256 -c RELEASE-CHECKSUMS.sha256
 
 Every line must report `OK`.
 
-## 3. Verify the 28 connector files specifically
+## 3. Verify the 29 connector files specifically
 
-This is the important one. `CONNECTOR-FILES.sha256` covers exactly the 28
+This is the important one. `CONNECTOR-FILES.sha256` covers exactly the 29
 connector files and nothing else:
 
 ```sh
 shasum -a 256 -c CONNECTOR-FILES.sha256
-wc -l < CONNECTOR-FILES.sha256      # must print 28
+wc -l < CONNECTOR-FILES.sha256      # must print 29
 ```
 
-All 28 must report `OK`. This is a self-consistency check against the
-public-package checksum manifest; it is not a claim that all 28 files match the
-sealed inventory. Any `FAILED` line means your copy has been modified.
+All 29 must report `OK`. This is a self-consistency check against the
+public-package checksum manifest; it is not a claim that all 29 files match the
+v0.5.0 sealed inventory. Any `FAILED` line means your copy has been modified.
 
 The provenance comparison is deliberately separate:
 
-- Sealed connector inventory: **28 files**
-- Public connector identity: **27/28 sealed files**
-- Sole intentional difference: **`connector/package.json`**
-- Runtime modules (`.mjs`): **23**
-- Runtime-module identity: **23/23 byte-identical**
+- Sealed v0.5.0 connector inventory: **28 files**
+- Files v0.5.1 adds: **1** (`connector/host.mjs`)
+- Files v0.5.1 changes: **5** (`connector/config.mjs`, `connector/constants.mjs`,
+  `connector/hook.mjs`, `connector/index.mjs`, `connector/pipeline.mjs`)
+- Metadata files that differ from sealed: **2**
+  (`connector/package.json`, `connector/openclaw.plugin.json`)
+- Documentation files that differ from sealed: **1** (`connector/README.md`)
+- Sealed files carried over byte-identical: **20/28**
+- Runtime modules (`.mjs`): **24**
 
-The package-metadata difference enables public distribution and does not change
-runtime logic. `SEALED-CONNECTOR-FILES.sha256` records the sealed-reference
-hashes; `npm test` verifies that the changed-file set is exactly
-`connector/package.json` and that no `.mjs` file differs.
+The connector tree holds 24 `.mjs` runtime modules in total.
+
+`SEALED-CONNECTOR-FILES.sha256` records the sealed v0.5.0 reference hashes.
+`npm test` verifies that the difference from that sealed inventory is **exactly**
+the enumerated set above and nothing else — an unexpected change to any other
+connector file fails the check.
+
+Every changed runtime module is changed for a stated v0.5.1 finding; see
+[CHANGELOG.md](CHANGELOG.md).
 
 To confirm no extra runtime file was added to the connector tree:
 
 ```sh
-find connector -type f | wc -l      # must print 28
+find connector -type f | wc -l      # must print 29
 ```
 
 ## 4. Verify the embedded governance core
 
 The connector embeds a subset of the governance core and records its own source
-hashes:
+hashes. **v0.5.1 does not change it:**
 
 ```sh
 cd connector/runtime/governance-core
@@ -80,7 +107,7 @@ Neither should exist.
 Do not take the README's word for it — read the constants:
 
 ```sh
-grep -nE 'REMOTE_AUTHORITY|ENFORCEABLE_REMOTE_DECISIONS|remote_shadow|remote_authority|deny_enforcement|approval_enforcement|RECEIPT_MODE|PLUGIN_VERSION' \
+grep -nE 'REMOTE_AUTHORITY|ENFORCEABLE_REMOTE_DECISIONS|remote_shadow|remote_authority|deny_enforcement|approval_enforcement|RECEIPT_MODE|PLUGIN_VERSION|MIN_SUPPORTED_OPENCLAW_VERSION' \
   connector/constants.mjs
 ```
 
@@ -88,7 +115,8 @@ Expected:
 
 | Constant | Required value |
 | --- | --- |
-| `PLUGIN_VERSION` | `"0.5.0"` |
+| `PLUGIN_VERSION` | `"0.5.1"` |
+| `MIN_SUPPORTED_OPENCLAW_VERSION` | `"2026.6.5"` |
 | `REMOTE_AUTHORITY` | `false` |
 | `ENFORCEABLE_REMOTE_DECISIONS` | `[]` |
 | `remote_shadow` | `true` |
@@ -103,7 +131,8 @@ Machine-checkable version:
 node --input-type=module -e '
 import * as c from "./connector/constants.mjs";
 const ok =
-  c.PLUGIN_VERSION === "0.5.0" &&
+  c.PLUGIN_VERSION === "0.5.1" &&
+  c.MIN_SUPPORTED_OPENCLAW_VERSION === "2026.6.5" &&
   c.REMOTE_AUTHORITY === false &&
   c.ENFORCEABLE_REMOTE_DECISIONS.length === 0 &&
   c.DEFAULT_MODES.remote_shadow === true &&
@@ -123,7 +152,11 @@ node -e 'JSON.parse(require("fs").readFileSync("connector/openclaw.plugin.json",
 node -e 'const p=JSON.parse(require("fs").readFileSync("connector/package.json","utf8")); console.log("package metadata OK, version", p.version)'
 ```
 
-Version must be `0.5.0`.
+Version must be `0.5.1`. The version OpenClaw itself reports must agree:
+
+```sh
+openclaw --profile <profile> plugins info mcpherson-governance-connector --json
+```
 
 ## 7. Verify no remote decision can block
 
@@ -164,15 +197,51 @@ grep -n -A22 'OUTBOUND_FIELDS' connector/constants.mjs
 Confirm the list matches [PRIVACY.md](PRIVACY.md) and contains no field capable
 of carrying prompts, parameters, or content.
 
-## 10. Check runtime state
+## 10. Verify the compatibility gate reads the host, not a subprocess
 
 ```sh
-connector-ctl status
+grep -n 'runtime?.version\|readHostManifestVersion\|MIN_SUPPORTED_OPENCLAW_VERSION' \
+  connector/host.mjs
+grep -c 'child_process\|spawnSync\|execSync' connector/host.mjs   # must print 0
+```
+
+The gate reads the OpenClaw plugin SDK's `runtime.version`. When the host
+declares a version it could not itself resolve, the gate falls back to a
+bounded, read-only lookup of the host's own installed `package.json`. It
+executes no subprocess and opens no socket. A host below the minimum refuses
+activation and stays inert.
+
+## 11. Verify state resolves inside the active profile
+
+```sh
+grep -n -A12 'resolveOpenClawStateDir' connector/host.mjs
+```
+
+Confirm the order: the host's own `resolveStateDir`, then `OPENCLAW_STATE_DIR`,
+then the default profile root. No branch reads, copies, or migrates state from
+another profile.
+
+Check it against a live profile:
+
+```sh
+OPENCLAW_STATE_DIR="$HOME/.openclaw-<profile>" \
+  node connector/connector-ctl.mjs status
+```
+
+## 12. Check runtime state
+
+The connector's control CLI is not placed on your `PATH` by a ClawHub download
+plus an OpenClaw archive install. Invoke it by explicit path, with
+`OPENCLAW_STATE_DIR` naming the profile:
+
+```sh
+OPENCLAW_STATE_DIR="$HOME/.openclaw-<profile>" \
+  node connector/connector-ctl.mjs status
 ```
 
 Reports mode, enabled state, disable/kill-switch/lock state, and receipt counts.
 
-## 11. Run the bundled verification
+## 13. Run the bundled verification
 
 The package ships a self-contained check with no dependencies and no network
 calls:
@@ -183,17 +252,17 @@ npm test
 node scripts/verify-package.mjs
 ```
 
-It verifies the public connector checksum manifest; 27/28 sealed identity with
-only `connector/package.json` changed; 23/23 `.mjs` runtime identity;
-documentation truth; the embedded governance-core hashes; absence of the
-enforcement modules; plugin and package metadata; LICENSE and NOTICE presence;
-compatibility metadata consistency; the shadow-only invariants; rejection of
-authority configuration; that only the canary constructs a block; and that the
-bundled configuration example still loads.
+It verifies the public connector checksum manifest; the exact enumerated
+difference from the sealed v0.5.0 inventory; documentation truth; the embedded
+governance-core hashes; absence of the enforcement modules; plugin and package
+metadata; LICENSE and NOTICE presence; compatibility metadata consistency; the
+shadow-only invariants; rejection of authority configuration; that only the
+canary constructs a block; and that the bundled configuration example still
+loads.
 
 ## What this package does not let you re-run
 
-The 181-test connector suite runs against the internal build repository's test
+The upstream connector suite runs against the internal build repository's test
 tree, which is **not** shipped here (see [LIMITATIONS.md](LIMITATIONS.md) §10a).
 The checks above plus `npm test` are the supported local verification path for
 this release.

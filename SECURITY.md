@@ -1,6 +1,6 @@
 # Security Policy
 
-**Version: 0.5.0 — initial public release.**
+**Version: 0.5.1.**
 
 ## Reporting a vulnerability
 
@@ -20,7 +20,8 @@ receipt contents in a report.
 
 | Version | Supported |
 | --- | --- |
-| 0.5.0 | Yes |
+| 0.5.1 | Yes |
+| 0.5.0 | No |
 | < 0.5.0 | No |
 
 ## Security properties this release intends to hold
@@ -57,7 +58,7 @@ caller-supplied trusted callback executable via `sudo`
 understand this before using those commands:
 
 - It is **opt-in**. It runs only when you pass `--rotation-operator <path>` to
-  `connector-ctl rotate` or `recover`. Ordinary observation, install, enable,
+  the connector control CLI's `rotate` or `recover`. Ordinary observation, install, enable,
   disable, and uninstall never touch it.
 - The callback path is canonicalized and revalidated — including every parent
   directory — immediately before *each* execution, so a path swapped after CLI

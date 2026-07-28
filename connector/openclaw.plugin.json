@@ -1,7 +1,7 @@
 {
   "id": "mcpherson-governance-connector",
   "name": "McPherson Governance Connector",
-  "description": "Private v0.5.0 shadow-only metadata connector with local authority retained and truthful post-hook receipts.",
+  "description": "Shadow-only metadata connector with local authority retained and truthful post-hook receipts. It does not block or alter tool execution; remote decisions have no execution authority.",
   "activation": {
     "onStartup": true
   },

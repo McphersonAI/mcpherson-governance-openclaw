@@ -132,19 +132,24 @@ export class ObservationPipeline {
     return receipt;
   }
 
-  #writeImmediate(summary, remoteStatus, localDisposition) {
+  // `persist: false` produces the same handle shape without emitting a
+  // receipt. It exists for the operationally-disabled path, which must be
+  // inert rather than merely remote-silent.
+  #writeImmediate(summary, remoteStatus, localDisposition, { persist = true } = {}) {
     const request = fallbackIdentity(summary, this.#config);
-    const receipt = this.#writeReceipt(this.#makeReceipt(request, remoteStatus, localDisposition));
+    const built = this.#makeReceipt(request, remoteStatus, localDisposition);
+    const receipt = persist ? this.#writeReceipt(built) : built;
     return Object.freeze({
       request,
       receipt,
       immediate: true,
+      persisted: persist,
       promise: Promise.resolve(receipt),
     });
   }
 
-  recordLocal(summary, remoteStatus, localDisposition = "SKIPPED") {
-    return this.#writeImmediate(summary, remoteStatus, localDisposition);
+  recordLocal(summary, remoteStatus, localDisposition = "SKIPPED", options = undefined) {
+    return this.#writeImmediate(summary, remoteStatus, localDisposition, options);
   }
 
   #updatePeaks() {
@@ -222,7 +227,14 @@ export class ObservationPipeline {
     // Control precedence is rechecked here even when the caller is the hook.
     // This occurs before outbound identity construction or queue admission.
     const controls = this.#inspectControls();
-    if (controls.blocked) return this.recordLocal(summary, controls.remoteStatus || "NOT_ATTEMPTED", "SKIPPED");
+    if (controls.blocked) {
+      return this.recordLocal(
+        summary,
+        controls.remoteStatus || "NOT_ATTEMPTED",
+        "SKIPPED",
+        { persist: controls.priority !== "DISABLED" },
+      );
+    }
 
     // Capacity admission is synchronous. A saturated submission never invokes
     // the outbound builder, credential provider, client, or transport.
@@ -259,11 +271,13 @@ export class ObservationPipeline {
     }
     const controls = this.#inspectControls();
     if (controls.blocked) {
+      // An entry admitted before the operator disabled the connector settles
+      // silently; disabling is immediate and emits no receipt.
       this.#finishEntry(entry, this.#makeReceipt(
         entry.request,
         controls.remoteStatus || "NOT_ATTEMPTED",
         "SKIPPED",
-      ));
+      ), { persist: controls.priority !== "DISABLED" });
       return;
     }
     entry.permit = true;
@@ -314,14 +328,18 @@ export class ObservationPipeline {
         CONTROL_STATUSES.has(remoteStatus) ? "SKIPPED" : "NONE",
       );
     }
-    this.#finishEntry(entry, receipt);
+    // Re-checked at settle time: if the operator disabled the connector while
+    // this entry was in flight, it settles without emitting a receipt.
+    this.#finishEntry(entry, receipt, {
+      persist: this.#inspectControls().priority !== "DISABLED",
+    });
   }
 
-  #finishEntry(entry, receipt) {
+  #finishEntry(entry, receipt, { persist = true } = {}) {
     if (entry.cleaned) return receipt;
     if (entry.state === "QUEUED" || entry.state === "RUNNING") this.#transition(entry, "SETTLING");
     let finalReceipt = receipt;
-    try { finalReceipt = this.#writeReceipt(receipt); }
+    try { if (persist) finalReceipt = this.#writeReceipt(receipt); }
     finally { this.#cleanupEntry(entry, finalReceipt); }
     return finalReceipt;
   }

@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 
 const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
-const EVIDENCE_ROOT = "mcpherson-governance-openclaw-v0.5.0";
+const EVIDENCE_ROOT = "mcpherson-governance-openclaw-v0.5.1";
 const EVIDENCE_NAME = `${EVIDENCE_ROOT}.tar.gz`;
 const CLI_RELATIVE = "connector/connector-ctl.mjs";
 const FORBIDDEN_REPORT = /(?:AUDIT|CANDIDATE_REPORT|PUBLIC_SURFACE_REPAIR_REPORT)/i;

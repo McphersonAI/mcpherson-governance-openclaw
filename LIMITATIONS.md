@@ -1,6 +1,6 @@
 # Limitations
 
-**Connector v0.5.0.** Read this before relying on the connector for anything.
+**Connector v0.5.1.** Read this before relying on the connector for anything.
 
 ## 1. It is shadow-only. It does not enforce.
 
@@ -83,21 +83,123 @@ certification or guarantee.
 
 ## 9. Scope of testing
 
-The sealed reference suite contains 181 connector tests. The applicable 180
-tests pass against the public connector; its one internal-only packaging
-assertion is replaced by the public distribution tests. Coverage includes
-hostile-endpoint behavior, privacy-guard assertions over serialized wire bytes,
-scheduler saturation, and shutdown residue accounting.
+The complete v0.5.1 public release suite reports **250 passed, 0 failed, 0
+skipped**. Those 250 are not all upstream tests. They are three distinct
+groups:
+
+| Group | Count | Shipped in this package |
+| --- | ---: | --- |
+| Applicable upstream (sealed-reference) connector tests | 179 | No — see §10a |
+| Public distribution, runtime, and v0.5.1 regression tests | 51 | Yes |
+| Bundled package verification checks | 20 | Yes |
+| **Total** | **250** | — |
+
+Only the second and third groups ship in this package; together they are the
+71 checks an external auditor can reproduce without the internal build
+repository (`npm test`).
+
+The sealed reference suite contains **181** connector tests. **179** are
+applicable to v0.5.1 and pass against the public connector. **Two** are
+excluded, each by exact test name, because each encodes a v0.5.0 contract that
+v0.5.1 deliberately supersedes:
+
+1. `"package is private v0.5.0 and declares only inspected supported hooks at
+   runtime"` asserts `package.json.private === true` and version `0.5.0`. The
+   private flag is npm's refuse-to-publish flag: correct for the internal
+   installer, and deliberately invalid for a public package.
+2. `"disabled/kill/lock precedence beats exact canary with a zero-network
+   call-order trace"` asserts that an operationally **disabled** connector still
+   derives a tool summary and writes a `NOT_ATTEMPTED` attempt receipt. v0.5.1
+   deliberately changed that: disabled is now inert and writes no observation
+   receipt at all.
+
+Each is replaced by **stricter** public coverage, not dropped. The first is
+replaced by `tests/public-distribution.test.mjs`. The second is replaced by
+`tests/public-v051-regression.test.mjs`, which runs **all five** of the original
+test's scenarios — the three kill-switch/system-lock scenarios keep their
+original receipt expectations, and the two disabled scenarios assert the tighter
+v0.5.1 contract (no receipt at all, and the tool summary is never derived).
+
+**No broad exclusion pattern is used.** Exclusion is by exact, fully anchored
+test name — never by filename, prefix, or wildcard — so every other test in
+those two files continues to run, including the 20 safety tests in
+`operator-structure.test.mjs`. Running the upstream suite with the exclusions
+removed produces exactly two failures, and they are exactly these two tests.
+§10a records the full rationale.
+
+Coverage includes hostile-endpoint behavior, privacy-guard assertions over
+serialized wire bytes, scheduler saturation, shutdown residue accounting,
+named-profile state isolation, the OpenClaw compatibility gate, and
+disabled-mode inertness.
 
 Long-run production soak evidence and platforms other than those tested are not
 covered by the distributed package. Built and tested against OpenClaw
-`2026.6.5` (`5181e4f`), plugin API `>=2026.6.5`, on Node 24.
+`2026.6.5` (`5181e4f`), minimum supported OpenClaw `2026.6.5`, on Node 24. **No
+end-to-end install on a real OpenClaw `2026.6.5` or newer host has been
+performed for this release** — see §9a and §12.
+
+## 9a. OpenClaw version detection, and what UNKNOWN means
+
+**The minimum supported OpenClaw version is `2026.6.5`.** The connector enforces
+this itself at activation time rather than relying on package-manager
+compatibility metadata, which is not enforced by every installer — OpenClaw
+`2026.3.2` installed and loaded the v0.5.0 package without warning.
+
+The gate reads the version the host reports through the OpenClaw plugin SDK. If
+the host reports a version it could not itself resolve, the connector makes one
+bounded, read-only attempt to read the host's own installed `package.json`. It
+runs no subprocess and opens no socket. There are three outcomes:
+
+| What the host reports | Compatibility status | Connector activates |
+| --- | --- | --- |
+| A version `2026.6.5` or newer | `SUPPORTED` | Yes |
+| A version below `2026.6.5` | `UNSUPPORTED` | **No** |
+| A version that is supplied but not parseable, and no readable host manifest | `UNSUPPORTED` | **No** |
+| **No detectable version at all** — the host exposes no version field | `UNKNOWN` | **Yes** |
+
+The first three rows are the enforcement you should rely on. A known-unsupported
+host, and a host that explicitly supplies a version nobody can parse, both
+refuse activation: the connector logs a compatibility error and stays inert —
+no governance requests, no observation receipts, no shadow observation — while
+OpenClaw and your other plugins continue to run normally.
+
+**The fourth row is the honest carve-out, and you should read it carefully.**
+
+An environment that exposes **no** identifiable OpenClaw version is reported as
+`UNKNOWN` and is allowed to activate. This covers non-OpenClaw embedders and
+test harnesses that load the plugin module directly without implementing the
+SDK's version field. The gate refuses only what it can positively identify as
+unsupported; it does not invent a refusal for a host that never made a version
+claim at all.
+
+The consequence, stated plainly:
+
+- **`UNKNOWN` does not mean verified compatible.** It means no version was
+  detectable. Nothing about that environment has been checked against the
+  `2026.6.5` floor.
+- **An unsupported host that exposes no version is therefore not refused.** The
+  floor is enforced against hosts that declare a version, not against hosts that
+  are silent.
+- **`UNKNOWN` hosts are not officially supported**, are not covered by the
+  compatibility statement in §9, and are not a tested configuration.
+
+What still holds in every case, including `UNKNOWN`: the connector remains
+shadow-only and non-blocking. `remote_authority` stays `false`,
+`ENFORCEABLE_REMOTE_DECISIONS` stays empty, no remote decision acquires
+execution authority, and every hook returns without altering tool execution. An
+`UNKNOWN` host cannot obtain behavior the shadow-only contract does not already
+permit — the carve-out affects *whether observation starts*, not *what
+observation is allowed to do*.
+
+**For a supported deployment, run OpenClaw `2026.6.5` or newer** and confirm it
+with `openclaw --version` before installing. Do not rely on `UNKNOWN` as a
+substitute for a supported host.
 
 ## 10. Packaging metadata differs from the sealed internal build
 
-**One file** in the connector directory differs from the sealed internal
-inventory: `connector/package.json`. It was changed deliberately, to make the
-package publishable and its test command functional:
+Two kinds of difference from the sealed internal inventory exist. First, the
+public packaging changes made in v0.5.0 to make the package publishable and its
+test command functional:
 
 | Change | Reason |
 | --- | --- |
@@ -107,21 +209,27 @@ package publishable and its test command functional:
 | `scripts.test` now runs `../scripts/verify-package.mjs` | The old path pointed at a test tree not shipped in this package, so `npm test` was broken |
 | `bin` path `./connector-ctl.mjs` → `connector-ctl.mjs` | npm rejects and strips the `./` prefix |
 
-The sealed connector inventory contains 28 files. The public connector matches
-27/28 sealed files. The sole intentional difference is
-`connector/package.json`; all 23 `.mjs` runtime files remain byte-identical.
-That package-metadata difference enables public distribution and does not
-change runtime logic. See [CONNECTOR-FILES.sha256](CONNECTOR-FILES.sha256) for
+Second, the runtime changes made in v0.5.1 for the findings listed in
+[CHANGELOG.md](CHANGELOG.md): profile-scoped state, the OpenClaw compatibility
+activation gate, and inert disabled behavior.
+
+The sealed v0.5.0 connector inventory contains 28 files. Relative to it, v0.5.1
+adds `connector/host.mjs`, changes five runtime modules
+(`config.mjs`, `constants.mjs`, `hook.mjs`, `index.mjs`, `pipeline.mjs`),
+changes two metadata files (`package.json`, `openclaw.plugin.json`), updates
+`connector/README.md`, and carries the remaining 20 sealed files over
+byte-identical. The connector tree is 29 files, including 24 `.mjs` runtime
+modules. `npm test` verifies that this enumerated set is the
+*only* difference. See [CONNECTOR-FILES.sha256](CONNECTOR-FILES.sha256) for
 public-package integrity and
-[SEALED-CONNECTOR-FILES.sha256](SEALED-CONNECTOR-FILES.sha256) for the exact
-sealed-reference comparison.
+[SEALED-CONNECTOR-FILES.sha256](SEALED-CONNECTOR-FILES.sha256) for the sealed
+v0.5.0 reference.
 
-Two cosmetic items were **not** changed, to keep runtime source byte-frozen:
+The embedded governance core is unchanged by v0.5.1 and still verifies against
+its recorded `SOURCE.sha256`.
 
-- `connector/openclaw.plugin.json` and `connector/index.mjs` still describe the
-  plugin as "Private v0.5.0 …" in their description strings. This is stale
-  wording from the internal build, not a statement about licensing — the package
-  is Apache-2.0. Correcting it requires a new sealed connector build.
+One item is still **not** changed:
+
 - `connector/runtime/governance-core/policy-validate.mjs` defaults its expected
   policy-document owner to an internal build value and its expected environment
   to `production`. These are defaults of an **optional validation helper** —
@@ -129,29 +237,42 @@ Two cosmetic items were **not** changed, to keep runtime source byte-frozen:
 
 ## 10a. What `npm test` covers, and what it does not
 
-`npm test` runs the package's own tests — 27 tests across
-`tests/public-distribution.test.mjs` and `tests/public-runtime.test.mjs`, plus
-18 checks in `scripts/verify-package.mjs`. All of it is dependency-free and
-makes no network calls, and it works from an installed copy of the package.
+`npm test` runs the package's own tests — `tests/public-distribution.test.mjs`,
+`tests/public-runtime.test.mjs`, and `tests/public-v051-regression.test.mjs`,
+plus the checks in `scripts/verify-package.mjs`. All of it is dependency-free
+and makes no network calls, and it works from an installed copy of the package.
 
 It covers: the public packaging contract, checksum manifests, shadow-only
 invariants, metadata and manifest parsing, license presence, hook registration,
 non-blocking behaviour under hostile remote responses, metadata-only receipts,
-outbound-guard rejection, local control precedence, and
-configuration-example loading.
+outbound-guard rejection, local control precedence, configuration-example
+loading, and every v0.5.1 finding — named-profile state isolation, absence of
+legacy-state migration, the OpenClaw compatibility activation gate, and inert
+disabled behavior.
 
 It is **not** the full upstream connector suite. That suite lives in the
 internal build repository and is not shipped here. `npm run test:public` runs
-the complete 225-test public release suite, but it needs that tree — set
+the complete public release suite, but it needs that tree — set
 `MCPHERSON_UPSTREAM_REPO` to the internal build repository root. Without it the
 runner exits non-zero rather than reporting a partial pass.
 
-One upstream test is excluded from the public suite by exact name:
-`"package is private v0.5.0 and declares only inspected supported hooks at
-runtime"`, which asserts `package.json.private === true`. That is correct for
-the internal installer and deliberately wrong for a public package, so it is
-replaced by `tests/public-distribution.test.mjs`. The exclusion is by test name
-rather than by file so the other 20 safety tests in that file keep running.
+Two upstream tests are excluded from the public suite by exact name, and each
+is replaced by a public test asserting the contract that supersedes it:
+
+- `"package is private v0.5.0 and declares only inspected supported hooks at
+  runtime"` asserts `package.json.private === true` and version `0.5.0`. That is
+  correct for the internal installer and deliberately wrong for a public
+  package. Replaced by `tests/public-distribution.test.mjs`.
+- `"disabled/kill/lock precedence beats exact canary with a zero-network
+  call-order trace"` asserts that a *disabled* connector still writes a
+  `NOT_ATTEMPTED` attempt receipt. v0.5.1 deliberately changed that: disabled is
+  now inert and writes no observation receipt at all. Replaced by
+  `tests/public-v051-regression.test.mjs`, which runs all five of that test's
+  scenarios — the three kill-switch/system-lock scenarios unchanged, and the two
+  disabled scenarios under the stricter v0.5.1 contract.
+
+Both exclusions are by test name rather than by file, so every other safety test
+in those files keeps running.
 
 ## 11. License scope
 

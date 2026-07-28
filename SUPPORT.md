@@ -1,6 +1,6 @@
 # Support
 
-**Version: 0.5.0 — initial public release.**
+**Version: 0.5.1.**
 
 ## Where to get help
 
@@ -18,10 +18,12 @@ a small team.
 
 Most issues resolve faster with this information gathered first:
 
-1. **Connector status** — run `connector-ctl status`. It reports mode, enabled
+1. **Connector status** — run the connector control CLI's `status` command by
+   explicit path (see [LIFECYCLE.md](LIFECYCLE.md)). It reports mode, enabled
    state, disable/kill-switch/lock state, and receipt counts.
-2. **Versions** — connector version (`0.5.0`), your OpenClaw version, Node
-   version, and platform.
+2. **Versions** — connector version (`0.5.1`), your OpenClaw version (must be
+   `2026.6.5` or newer), Node version, and platform. Include the output of
+   `openclaw plugins info mcpherson-governance-connector --json`.
 3. **Verification** — confirm your install is intact using
    [VERIFY.md](VERIFY.md). A modified connector file is worth knowing about
    before anything else.

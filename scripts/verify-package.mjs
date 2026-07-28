@@ -17,6 +17,40 @@ import { join, dirname, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+const VERSION = "0.5.1";
+const MIN_OPENCLAW = "2026.6.5";
+const CONNECTOR_FILE_COUNT = 29;
+const CONNECTOR_RUNTIME_COUNT = 24;
+const SEALED_FILE_COUNT = 28;
+
+// The EXACT, enumerated difference between this release's connector tree and
+// the sealed v0.5.0 connector inventory. Every entry corresponds to a stated
+// v0.5.1 finding in CHANGELOG.md. Anything outside this set — an unexpected
+// added file, a changed runtime module, a removed sealed file — fails.
+const SEALED_DELTA = Object.freeze({
+  added: Object.freeze(["connector/host.mjs"]),
+  changedRuntime: Object.freeze([
+    "connector/config.mjs",
+    "connector/constants.mjs",
+    "connector/hook.mjs",
+    "connector/index.mjs",
+    "connector/pipeline.mjs",
+  ]),
+  changedMetadata: Object.freeze([
+    "connector/openclaw.plugin.json",
+    "connector/package.json",
+  ]),
+  changedDocs: Object.freeze([
+    "connector/README.md",
+  ]),
+});
+
+// CHANGELOG.md is a historical record: its superseded entries legitimately
+// state the file counts that were true for earlier releases. Current-state
+// documentation is checked against the current tree.
+const HISTORICAL_DOCS = new Set(["CHANGELOG.md"]);
+
 const results = [];
 const record = (ok, name, detail) => results.push({ ok, name, detail });
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
@@ -68,37 +102,59 @@ function walk(dir) {
 }
 
 // 1. connector byte manifest -------------------------------------------------
-await check("connector byte manifest verifies (28 files)", () => {
+await check(`connector byte manifest verifies (${CONNECTOR_FILE_COUNT} files)`, () => {
   const { ok, failed, total } = verifyManifest(join(root, "CONNECTOR-FILES.sha256"), root);
   assert(failed.length === 0, `${failed.length} problem(s): ${failed.slice(0, 5).join("; ")}`);
-  assert(total === 28, `expected 28 manifest entries, found ${total}`);
+  assert(total === CONNECTOR_FILE_COUNT,
+    `expected ${CONNECTOR_FILE_COUNT} manifest entries, found ${total}`);
   return `${ok}/${total} match the public checksum manifest`;
 });
 
 // 2. sealed provenance identity ----------------------------------------------
-await check("sealed connector identity is exactly 27/28 with 23/23 runtime modules", () => {
+await check("difference from the sealed v0.5.0 inventory is exactly the enumerated v0.5.1 set", () => {
   const sealed = readManifest(join(root, "SEALED-CONNECTOR-FILES.sha256"));
   const files = walk(join(root, "connector"))
     .map((path) => relative(root, path))
     .sort();
-  const sealedFiles = [...sealed.keys()].sort();
-  assert(sealed.size === 28, `expected 28 sealed entries, found ${sealed.size}`);
-  assert(files.length === 28, `expected 28 public connector files, found ${files.length}`);
-  assert(JSON.stringify(files) === JSON.stringify(sealedFiles),
-    "sealed and public connector inventories contain different filenames");
+  assert(sealed.size === SEALED_FILE_COUNT,
+    `expected ${SEALED_FILE_COUNT} sealed entries, found ${sealed.size}`);
+  assert(files.length === CONNECTOR_FILE_COUNT,
+    `expected ${CONNECTOR_FILE_COUNT} public connector files, found ${files.length}`);
 
-  const changed = files.filter((path) => sha256(join(root, path)) !== sealed.get(path));
-  assert(changed.length === 1,
-    `expected exactly one sealed difference, found ${changed.length}: ${changed.join(", ")}`);
-  assert(changed[0] === "connector/package.json",
-    `unexpected sealed difference: ${changed[0]}`);
+  const expectedAdded = [...SEALED_DELTA.added].sort();
+  const expectedChanged = [
+    ...SEALED_DELTA.changedRuntime,
+    ...SEALED_DELTA.changedMetadata,
+    ...SEALED_DELTA.changedDocs,
+  ].sort();
 
+  const added = files.filter((path) => !sealed.has(path)).sort();
+  assert(JSON.stringify(added) === JSON.stringify(expectedAdded),
+    `unexpected added file set: ${added.join(", ") || "(none)"}`);
+
+  const removed = [...sealed.keys()].filter((path) => !files.includes(path)).sort();
+  assert(removed.length === 0, `sealed file removed: ${removed.join(", ")}`);
+
+  const changed = files
+    .filter((path) => sealed.has(path) && sha256(join(root, path)) !== sealed.get(path))
+    .sort();
+  assert(JSON.stringify(changed) === JSON.stringify(expectedChanged),
+    `changed-file set differs from the declared v0.5.1 delta: ${changed.join(", ") || "(none)"}`);
+
+  const unchanged = SEALED_FILE_COUNT - expectedChanged.length;
   const runtime = files.filter((path) => path.endsWith(".mjs"));
-  const changedRuntime = runtime.filter((path) => changed.includes(path));
-  assert(runtime.length === 23, `expected 23 .mjs runtime files, found ${runtime.length}`);
-  assert(changedRuntime.length === 0,
-    `runtime .mjs file differs from sealed: ${changedRuntime.join(", ")}`);
-  return "27/28 match sealed; connector/package.json only; 23/23 .mjs match";
+  assert(runtime.length === CONNECTOR_RUNTIME_COUNT,
+    `expected ${CONNECTOR_RUNTIME_COUNT} .mjs runtime files, found ${runtime.length}`);
+
+  // the embedded governance core must not drift in a patch release
+  const coreChanged = changed.filter((path) => path.includes("runtime/governance-core"));
+  assert(coreChanged.length === 0,
+    `embedded governance core changed: ${coreChanged.join(", ")}`);
+
+  return `${unchanged}/${SEALED_FILE_COUNT} sealed files byte-identical; `
+    + `+${expectedAdded.length} added, ${SEALED_DELTA.changedRuntime.length} runtime, `
+    + `${SEALED_DELTA.changedMetadata.length} metadata, `
+    + `${SEALED_DELTA.changedDocs.length} doc file(s) changed; core unchanged`;
 });
 
 // 3. complete release checksum manifest --------------------------------------
@@ -130,9 +186,10 @@ await check("release checksum manifest covers the complete public package", () =
 // 4. documentation truth -----------------------------------------------------
 await check("documentation states the exact connector identity boundary", () => {
   const runtimeCount = walk(join(root, "connector")).filter((path) => path.endsWith(".mjs")).length;
-  const docs = walk(root).filter((path) =>
-    path.endsWith(".md")
-    && !relative(root, path).startsWith(".git/"));
+  const docs = walk(root).filter((path) => {
+    const rel = relative(root, path);
+    return path.endsWith(".md") && !rel.startsWith(".git/") && !HISTORICAL_DOCS.has(rel);
+  });
   const documentedCounts = [];
   for (const path of docs) {
     const contents = readFileSync(path, "utf8");
@@ -150,14 +207,25 @@ await check("documentation states the exact connector identity boundary", () => 
       wrong.map(({ path, count }) => `${path}=${count}`).join(", ")
     }`);
 
+  // Every internal §N cross-reference must resolve to a real heading, so a
+  // documentation repair cannot leave a dangling pointer behind.
+  const limitations = readFileSync(join(root, "LIMITATIONS.md"), "utf8");
+  const headings = new Set(
+    [...limitations.matchAll(/^##\s+(\d+[a-z]?)\./gm)].map((m) => m[1]),
+  );
+  const dangling = [...new Set(
+    [...limitations.matchAll(/§(\d+[a-z]?)/g)].map((m) => m[1]),
+  )].filter((ref) => !headings.has(ref));
+  assert(dangling.length === 0,
+    `LIMITATIONS.md has dangling cross-reference(s): ${dangling.map((r) => `§${r}`).join(", ")}`);
+
   const verify = readFileSync(join(root, "VERIFY.md"), "utf8").replace(/\s+/g, " ");
   for (const required of [
-    "Sealed connector inventory: **28 files**",
-    "Public connector identity: **27/28 sealed files**",
-    "Sole intentional difference: **`connector/package.json`**",
-    "Runtime modules (`.mjs`): **23**",
-    "Runtime-module identity: **23/23 byte-identical**",
-    "The package-metadata difference enables public distribution and does not change runtime logic.",
+    "Sealed v0.5.0 connector inventory: **28 files**",
+    "Files v0.5.1 adds: **1** (`connector/host.mjs`)",
+    "Sealed files carried over byte-identical: **20/28**",
+    `Runtime modules (\`.mjs\`): **${CONNECTOR_RUNTIME_COUNT}**`,
+    "verifies that the difference from that sealed inventory is **exactly** the enumerated set above",
   ]) {
     assert(verify.includes(required), `VERIFY.md is missing: ${required}`);
   }
@@ -184,10 +252,10 @@ await check("public lifecycle wording is durable and makes no certification over
 });
 
 // 6. no extra runtime file ---------------------------------------------------
-await check("connector tree contains exactly 28 files", () => {
+await check(`connector tree contains exactly ${CONNECTOR_FILE_COUNT} files`, () => {
   const files = walk(join(root, "connector"));
-  assert(files.length === 28, `found ${files.length} files in connector/`);
-  return "28 files, no extras";
+  assert(files.length === CONNECTOR_FILE_COUNT, `found ${files.length} files in connector/`);
+  return `${CONNECTOR_FILE_COUNT} files, no extras`;
 });
 
 // 7. embedded governance-core source hashes ----------------------------------
@@ -218,12 +286,12 @@ await check("plugin manifest parses (openclaw.plugin.json)", () => {
 // 10. package metadata parses ------------------------------------------------
 await check("package metadata parses and declares Apache-2.0", () => {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  assert(pkg.version === "0.5.0", `version is ${pkg.version}`);
+  assert(pkg.version === VERSION, `version is ${pkg.version}`);
   assert(pkg.license === "Apache-2.0", `license is ${pkg.license}`);
   assert(pkg.type === "module", `type is ${pkg.type}`);
   assert(pkg.private !== true, "package is marked private");
   const conn = JSON.parse(readFileSync(join(root, "connector", "package.json"), "utf8"));
-  assert(conn.version === "0.5.0", `connector version is ${conn.version}`);
+  assert(conn.version === VERSION, `connector version is ${conn.version}`);
   assert(conn.license === "Apache-2.0", `connector license is ${conn.license}`);
   assert(conn.private !== true, "connector package is marked private");
   return `${pkg.name}@${pkg.version}, license=${pkg.license}`;
@@ -273,6 +341,36 @@ await check("OpenClaw compatibility metadata matches the sealed connector", () =
   return `pluginApi=${pkg.openclaw.compat.pluginApi}, openclawVersion=${pkg.openclaw.build.openclawVersion}`;
 });
 
+// 13a. release-artifact evidence root tracks the package version -------------
+await check("release-artifact evidence root matches the package version", () => {
+  // The release builder packages the committed HEAD and names its archive from
+  // a hardcoded EVIDENCE_ROOT. If that drifts from the package version it would
+  // emit an archive named for one version containing another.
+  const builder = readFileSync(join(root, "scripts", "build-release-artifacts.mjs"), "utf8");
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const match = builder.match(/const EVIDENCE_ROOT = "([^"]+)";/);
+  assert(match, "EVIDENCE_ROOT is not declared in the expected form");
+  const expected = `mcpherson-governance-openclaw-v${pkg.version}`;
+  assert(match[1] === expected,
+    `EVIDENCE_ROOT is ${match[1]}, expected ${expected}`);
+  return `${match[1]} == v${pkg.version}`;
+});
+
+// 13b. the primary example does not defeat profile isolation -----------------
+await check("bundled example omits stateDir/receiptDir so profile isolation applies", () => {
+  const raw = JSON.parse(readFileSync(join(root, "examples", "connector-config.example.json"), "utf8"));
+  for (const key of ["stateDir", "receiptDir"]) {
+    assert(!Object.prototype.hasOwnProperty.call(raw, key),
+      `the bundled example hardcodes ${key}, which bypasses profile isolation`);
+  }
+  const readme = readFileSync(join(root, "examples", "README.md"), "utf8");
+  assert(readme.includes("deliberately omits `stateDir` and `receiptDir`"),
+    "examples/README.md does not explain the omission");
+  assert(readme.includes("Optional explicit overrides"),
+    "examples/README.md does not document the optional overrides separately");
+  return "no explicit state paths; overrides documented separately";
+});
+
 // 14. extension entry resolves -----------------------------------------------
 await check("declared OpenClaw extension entry resolves", () => {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
@@ -287,7 +385,7 @@ await check("declared OpenClaw extension entry resolves", () => {
 // 15. shadow-only invariants -------------------------------------------------
 await check("shadow-only invariants hold in shipped source", async () => {
   const c = await import(pathToFileURL(join(root, "connector", "constants.mjs")).href);
-  assert(c.PLUGIN_VERSION === "0.5.0", `version ${c.PLUGIN_VERSION}`);
+  assert(c.PLUGIN_VERSION === VERSION, `version ${c.PLUGIN_VERSION}`);
   assert(c.REMOTE_AUTHORITY === false, "REMOTE_AUTHORITY is not false");
   assert(c.ENFORCEABLE_REMOTE_DECISIONS.length === 0, "enforceable remote decisions is not empty");
   assert(c.DEFAULT_MODES.remote_shadow === true, "remote_shadow is not true");
@@ -295,7 +393,9 @@ await check("shadow-only invariants hold in shipped source", async () => {
   assert(c.DEFAULT_MODES.deny_enforcement === false, "deny_enforcement is not false");
   assert(c.DEFAULT_MODES.approval_enforcement === false, "approval_enforcement is not false");
   assert(c.RECEIPT_MODE === "POST_HOOK", "receipt mode is not POST_HOOK");
-  return "8/8 invariants";
+  assert(c.MIN_SUPPORTED_OPENCLAW_VERSION === MIN_OPENCLAW,
+    `minimum supported OpenClaw is ${c.MIN_SUPPORTED_OPENCLAW_VERSION}`);
+  return "9/9 invariants";
 });
 
 // 16. configuration cannot raise authority -----------------------------------
@@ -358,6 +458,23 @@ await check("bundled configuration example is valid", async () => {
 // ---------------------------------------------------------------------------
 const pass = results.filter((r) => r.ok).length;
 const fail = results.length - pass;
+const actualVerificationCount = results.length;
+let documentedVerificationCount = null;
+let documentationCountError = null;
+
+try {
+  const limitations = readFileSync(join(root, "LIMITATIONS.md"), "utf8").replace(/\s+/g, " ");
+  const match = limitations.match(/Bundled package verification checks \| (\d+) \|/);
+  assert(match, "LIMITATIONS.md is missing the bundled package verification count");
+  documentedVerificationCount = Number(match[1]);
+  assert(Number.isSafeInteger(documentedVerificationCount),
+    "LIMITATIONS.md verification count is not an integer");
+  if (documentedVerificationCount !== actualVerificationCount) {
+    throw new Error("the documented verification-check count does not match the executed checks");
+  }
+} catch (error) {
+  documentationCountError = error;
+}
 
 console.log("\nMcPherson Governance Connector - package verification\n");
 for (const r of results) {
@@ -365,4 +482,10 @@ for (const r of results) {
   if (r.detail) console.log(`        ${r.detail}`);
 }
 console.log(`\n  ${pass} passed, ${fail} failed\n`);
-process.exit(fail ? 1 : 0);
+if (documentationCountError) {
+  console.error("DOCUMENTATION TRUTH FAILURE: verification accounting in LIMITATIONS.md is stale.");
+  console.error(`  documented verification count: ${documentedVerificationCount ?? "unparseable"}`);
+  console.error(`  actual executed verification count: ${actualVerificationCount}`);
+  console.error("  Update LIMITATIONS.md deliberately to match the executed verification checks.\n");
+}
+process.exit(fail || documentationCountError ? 1 : 0);

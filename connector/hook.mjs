@@ -98,6 +98,12 @@ export class ConnectorHookController {
     // on this path.
     const controls = this.#controlInspector();
     if (controls.blocked) {
+      // Operationally disabled is INERT: the handler returns here without
+      // deriving a summary, writing an ordinary observation receipt, or
+      // retaining correlation state. Kill switch and system lock keep their
+      // documented behaviour of stopping remote contact while still recording
+      // a local receipt.
+      if (controls.priority === "DISABLED") return undefined;
       const summary = this.#summary(event, ctx);
       const handle = this.#pipeline.recordLocal(summary, controls.remoteStatus || "NOT_ATTEMPTED", "SKIPPED");
       this.#remember(handle);
@@ -122,6 +128,10 @@ export class ConnectorHookController {
 
   async afterToolCall(event, ctx) {
     if (this.#stopped || this.#receiptMode !== "POST_HOOK") return undefined;
+    // Disabling takes effect immediately, including for a call whose pre-hook
+    // ran while the connector was still enabled. No completion receipt is
+    // written while operationally disabled.
+    if (this.#controlInspector().priority === "DISABLED") return undefined;
     const summary = this.#summary(event, ctx);
     const ref = correlationRef(summary.rawCorrelation || "");
     const queue = ref ? this.#pending.get(ref) : null;

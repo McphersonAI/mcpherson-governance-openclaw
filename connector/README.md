@@ -1,10 +1,12 @@
-# McPherson Governance Connector v0.5.0
+# McPherson Governance Connector v0.5.1
 
-This private OpenClaw connector is structurally shadow-only. Remotely sourced data is observed and receipted but cannot block, pause, approve, modify, or duplicate an ordinary tool call. The only blocking path is the exact-match, operator-enabled local harmless canary; it does not read or depend on remote data.
+This OpenClaw connector is structurally shadow-only. Remotely sourced data is observed and receipted but cannot block, pause, approve, modify, or duplicate an ordinary tool call. The only blocking path is the exact-match, operator-enabled local harmless canary; it does not read or depend on remote data.
 
 The exact integration target, OpenClaw `2026.6.5 (5181e4f)`, publicly documents and types `before_tool_call`, `after_tool_call`, `gateway_start`, and `gateway_stop`. The connector therefore uses `POST_HOOK` mode. Every pre-call emits an `attempt_receipt` with `UNKNOWN` or `NOT_OBSERVED`; a `completion_receipt` is emitted only after a directly observed `after_tool_call`. HTTP timeouts, queue drops, shutdown, missing events, and elapsed time never become tool outcomes.
 
-Operator controls are available through `connector-ctl`:
+The connector requires OpenClaw `2026.6.5` or newer and enforces that minimum at runtime from the host's own reported version; on an older host it refuses activation, logs a compatibility error, and stays inert without sending a governance request, writing a receipt, or blocking anything. All connector state, receipts, controls, and the credential resolve inside the active OpenClaw profile (`OPENCLAW_STATE_DIR`, else the host's resolved state directory, else `~/.openclaw`); no state is shared between profiles and none is migrated. While operationally disabled the connector is inert for observation: both tool-observation hook handlers return immediately and no governance request, shadow observation, or ordinary observation receipt is produced. Gateway lifecycle records, which note only that the connector was loaded, are unaffected.
+
+Operator controls are available through the `connector-ctl.mjs` control CLI. A ClawHub download plus an OpenClaw archive install does not place it on `PATH`; invoke it as `node <install-dir>/connector/connector-ctl.mjs <command>` with `OPENCLAW_STATE_DIR` naming the profile. Commands:
 
 - `status`
 - `enable` (clear the durable disabled control after OpenClaw config has explicitly set `enabled:true`)

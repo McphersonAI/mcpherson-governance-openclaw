@@ -1,6 +1,6 @@
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { ACTION_CLASSES } from "./runtime/governance-core/index.mjs";
+import { connectorStateRoot, resolveOpenClawStateDir } from "./host.mjs";
 import {
   ABSOLUTE_OBSERVATION_CAP_MS,
   DEFAULT_CONNECT_TIMEOUT_MS,
@@ -85,7 +85,16 @@ export function loadConnectorConfig(input = {}, pathOverrides = {}) {
     if (!ALLOWED_KEYS.has(key)) fail("CONFIG_UNKNOWN_KEY");
   }
 
-  const stateDir = resolve(pathOverrides.stateDir || input.stateDir || join(homedir(), ".openclaw", "mcpherson-governance-connector"));
+  // Precedence: explicit override > explicit configuration > the connector
+  // state root inside the ACTIVE OpenClaw profile. The default never resolves
+  // to another profile's root, and no state is read or migrated from one.
+  const stateDir = resolve(
+    pathOverrides.stateDir
+    || input.stateDir
+    || connectorStateRoot(
+      pathOverrides.openclawStateDir || resolveOpenClawStateDir(),
+    ),
+  );
   const receiptDir = resolve(pathOverrides.receiptDir || input.receiptDir || join(stateDir, "receipts"));
   const apiUrl = input.apiUrl || "https://127.0.0.1:8443";
   let parsed;

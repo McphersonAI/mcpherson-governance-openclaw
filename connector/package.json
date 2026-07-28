@@ -1,6 +1,6 @@
 {
   "name": "mcpherson-governance-connector",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Shadow-only OpenClaw connector for McPherson Governance. Observes configured tool activity and records local receipts; does not block or alter tool execution.",
   "type": "module",
   "main": "plugin.mjs",

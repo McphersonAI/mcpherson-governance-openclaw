@@ -1,6 +1,6 @@
 {
   "name": "@mcphersonai/mcpherson-governance-openclaw",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Shadow-only OpenClaw plugin that observes configured tool activity, sends metadata-minimized governance requests, and records local attempt and completion receipts. It does not block or alter tool execution.",
   "type": "module",
   "license": "Apache-2.0",
@@ -55,7 +55,7 @@
     "VERIFY.md"
   ],
   "scripts": {
-    "test": "node --test tests/public-distribution.test.mjs tests/public-runtime.test.mjs && node scripts/verify-package.mjs",
+    "test": "node scripts/run-public-tests.mjs --package-only",
     "test:public": "node scripts/run-public-tests.mjs",
     "verify": "node scripts/verify-package.mjs"
   },

@@ -8,6 +8,11 @@ import {
   REMOTE_AUTHORITY,
 } from "./constants.mjs";
 import { loadConnectorConfig } from "./config.mjs";
+import {
+  evaluateHostCompatibility,
+  resolveHostOpenClawVersion,
+  resolveOpenClawStateDir,
+} from "./host.mjs";
 import { ensureSecureDir } from "./secure-files.mjs";
 import { HardenedReceiptWriter, makeLifecycleReceipt } from "./receipts.mjs";
 import { GovernanceApiClient } from "./client.mjs";
@@ -22,14 +27,86 @@ const CAPABILITY_PROFILES = Object.freeze({
   ATTEMPT_ONLY: Object.freeze({ receiptMode: "ATTEMPT_ONLY", postHookName: null }),
 });
 
+// Refusal path for an OpenClaw host below the supported minimum.
+//
+// OpenClaw registers plugin hook entrypoints when it loads the plugin, so the
+// same surface is registered here to leave the host's plugin contract intact.
+// Every handler returns immediately. No configuration is loaded, no state or
+// receipt directory is created, and no client, pipeline, or receipt writer is
+// constructed, so no governance request and no receipt of any kind can occur.
+function registerIncompatibleConnector(api, compatibility, receiptMode) {
+  api.logger?.error?.(compatibility.message);
+  const inert = () => undefined;
+  api.registerTool(makeConnectionTool(), { name: "mcpherson_connection_test" });
+  api.registerTool(makeCanaryTool(), { name: "mcpherson_governance_canary" });
+  const cleanup = [];
+  for (const hookName of ["before_tool_call", "after_tool_call", "gateway_start", "gateway_stop"]) {
+    const unregister = api.on(hookName, inert);
+    if (typeof unregister === "function") cleanup.push(unregister);
+  }
+  const status = () => Object.freeze({
+    pluginId: PLUGIN_ID,
+    pluginVersion: PLUGIN_VERSION,
+    activated: false,
+    enabled: false,
+    mode: "remote_shadow",
+    remoteAuthority: false,
+    receiptMode,
+    compatibility,
+    pairing: null,
+    pipeline: null,
+    receipts: null,
+  });
+  return Object.freeze({
+    config: null,
+    controller: null,
+    pipeline: null,
+    client: null,
+    receiptWriter: null,
+    compatibility,
+    activated: false,
+    status,
+    terminalStatus: () => Object.freeze({
+      terminal: true,
+      reason: "openclaw_incompatible",
+      registeredHooks: cleanup.length,
+      pipeline: null,
+      client: null,
+      controller: null,
+      receipts: null,
+    }),
+    disable: async () => status(),
+    unpair: async () => { throw Object.assign(new Error("OPENCLAW_VERSION_UNSUPPORTED"), { code: "OPENCLAW_VERSION_UNSUPPORTED" }); },
+    uninstall: async (operatorOptions = {}) => uninstallConnector(operatorOptions),
+    shutdown: async () => {
+      for (const unregister of cleanup.splice(0)) unregister();
+      return status();
+    },
+  });
+}
+
 function buildGovernanceConnector(options, capabilityProfile) {
   const { receiptMode, postHookName } = capabilityProfile;
   return {
     id: PLUGIN_ID,
     name: PLUGIN_NAME,
-    description: "Private v0.5.0 metadata-only shadow connector with local authority retained and truthful post-hook receipts.",
+    version: PLUGIN_VERSION,
+    description: "Shadow-only metadata-minimized OpenClaw governance connector. It observes configured tool activity and records local attempt and completion receipts; it does not block or alter tool execution, and remote decisions carry no execution authority.",
     register(api) {
-      const config = loadConnectorConfig(options.config || api.pluginConfig || {}, options.pathOverrides || {});
+      // Runtime compatibility is decided before anything else, from the host's
+      // own reported version. Package-manager compatibility metadata is not
+      // relied upon: it is not enforced by every installer.
+      const compatibility = evaluateHostCompatibility(resolveHostOpenClawVersion(api));
+      if (!compatibility.activate) {
+        return registerIncompatibleConnector(api, compatibility, receiptMode);
+      }
+
+      const config = loadConnectorConfig(options.config || api.pluginConfig || {}, {
+        // Explicit overrides win; otherwise the connector's default state root
+        // resolves inside the ACTIVE OpenClaw profile.
+        openclawStateDir: resolveOpenClawStateDir({ runtime: api?.runtime }),
+        ...(options.pathOverrides || {}),
+      });
       ensureSecureDir(config.stateDir);
       ensureSecureDir(config.receiptDir);
       const receiptWriter = options.receiptWriter || new HardenedReceiptWriter(config.receiptDir, api.logger);
@@ -101,6 +178,9 @@ function buildGovernanceConnector(options, capabilityProfile) {
 
       const hookRegistrations = [
         ["before_tool_call", (event, ctx) => controller.beforeToolCall(event, ctx)],
+        // Gateway lifecycle records that the connector was loaded. They are
+        // not ordinary observation receipts and are unaffected by the
+        // operational disable, which governs tool observation.
         ["gateway_start", async () => {
           receiptWriter.write(makeLifecycleReceipt({ event: "gateway_start", receiptMode }));
         }],
@@ -126,8 +206,13 @@ function buildGovernanceConnector(options, capabilityProfile) {
         pipeline,
         client,
         receiptWriter,
+        compatibility,
+        activated: true,
         status: () => Object.freeze({
           ...connectorStatus(config, pipeline.status(), receiptWriter.status?.() || null, receiptMode),
+          pluginVersion: PLUGIN_VERSION,
+          activated: true,
+          compatibility,
           lifecycle: Object.freeze({
             terminal: terminalPromise !== null,
             reason: terminalReason,
@@ -189,6 +274,7 @@ export {
   REMOTE_AUTHORITY,
 };
 export * from "./allowlist.mjs";
+export * from "./host.mjs";
 export * from "./client.mjs";
 export * from "./config.mjs";
 export * from "./constants.mjs";

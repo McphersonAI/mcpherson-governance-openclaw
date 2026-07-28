@@ -17,10 +17,12 @@
 //     `"private": true` is npm's refuse-to-publish flag; leaving it in place
 //     would block distribution and misrepresent the package.
 //
-// This is a PACKAGING-CONTRACT DIFFERENCE, NOT A RUNTIME CHANGE. The sealed
-// connector inventory contains 28 files; the public connector matches 27/28.
-// All 23 `.mjs` runtime files remain byte-identical. Only
-// `connector/package.json` metadata differs.
+// This is a PACKAGING-CONTRACT DIFFERENCE, NOT A RUNTIME CHANGE. It was true
+// at v0.5.0 and remains true at v0.5.1.
+//
+// The connector's difference from the sealed v0.5.0 inventory is enumerated and
+// enforced in scripts/verify-package.mjs; see VERIFY.md and CHANGELOG.md for
+// what v0.5.1 changed and why.
 //
 // This file therefore does NOT copy the internal assertion and mark it
 // skipped. It asserts the *public* contract that replaces it, and it re-checks
@@ -53,8 +55,11 @@ const SEALED = Object.freeze({
   openclawVersion: "2026.6.5",
   openclawCommit: "5181e4f",
   receiptMode: "POST_HOOK",
-  version: "0.5.0",
 });
+
+// The current release version. The sealed compatibility values above are
+// carried over unchanged; only the package version advances.
+const VERSION = "0.5.1";
 
 const PUBLIC_NAME = "@mcphersonai/mcpherson-governance-openclaw";
 const REPO_URL = "https://github.com/McphersonAI/mcpherson-governance-openclaw";
@@ -94,10 +99,12 @@ test("public package name is the approved ClawHub scope", () => {
   assert.match(rootPkg.name, /^@mcphersonai\/[a-z0-9-]+$/);
 });
 
-test("version is 0.5.0 in every manifest", () => {
-  assert.equal(rootPkg.version, SEALED.version);
-  assert.equal(connectorPkg.version, SEALED.version);
-  assert.equal(rootManifest.version, SEALED.version);
+test("version is 0.5.1 in every manifest and in the runtime constant", async () => {
+  assert.equal(rootPkg.version, VERSION);
+  assert.equal(connectorPkg.version, VERSION);
+  assert.equal(rootManifest.version, VERSION);
+  const c = await import(pathToFileURL(join(ROOT, "connector/constants.mjs")).href);
+  assert.equal(c.PLUGIN_VERSION, VERSION);
 });
 
 test("license is Apache-2.0 and license files are present", () => {
@@ -245,6 +252,14 @@ test("OpenClaw build metadata remains grounded in the sealed candidate", () => {
 
 // ── Shadow-only runtime contract (still-applicable internal coverage) ───────
 
+test("the runtime compatibility floor matches the declared compatibility metadata", async () => {
+  const c = await import(pathToFileURL(join(ROOT, "connector/constants.mjs")).href);
+  assert.equal(c.MIN_SUPPORTED_OPENCLAW_VERSION, SEALED.openclawVersion);
+  // the enforced floor and the declared range must never drift apart
+  assert.equal(rootPkg.openclaw.compat.pluginApi, `>=${c.MIN_SUPPORTED_OPENCLAW_VERSION}`);
+  assert.equal(connectorPkg.openclaw.compat.pluginApi, `>=${c.MIN_SUPPORTED_OPENCLAW_VERSION}`);
+});
+
 test("receipt mode remains POST_HOOK", async () => {
   const c = await import(pathToFileURL(join(ROOT, "connector/constants.mjs")).href);
   assert.equal(c.RECEIPT_MODE, SEALED.receiptMode);
@@ -259,7 +274,7 @@ test("remote authority remains false", async () => {
   assert.equal(c.DEFAULT_MODES.remote_shadow, true);
   assert.equal(c.DEFAULT_MODES.deny_enforcement, false);
   assert.equal(c.DEFAULT_MODES.approval_enforcement, false);
-  assert.equal(c.PLUGIN_VERSION, SEALED.version);
+  assert.equal(c.PLUGIN_VERSION, VERSION);
 });
 
 test("enforceable remote decisions remain empty", async () => {

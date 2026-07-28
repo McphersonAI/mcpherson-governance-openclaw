@@ -62,7 +62,7 @@ test("plugin and package manifests parse", () => {
     ["mcpherson_connection_test", "mcpherson_governance_canary"]);
 
   const pkg = JSON.parse(readFileSync(join(ROOT, "connector/package.json"), "utf8"));
-  assert.equal(pkg.version, "0.5.0");
+  assert.equal(pkg.version, "0.5.1");
   assert.equal(pkg.type, "module");
 
   const rootPkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));

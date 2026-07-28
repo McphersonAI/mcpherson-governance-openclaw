@@ -1,6 +1,6 @@
 # McPherson Governance Connector for OpenClaw
 
-**Version: 0.5.0 — initial public release.**
+**Version: 0.5.1 — public install-contract patch release.**
 
 A small OpenClaw plugin that observes configured tool activity, sends
 metadata-minimized governance requests, and records local receipts of what was
@@ -74,7 +74,7 @@ connector's own diagnostic tool `mcpherson_governance_canary`, and only when
 1. the tool name is exactly `mcpherson_governance_canary`;
 2. the agent ID matches the configured agent;
 3. the operator has explicitly activated the local canary control file
-   (`connector-ctl canary --on`); and
+   (the connector control CLI's `canary --on`); and
 4. the call carries the exact literal canary token.
 
 It never inspects or blocks any other tool, and it never reads remote data. It
@@ -107,18 +107,75 @@ I/O.
 
 ## Requirements
 
-- OpenClaw with plugin API `>=2026.6.5`. Built and tested against OpenClaw
-  `2026.6.5` (commit `5181e4f`).
+- **OpenClaw `2026.6.5` or newer.** Built and tested against OpenClaw
+  `2026.6.5` (commit `5181e4f`). This minimum is **enforced by the connector at
+  runtime**, not merely declared in package metadata: on a host that reports an
+  older version — or a version that cannot be parsed — the connector refuses to
+  activate, logs a compatibility error, and stays inert. It sends no governance
+  requests, writes no receipts, and leaves OpenClaw and your other plugins
+  running normally.
+
+  One carve-out, stated plainly: an environment that exposes **no** detectable
+  OpenClaw version at all (a non-OpenClaw embedder, or a harness that loads the
+  module directly) is reported as compatibility status `UNKNOWN` and is allowed
+  to activate. `UNKNOWN` does not mean verified compatible, and such hosts are
+  not officially supported. Shadow-only and non-blocking guarantees still apply
+  in every case. See [LIMITATIONS.md](LIMITATIONS.md) §9a.
+- ClawHub CLI for package download and verification (tested with `0.23.1`).
 - Node.js with ES module support (developed and tested on Node 24).
 - Outbound HTTPS access to the governance endpoint you configure — only when
   `enabled` is `true`.
 
 ## Installation
 
-See **[INSTALL.md](INSTALL.md)** for full steps. In short: verify the package
-checksum, install through OpenClaw's supported plugin mechanism, place a
-configuration file with `enabled: false`, confirm status, then enable
-deliberately.
+Full steps, with the exact commands, are in **[INSTALL.md](INSTALL.md)**. The
+short version:
+
+```sh
+PROFILE=my-profile
+
+clawhub package download @mcphersonai/mcpherson-governance-openclaw \
+  --version 0.5.1 --output ./download
+
+clawhub package verify \
+  ./download/mcphersonai-mcpherson-governance-openclaw-0.5.1.tgz \
+  --package @mcphersonai/mcpherson-governance-openclaw --version 0.5.1
+
+openclaw --profile "$PROFILE" plugins install \
+  ./download/mcphersonai-mcpherson-governance-openclaw-0.5.1.tgz
+
+openclaw --profile "$PROFILE" plugins info mcpherson-governance-connector --json
+```
+
+Then configure with `enabled: false`, confirm status, and enable deliberately.
+ClawHub's package workflow exposes `inspect`, `download`, and `verify`;
+installation is performed by OpenClaw, and the whole verified `.tgz` is what you
+install.
+
+### Enabled at the host is not enabled at the connector
+
+OpenClaw records the plugin entry as `enabled: true` and registers its hook
+entrypoints as soon as it loads the plugin. That is expected. The connector's
+own configuration still defaults to `enabled: false`, and while it is
+operationally disabled both tool-observation hook handlers return immediately,
+no governance request is sent, no ordinary observation receipt is written, and
+no shadow observation is active. (The gateway lifecycle hooks still record that
+the connector was loaded; that record is not an observation receipt.) Explicit enablement starts shadow observation; disabling
+returns it to inert behavior immediately.
+
+## Profiles and state isolation
+
+The connector keeps all of its state inside the **active OpenClaw profile**:
+
+```
+~/.openclaw-<profile>/extensions/mcpherson-governance-connector/   installed files
+~/.openclaw-<profile>/mcpherson-governance-connector/              state, controls, credential
+~/.openclaw-<profile>/mcpherson-governance-connector/receipts/     receipts
+```
+
+A named profile never writes connector state into the default profile, two
+profiles never share connector state, and nothing is ever migrated between
+profiles. With no `--profile`, the same paths apply under `~/.openclaw`.
 
 ## Configuration
 
@@ -136,12 +193,12 @@ the original tool**.
 
 ## Verification
 
-See **[VERIFY.md](VERIFY.md)**. It covers verifying the release archive
-checksum, verifying all 28 connector files against
+See **[VERIFY.md](VERIFY.md)**. It covers verifying the ClawHub artifact,
+verifying every connector file against
 [CONNECTOR-FILES.sha256](CONNECTOR-FILES.sha256), and confirming the shadow-only
 constants in the installed source. It also distinguishes the public package's
-self-checksum manifest from its sealed provenance boundary: 27 of 28 connector
-files match the sealed inventory, and all 23 `.mjs` runtime files match.
+self-checksum manifest from its sealed v0.5.0 provenance boundary and the
+enumerated set of files this patch release changes.
 
 ## Disable, uninstall, rollback
 
@@ -194,9 +251,9 @@ deployment tooling. Those are separate works and are not distributed here.
 @mcphersonai/mcpherson-governance-openclaw
 ```
 
-Install through OpenClaw's supported plugin mechanism — see
-[INSTALL.md](INSTALL.md). Verify the package before installing
-([VERIFY.md](VERIFY.md)); the bundled check runs with `npm test`.
+Download and verify it with the ClawHub CLI, then install the verified `.tgz`
+with `openclaw plugins install` — see [INSTALL.md](INSTALL.md) and
+[VERIFY.md](VERIFY.md). The bundled check runs with `npm test`.
 
 ## Links
 

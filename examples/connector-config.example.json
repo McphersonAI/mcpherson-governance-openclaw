@@ -12,8 +12,6 @@
   "maxInFlight": 4,
   "maxQueue": 16,
 
-  "stateDir": "/REPLACE-WITH-ABSOLUTE-PATH/.openclaw/mcpherson-governance-connector",
-  "receiptDir": "/REPLACE-WITH-ABSOLUTE-PATH/.openclaw/mcpherson-governance-connector/receipts",
   "caFile": "/REPLACE-WITH-ABSOLUTE-PATH/your-governance-ca.crt",
 
   "toolMetadata": {
