@@ -1,111 +1,97 @@
-# Security Policy
-
-**Version: 0.5.1.**
+# Security — McPherson Governance Connector v0.6.0
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities **privately** to:
+To report a suspected vulnerability, email **admin@mcphersonai.com** privately.
+Please do not open a public issue for suspected security vulnerabilities.
 
-**admin@mcphersonai.com**
+Please include a description, the affected version, and reproduction steps.
 
-Do not open a public issue for a security report, and do not include exploit
-details in a public channel.
+## Security posture
 
-A report is most useful if it includes: affected version, environment (OpenClaw
-and Node versions, platform), reproduction steps, observed versus expected
-behavior, and impact. Please do not include credentials, real customer data, or
-receipt contents in a report.
+### Structural, not configurable
 
-## Supported versions
+The safety ceilings are source-owned constants, not settings:
 
-| Version | Supported |
-| --- | --- |
-| 0.5.1 | Yes |
-| 0.5.0 | No |
-| < 0.5.0 | No |
+- `REMOTE_AUTHORITY = false`
+- `ENFORCEABLE_REMOTE_DECISIONS = []` (frozen, empty)
+- `AUTHORITY = NONE`, `ENFORCEMENT = OFF`
 
-## Security properties this release intends to hold
+They are deliberately not derived from configuration, environment variables,
+policy documents, or API data. The configuration schema is
+`additionalProperties: false`, and a set of authority-shaped configuration keys
+is explicitly refused, so configuration cannot introduce authority.
 
-These are the properties worth reporting a break in:
+There is **no policy evaluator and no gate** in this package.
 
-- **No remote execution authority.** No governance response can block, approve,
-  delay, or modify a tool call. `REMOTE_AUTHORITY` is `false` and
-  `ENFORCEABLE_REMOTE_DECISIONS` is empty, both compiled into source.
-- **Authority ceilings are not configurable.** Configuration containing
-  `remote_authority`, `deny_enforcement`, `approval_enforcement`, or another
-  authority key is rejected at load.
-- **Closed outbound allowlist.** Only allowlisted metadata fields can be
-  serialized outbound; the guard runs over the serialized bytes. Prompts,
-  parameters, and content have no path to the network.
-- **TLS verification is never disabled**, anywhere in the connector.
-- **Local controls always win.** Disable, kill switch, and system lock are
-  evaluated before credentials are read and before any network I/O.
-- **Credential handling.** The deployment credential is read only from a `0600`
-  file inside a `0700` state directory. It is never accepted from an argument,
-  environment variable, or ordinary plugin configuration, and never logged.
-- **Receipt integrity.** Receipts are append-only, owner-only, and validated
-  against a schema before write.
-- **Bounded resource ownership.** Shutdown does not report clean while any
-  connector-owned socket, timer, request, or promise remains outstanding.
+### No third-party dependencies
 
-A demonstration that any of the above does not hold is a security issue.
+The package has zero runtime, development, peer, or bundled dependencies. Every
+import resolves to a sibling module in this package or to a Node.js built-in
+(`node:crypto`, `node:fs`, `node:https`, `node:path`, `node:os`, `node:url`,
+`node:util`, `node:child_process`). This removes the third-party supply-chain
+surface entirely.
 
-## Privileged-execution surface you should know about
+### Bounded outbound behavior
 
-Credential **rotation** and **recovery** can optionally invoke a
-caller-supplied trusted callback executable via `sudo`
-(`makeCommandRotationOperator` in `connector/operator.mjs`). You should
-understand this before using those commands:
+- Outbound requests occur only when `enabled: true` **and** the tool has
+  complete configured metadata.
+- `apiUrl` must match `^https://`.
+- The outbound field set is a fixed allowlist (see [PRIVACY.md](./PRIVACY.md)).
+- Requests are bounded: max outbound bytes, max response bytes, max in-flight,
+  max queue, connect timeout, observation budget, bounded retries, and a
+  circuit breaker.
+- An **unconfigured tool makes no HTTPS request at all** and is recorded
+  `remote_status: NOT_ATTEMPTED`, `local_disposition: SKIPPED`. Fallback
+  metadata is never manufactured and never reaches the wire.
 
-- It is **opt-in**. It runs only when you pass `--rotation-operator <path>` to
-  the connector control CLI's `rotate` or `recover`. Ordinary observation, install, enable,
-  disable, and uninstall never touch it.
-- The callback path is canonicalized and revalidated — including every parent
-  directory — immediately before *each* execution, so a path swapped after CLI
-  startup fails closed.
-- The invocation grammar is fixed and carries only a rotation ID and a
-  credential ID, both regex-constrained. Arbitrary arguments cannot be passed
-  through it.
-- It runs `sudo --non-interactive`; it never prompts and never adds a remote
-  administration endpoint.
-- Callback output is capped at 8 KB and is rejected outright if it contains
-  credential-shaped material.
+### Local file discipline
 
-If you do not use credential rotation, this path is never reached. If you do,
-the executable you point it at must be root-owned and not writable by the
-connector's runtime user — the connector enforces this and fails with
-`ROTATION_OPERATOR_PATH_INSECURE` otherwise.
+- Connector state lives in a fixed directory name inside the active OpenClaw
+  profile state directory.
+- Live observation requires a private local profile binding that pins the
+  package/source identity and exact explicit profile, home, state, config, and
+  runtime paths, plus the exact connector state and receipt-ledger paths.
+  NAMED never falls back to DEFAULT, the binding's canonical bytes are
+  enforced, it expires after at most 24 hours, every consumer requires its
+  independently captured `binding_id`, and inherited path/profile environment
+  variables cannot redirect it.
+- Credentials, receipts, and outputs are owner-only.
+- The observer first requires the binding's exact profile-local receipt path,
+  then refuses ledgers that are not private, owned, non-symlink, regular `0600`
+  files. A default/founder or other-profile path is never read.
+- Path components are checked for symlinks; descriptor-bound reads are used
+  where the platform allows.
 
-## Known defaults inherited from the internal build
+### Operator controls
 
-`connector/runtime/governance-core/policy-validate.mjs` carries build-time
-default expectations for policy-document validation — an expected owner value
-and an expected environment of `production`. These are **defaults for an
-optional validation helper**, overridable per call, and they are not used by the
-observation path. They are noted here for transparency because they reflect the
-internal build's context rather than a neutral public default. See
-[LIMITATIONS.md](LIMITATIONS.md) §10.
+A kill switch, a system lock, and an operational disable file each stop remote
+contact. Operationally disabled is fully inert for ordinary observations. See
+[LIFECYCLE.md](./LIFECYCLE.md).
 
-## Explicitly out of scope
+## Known and accepted limitations
 
-- The connector being unable to block a tool call. That is the intended
-  behavior of a shadow-only release, not a vulnerability.
-- Registry `404` observations for unmapped tools not blocking execution. Also
-  intended.
-- Misclassification by manually configured `toolMetadata` labels.
-- Dropped observations under configured in-flight/queue bounds.
-- Security of any governance endpoint you choose to configure. That endpoint is
-  outside this package's boundary.
+These are stated so they are not mistaken for defects:
 
-## Disclosure
+- **No certification.** This package carries no security or compliance
+  certification of any kind.
+- **Not a sandbox.** The connector runs in your OpenClaw process with your
+  permissions. It observes; it does not isolate or contain tools.
+- **Receipt truth is bounded by the post-hook.** Receipts record what the hook
+  observed, not independent verification of a tool's real-world effect.
+- **A configured connected-shadow identity may receive a remote `404`** when the
+  service cannot resolve the deployment, agent, tool, or contract. That is a
+  remote contract or registry failure, not an execution decision, and it cannot
+  block the original tool.
+- **Node does not expose portable `openat`/`renameat`.** Component checks,
+  descriptor-bound reads, and identity rechecks substantially narrow namespace
+  races but cannot eliminate a malicious concurrent process rewriting path
+  components between syscalls.
+- **Version-pinned evidence.** Behavior is evidenced against OpenClaw
+  `2026.6.5` (commit `5181e4f`) only.
 
-Coordinated disclosure. Please allow a reasonable period to investigate and
-issue a fix before public disclosure.
+## Verifying this package
 
-## No warranty
-
-This is an early release from a small team. It carries **no compliance
-certification and no security guarantee**. Independent verification records are
-maintained outside the distributed package. As stated in Sections 7 and 8 of
-the [Apache-2.0 License](LICENSE), the software is provided "AS IS", without
-warranties or conditions of any kind. See [LIMITATIONS.md](LIMITATIONS.md).
+Run `npm run verify` and follow [VERIFY.md](./VERIFY.md) to check the file
+inventory, checksums, declared identities, and safety constants yourself. Do not
+take this document's word for the posture — the verification is the point.

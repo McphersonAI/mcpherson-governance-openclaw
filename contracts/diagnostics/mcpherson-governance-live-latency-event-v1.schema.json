@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-live-latency-event-v1.schema.json",
+  "title": "McPherson Governance v0.6 live shadow latency event",
+  "description": "One LIVE_SHADOW tool execution duration paired from connector attempt and supported post-hook completion receipts. It is not a governance-path measurement or an SLA.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "observation_id",
+    "target_binding_id",
+    "source_id",
+    "source_commit",
+    "profile_mode",
+    "profile",
+    "profile_identity",
+    "runtime_identity",
+    "endpoint_identity",
+    "runtime_semantic_version",
+    "runtime_build_identifier",
+    "instrumentation_version",
+    "measurement_kind",
+    "authority",
+    "enforcement",
+    "automatic_mapping_activation",
+    "outbound_actions",
+    "registry_mutation",
+    "sequence",
+    "ts_utc",
+    "tags",
+    "durations_ms"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-live-latency-event/v1"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^live-obs-[a-f0-9]{64}$"
+    },
+    "target_binding_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_id": {
+      "const": "openclaw-live"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "profile_mode": {
+      "enum": [
+        "DEFAULT",
+        "NAMED"
+      ]
+    },
+    "profile": {
+      "$ref": "#/$defs/id"
+    },
+    "profile_identity": {
+      "$ref": "#/$defs/id"
+    },
+    "runtime_identity": {
+      "const": ".local/lib/node_modules/openclaw/openclaw.mjs"
+    },
+    "endpoint_identity": {
+      "const": "ws://127.0.0.1:18789"
+    },
+    "runtime_semantic_version": {
+      "const": "2026.6.5"
+    },
+    "runtime_build_identifier": {
+      "$ref": "#/$defs/buildIdentifier"
+    },
+    "instrumentation_version": {
+      "const": "0.6-live.2"
+    },
+    "measurement_kind": {
+      "const": "LIVE_SHADOW"
+    },
+    "authority": {
+      "const": "NONE"
+    },
+    "enforcement": {
+      "const": false
+    },
+    "automatic_mapping_activation": {
+      "const": false
+    },
+    "outbound_actions": {
+      "const": false
+    },
+    "registry_mutation": {
+      "const": false
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000
+    },
+    "ts_utc": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_id",
+        "capability_id",
+        "normalized_capability",
+        "risk_tier",
+        "policy_outcome",
+        "cache_state",
+        "path_kind",
+        "remote_status",
+        "mapping_status",
+        "classification_status"
+      ],
+      "properties": {
+        "agent_id": {
+          "$ref": "#/$defs/id"
+        },
+        "capability_id": {
+          "$ref": "#/$defs/id"
+        },
+        "normalized_capability": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "risk_tier": {
+          "const": "UNKNOWN"
+        },
+        "policy_outcome": {
+          "const": "UNKNOWN"
+        },
+        "cache_state": {
+          "const": "NONE"
+        },
+        "path_kind": {
+          "const": "LOCAL"
+        },
+        "remote_status": {
+          "$ref": "#/$defs/remoteStatus"
+        },
+        "mapping_status": {
+          "const": "UNKNOWN"
+        },
+        "classification_status": {
+          "const": "UNKNOWN"
+        }
+      }
+    },
+    "durations_ms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_execution_ms"
+      ],
+      "properties": {
+        "tool_execution_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      }
+    }
+  },
+  "$defs": {
+    "buildIdentifier": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{1,64}$"
+        }
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    },
+    "remoteStatus": {
+      "description": "Attempt-receipt remote status, matching the authoritative producer contract in governance-core validateAttemptReceipt: a base status, an HTTP 4xx/5xx error, or a binding mismatch.",
+      "oneOf": [
+        {
+          "enum": [
+            "OK",
+            "TIMEOUT",
+            "UNREACHABLE",
+            "TLS_FAILURE",
+            "AUTH_REJECTED",
+            "INVALID_RESPONSE",
+            "UNSUPPORTED_VERSION",
+            "STALE_DECISION",
+            "REPLAYED_DECISION",
+            "DROPPED_SATURATED",
+            "KILL_SWITCH_ACTIVE",
+            "SYSTEM_LOCK_ACTIVE",
+            "CIRCUIT_OPEN",
+            "PRIVACY_GUARD_TRIPPED",
+            "NOT_ATTEMPTED",
+            "ABORTED_SHUTDOWN",
+            "UNKNOWN"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^HTTP_ERROR:[45]\\d{2}$"
+        },
+        {
+          "enum": [
+            "BINDING_MISMATCH:request_hash",
+            "BINDING_MISMATCH:deployment_id",
+            "BINDING_MISMATCH:agent_id",
+            "BINDING_MISMATCH:tool_id"
+          ]
+        }
+      ]
+    }
+  }
+}

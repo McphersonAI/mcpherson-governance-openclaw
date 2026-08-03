@@ -1,295 +1,131 @@
-# Limitations
+# Limitations — McPherson Governance Connector v0.6.0
 
-**Connector v0.5.1.** Read this before relying on the connector for anything.
+Read this before deciding what this package is for. Everything here is a real
+limitation, stated plainly.
 
-## 1. It is shadow-only. It does not enforce.
+## 1. This is not enforcement
 
-This release observes and records. It does not block, deny, approve, delay, or
-modify any tool call. If you need blocking or approval gating today, **this
-release is not that product**, and no configuration setting will make it one.
+There is **no active enforcement** in this release. The connector contains no
+policy evaluator and no gate. It cannot block, approve, deny, delay, or rewrite
+a tool call, and no configuration option turns that on. `AUTHORITY` is `NONE`
+and `ENFORCEMENT` is `OFF`, both as source-owned constants that are not derived
+from configuration, environment variables, policy documents, or API data.
 
-Remote decisions have **no execution authority**. A governance response of
-`DENY`, `REQUIRE_APPROVAL`, or `HOLD` is written into a local receipt and
-changes nothing about execution. `ENFORCEABLE_REMOTE_DECISIONS` is empty and
-compiled into source.
+If you need enforcement, this release does not provide it.
 
-## 2. There is exactly one local blocking path, and it is not enforcement
+## 2. Remote decisions have no execution authority
 
-The connector's own diagnostic tool `mcpherson_governance_canary` can be blocked
-locally when the operator explicitly turns the canary on and the call carries an
-exact literal token. It exists to let an operator prove local authority is
-retained. It never inspects or blocks any other tool and never reads remote
-data. With the canary off — the default — nothing in this release blocks
-execution.
+When remote shadow is explicitly enabled, the connector may send
+metadata-minimized observations and receive responses. Those responses are
+recorded. **They cannot change what a tool does.** There is no code path from a
+remote response to a modified, delayed, denied, or duplicated tool call. The
+list of enforceable remote decisions is an empty frozen array in source.
 
-## 3. Manual capability mapping is required
+## 3. AutoMap proposals are proposals
 
-The connector cannot describe a tool it has no mapping for. Every tool you want
-meaningfully observed needs a `toolMetadata` entry (schema version, schema hash,
-action class). This is manual work and it does not happen automatically.
+AutoMap output has status `PROPOSED`. It **cannot activate itself**, and this
+package has no registry-mutation path (`apply-registry-patch` does not exist).
 
-## 4. Unmapped tools produce registry 404 observations
+This package does **not** claim that AutoMap proposals are correct, approved, or
+eligible for enforcement. They are machine-generated suggestions derived from
+local metadata. A human must review them. Some will be wrong.
 
-A tool with no mapping — or a deployment/agent the governance registry does not
-know — produces a `404`-class observation (`MGP_UNKNOWN_TOOL`,
-`MGP_UNKNOWN_AGENT`, `MGP_UNKNOWN_DEPLOYMENT`).
+## 4. Unconfigured tools — corrected in v0.6.0
 
-**These observations do not block the original tool.** The tool runs normally.
-The 404 is recorded in the receipt as the remote status. Expect a lot of them
-until mapping is complete; they are an inventory signal, not an error condition
-in your agent.
+**Previous releases of this documentation said unmapped tools normally produce
+remote registry `404` observations. That description is withdrawn.** It does not
+describe v0.6.0 behavior.
 
-## 5. Receipt truth is bounded by OpenClaw's hook surface
+Current behavior for a tool with no complete configured metadata:
 
-Receipt mode is `POST_HOOK`. A `completion_receipt` is emitted only after a
-directly observed `after_tool_call`. Where OpenClaw does not deliver that event,
-you get an `attempt_receipt` saying `UNKNOWN` or `NOT_OBSERVED` — the connector
-**does not guess** outcomes. Timeouts, queue drops, shutdown, and missing events
-never become tool outcomes.
+- the tool **remains local**;
+- **no HTTPS request occurs**;
+- the receipt records `remote_status: NOT_ATTEMPTED`;
+- the receipt records `local_disposition: SKIPPED`;
+- **tool execution is unchanged**;
+- **no fallback metadata reaches the wire or the receipt ledger.**
 
-Consequence: attempt and completion counts will not always match, and that is
-correct behavior rather than a defect.
+The connector does not manufacture a schema hash or action class for a tool you
+have not configured, so it does not send a request that could not be accepted.
 
-## 6. Observation is bounded and lossy by design
+### The one case where a 404 can still legitimately appear
 
-To avoid becoming a latency tax on your agents, the connector caps its own work:
+A **configured** connected-shadow identity may still receive a remote `404` when
+the service cannot resolve the deployment, agent, tool, or contract. That `404`
+is a **remote contract or registry failure**, not an execution decision, and it
+**cannot block the original tool** in V6. It is recorded as the remote status of
+an observation and nothing more.
 
-| Bound | Default |
-| --- | --- |
-| Foreground observation budget | 150 ms (max 500) |
-| Connect timeout | 2000 ms |
-| Max in-flight observations | 4 |
-| Max queued observations | 16 |
-| Network retries | 1 |
-| Circuit opens after | 5 consecutive failures (60 s) |
+## 5. Coverage is not universal
 
-When these limits are hit, observations are **dropped**. Dropped observations
-are recorded as such locally. **The connector is not a complete audit log** and
-must not be relied on as one.
+- **Not universal tool support.** Only tools your OpenClaw gateway reports, and
+  for remote shadow only tools you have configured with complete metadata.
+- **Not complete audit-log coverage.** Receipts cover what the post-hook
+  observes. Activity outside that path is not receipted. In the default
+  shadow posture the connector writes only `gateway_start` / `gateway_stop`
+  lifecycle records and no attempt or completion receipts — so zero receipt
+  groups is the expected result, not a broken pipeline.
+- **Not universal outcome verification.** A completion receipt records the
+  outcome the hook observed. It is not an independent verification that the
+  tool's real-world effect occurred.
 
-## 7. Classification labels can be wrong
+## 6. No certification
 
-`action_class`, `resource_class`, sensitivity, and reversibility labels come
-from your manual mapping and local derivation. They can misclassify. In a
-shadow release the consequence is a mislabeled observation — never a wrong
-enforcement action.
+This package carries **no security certification and no compliance
+certification** of any kind. Nothing here is an attestation of SOC 2, ISO 27001,
+HIPAA, GDPR, or any other framework. The safety properties described are
+properties of this source code, verified by its own test suite — not third-party
+certifications.
 
-## 8. Not a certification
+## 7. Platform and availability
 
-This release is **not a safety, security, or compliance certification**. No
-regulatory certification is claimed or implied. Independent verification
-records are maintained outside the distributed package and do not constitute a
-certification or guarantee.
+- **Not multi-platform.** Evidence binds this release to OpenClaw `2026.6.5`
+  (commit `5181e4f`) on POSIX hosts, with Node.js 22+. Other OpenClaw versions
+  are permitted by the declared `>=` range but are not covered by that evidence.
+- **No public dashboard.** The connected dashboard is a separate beta and is not
+  publicly available as part of this package.
+- **No billing or paid-plan activation.** There is no billing, credits, or
+  paid-plan path in this package.
+- **No v0.7 enforcement.** It is not included and not available here.
 
-## 9. Scope of testing
+## 8. Local observation constraints
 
-The complete v0.5.1 public release suite reports **250 passed, 0 failed, 0
-skipped**. Those 250 are not all upstream tests. They are three distinct
-groups:
+- Live observation requires an explicit, local profile binding. The binding
+  pins the exact package/source identity, profile mode and identity, physical
+  home, state/config/runtime paths, exact profile-local connector state and
+  receipt ledger, and the audited OpenClaw `2026.6.5 (5181e4f)` runtime. Its
+  canonical bytes are enforced, it expires after at most 24 hours, and every
+  consumer requires the independently captured ID printed at initialization.
+- Named mode uses exactly `<profile-home>/.openclaw-<profile>` and never falls
+  back to DEFAULT. Default mode is accepted only when both creation and use
+  explicitly request DEFAULT, and then selects exactly
+  `<profile-home>/.openclaw`.
+- OpenClaw's case-insensitive reserved named profile `dev` is refused because
+  2026.6.5 assigns it a different gateway port than the audited endpoint.
+- The profile home must be an owned physical absolute directory with no
+  symlinked component. The state root and config are owned and private; the
+  runtime must have the package-bound home-relative identity. Environment
+  variables cannot redirect an approved binding.
+- Live observation supports the connector's profile-local default `stateDir`
+  and `receiptDir` only. Explicit connector path overrides are refused rather
+  than guessed or followed; remove them and use the documented profile-local
+  layout before creating a binding.
+- Binding initialization and verification are local and account-free, but
+  they require the exact audited OpenClaw runtime, the documented local
+  SecretRef configuration, and the profile identity/operator token created by
+  one successful local loopback health call. No remote account is involved.
+- It reads only `agents.list`, `tools.catalog`, and the exact bounded receipt
+  ledger named by the binding. A ledger from DEFAULT or another named profile
+  is refused before RPC or file access.
+- It refuses a receipt ledger that is not a private, owned, non-symlink `0600`
+  regular file, and it refuses to overwrite an existing output path.
+- A ledger containing records from more than one connector version fails closed.
+  See [INSTALL.md](./INSTALL.md) §6.
+- Malformed or unavailable inputs produce no candidates and no proposals, plus a
+  bounded local error record. They never become authority or an action.
 
-| Group | Count | Shipped in this package |
-| --- | ---: | --- |
-| Applicable upstream (sealed-reference) connector tests | 179 | No — see §10a |
-| Public distribution, runtime, and v0.5.1 regression tests | 51 | Yes |
-| Bundled package verification checks | 20 | Yes |
-| **Total** | **250** | — |
+## 9. Trust boundary
 
-Only the second and third groups ship in this package; together they are the
-71 checks an external auditor can reproduce without the internal build
-repository (`npm test`).
-
-The sealed reference suite contains **181** connector tests. **179** are
-applicable to v0.5.1 and pass against the public connector. **Two** are
-excluded, each by exact test name, because each encodes a v0.5.0 contract that
-v0.5.1 deliberately supersedes:
-
-1. `"package is private v0.5.0 and declares only inspected supported hooks at
-   runtime"` asserts `package.json.private === true` and version `0.5.0`. The
-   private flag is npm's refuse-to-publish flag: correct for the internal
-   installer, and deliberately invalid for a public package.
-2. `"disabled/kill/lock precedence beats exact canary with a zero-network
-   call-order trace"` asserts that an operationally **disabled** connector still
-   derives a tool summary and writes a `NOT_ATTEMPTED` attempt receipt. v0.5.1
-   deliberately changed that: disabled is now inert and writes no observation
-   receipt at all.
-
-Each is replaced by **stricter** public coverage, not dropped. The first is
-replaced by `tests/public-distribution.test.mjs`. The second is replaced by
-`tests/public-v051-regression.test.mjs`, which runs **all five** of the original
-test's scenarios — the three kill-switch/system-lock scenarios keep their
-original receipt expectations, and the two disabled scenarios assert the tighter
-v0.5.1 contract (no receipt at all, and the tool summary is never derived).
-
-**No broad exclusion pattern is used.** Exclusion is by exact, fully anchored
-test name — never by filename, prefix, or wildcard — so every other test in
-those two files continues to run, including the 20 safety tests in
-`operator-structure.test.mjs`. Running the upstream suite with the exclusions
-removed produces exactly two failures, and they are exactly these two tests.
-§10a records the full rationale.
-
-Coverage includes hostile-endpoint behavior, privacy-guard assertions over
-serialized wire bytes, scheduler saturation, shutdown residue accounting,
-named-profile state isolation, the OpenClaw compatibility gate, and
-disabled-mode inertness.
-
-Long-run production soak evidence and platforms other than those tested are not
-covered by the distributed package. Built and tested against OpenClaw
-`2026.6.5` (`5181e4f`), minimum supported OpenClaw `2026.6.5`, on Node 24. **No
-end-to-end install on a real OpenClaw `2026.6.5` or newer host has been
-performed for this release** — see §9a and §12.
-
-## 9a. OpenClaw version detection, and what UNKNOWN means
-
-**The minimum supported OpenClaw version is `2026.6.5`.** The connector enforces
-this itself at activation time rather than relying on package-manager
-compatibility metadata, which is not enforced by every installer — OpenClaw
-`2026.3.2` installed and loaded the v0.5.0 package without warning.
-
-The gate reads the version the host reports through the OpenClaw plugin SDK. If
-the host reports a version it could not itself resolve, the connector makes one
-bounded, read-only attempt to read the host's own installed `package.json`. It
-runs no subprocess and opens no socket. There are three outcomes:
-
-| What the host reports | Compatibility status | Connector activates |
-| --- | --- | --- |
-| A version `2026.6.5` or newer | `SUPPORTED` | Yes |
-| A version below `2026.6.5` | `UNSUPPORTED` | **No** |
-| A version that is supplied but not parseable, and no readable host manifest | `UNSUPPORTED` | **No** |
-| **No detectable version at all** — the host exposes no version field | `UNKNOWN` | **Yes** |
-
-The first three rows are the enforcement you should rely on. A known-unsupported
-host, and a host that explicitly supplies a version nobody can parse, both
-refuse activation: the connector logs a compatibility error and stays inert —
-no governance requests, no observation receipts, no shadow observation — while
-OpenClaw and your other plugins continue to run normally.
-
-**The fourth row is the honest carve-out, and you should read it carefully.**
-
-An environment that exposes **no** identifiable OpenClaw version is reported as
-`UNKNOWN` and is allowed to activate. This covers non-OpenClaw embedders and
-test harnesses that load the plugin module directly without implementing the
-SDK's version field. The gate refuses only what it can positively identify as
-unsupported; it does not invent a refusal for a host that never made a version
-claim at all.
-
-The consequence, stated plainly:
-
-- **`UNKNOWN` does not mean verified compatible.** It means no version was
-  detectable. Nothing about that environment has been checked against the
-  `2026.6.5` floor.
-- **An unsupported host that exposes no version is therefore not refused.** The
-  floor is enforced against hosts that declare a version, not against hosts that
-  are silent.
-- **`UNKNOWN` hosts are not officially supported**, are not covered by the
-  compatibility statement in §9, and are not a tested configuration.
-
-What still holds in every case, including `UNKNOWN`: the connector remains
-shadow-only and non-blocking. `remote_authority` stays `false`,
-`ENFORCEABLE_REMOTE_DECISIONS` stays empty, no remote decision acquires
-execution authority, and every hook returns without altering tool execution. An
-`UNKNOWN` host cannot obtain behavior the shadow-only contract does not already
-permit — the carve-out affects *whether observation starts*, not *what
-observation is allowed to do*.
-
-**For a supported deployment, run OpenClaw `2026.6.5` or newer** and confirm it
-with `openclaw --version` before installing. Do not rely on `UNKNOWN` as a
-substitute for a supported host.
-
-## 10. Packaging metadata differs from the sealed internal build
-
-Two kinds of difference from the sealed internal inventory exist. First, the
-public packaging changes made in v0.5.0 to make the package publishable and its
-test command functional:
-
-| Change | Reason |
-| --- | --- |
-| Removed `"private": true` | npm's refuse-to-publish flag; it blocks public distribution |
-| Description no longer says "Private" | Inaccurate for a public release |
-| Added `"license": "Apache-2.0"`, author, homepage, repository, bugs | Required public metadata |
-| `scripts.test` now runs `../scripts/verify-package.mjs` | The old path pointed at a test tree not shipped in this package, so `npm test` was broken |
-| `bin` path `./connector-ctl.mjs` → `connector-ctl.mjs` | npm rejects and strips the `./` prefix |
-
-Second, the runtime changes made in v0.5.1 for the findings listed in
-[CHANGELOG.md](CHANGELOG.md): profile-scoped state, the OpenClaw compatibility
-activation gate, and inert disabled behavior.
-
-The sealed v0.5.0 connector inventory contains 28 files. Relative to it, v0.5.1
-adds `connector/host.mjs`, changes five runtime modules
-(`config.mjs`, `constants.mjs`, `hook.mjs`, `index.mjs`, `pipeline.mjs`),
-changes two metadata files (`package.json`, `openclaw.plugin.json`), updates
-`connector/README.md`, and carries the remaining 20 sealed files over
-byte-identical. The connector tree is 29 files, including 24 `.mjs` runtime
-modules. `npm test` verifies that this enumerated set is the
-*only* difference. See [CONNECTOR-FILES.sha256](CONNECTOR-FILES.sha256) for
-public-package integrity and
-[SEALED-CONNECTOR-FILES.sha256](SEALED-CONNECTOR-FILES.sha256) for the sealed
-v0.5.0 reference.
-
-The embedded governance core is unchanged by v0.5.1 and still verifies against
-its recorded `SOURCE.sha256`.
-
-One item is still **not** changed:
-
-- `connector/runtime/governance-core/policy-validate.mjs` defaults its expected
-  policy-document owner to an internal build value and its expected environment
-  to `production`. These are defaults of an **optional validation helper** —
-  overridable per call and not used by the observation path.
-
-## 10a. What `npm test` covers, and what it does not
-
-`npm test` runs the package's own tests — `tests/public-distribution.test.mjs`,
-`tests/public-runtime.test.mjs`, and `tests/public-v051-regression.test.mjs`,
-plus the checks in `scripts/verify-package.mjs`. All of it is dependency-free
-and makes no network calls, and it works from an installed copy of the package.
-
-It covers: the public packaging contract, checksum manifests, shadow-only
-invariants, metadata and manifest parsing, license presence, hook registration,
-non-blocking behaviour under hostile remote responses, metadata-only receipts,
-outbound-guard rejection, local control precedence, configuration-example
-loading, and every v0.5.1 finding — named-profile state isolation, absence of
-legacy-state migration, the OpenClaw compatibility activation gate, and inert
-disabled behavior.
-
-It is **not** the full upstream connector suite. That suite lives in the
-internal build repository and is not shipped here. `npm run test:public` runs
-the complete public release suite, but it needs that tree — set
-`MCPHERSON_UPSTREAM_REPO` to the internal build repository root. Without it the
-runner exits non-zero rather than reporting a partial pass.
-
-Two upstream tests are excluded from the public suite by exact name, and each
-is replaced by a public test asserting the contract that supersedes it:
-
-- `"package is private v0.5.0 and declares only inspected supported hooks at
-  runtime"` asserts `package.json.private === true` and version `0.5.0`. That is
-  correct for the internal installer and deliberately wrong for a public
-  package. Replaced by `tests/public-distribution.test.mjs`.
-- `"disabled/kill/lock precedence beats exact canary with a zero-network
-  call-order trace"` asserts that a *disabled* connector still writes a
-  `NOT_ATTEMPTED` attempt receipt. v0.5.1 deliberately changed that: disabled is
-  now inert and writes no observation receipt at all. Replaced by
-  `tests/public-v051-regression.test.mjs`, which runs all five of that test's
-  scenarios — the three kill-switch/system-lock scenarios unchanged, and the two
-  disabled scenarios under the stricter v0.5.1 contract.
-
-Both exclusions are by test name rather than by file, so every other safety test
-in those files keeps running.
-
-## 11. License scope
-
-Licensed under Apache-2.0 (see [LICENSE](LICENSE), [NOTICE](NOTICE)),
-copyright 2026 McPherson AI LLC.
-
-The license covers **this connector only**. It does not license or include the
-commercial McPherson Governance wrapper, the hosted Governance API, Observa
-commercial services, the Governance Dashboard, v0.6, v0.7 enforcement, private
-infrastructure, or internal deployment tooling. Nothing in this package provides
-access to those, and none of them is required to run the connector — but the
-connector is only useful when pointed at some governance endpoint, which you
-must supply or obtain separately.
-
-## 12. Production use is an operator decision
-
-Before production use, review your configuration, your tool naming, your
-identifier choices, your receipt retention, and the privacy boundary in
-[PRIVACY.md](PRIVACY.md) — including who operates the governance endpoint you
-configure.
+The connector runs inside your OpenClaw process with your permissions. It is not
+a sandbox and does not isolate tools from each other or from your system. It
+observes; it does not contain.

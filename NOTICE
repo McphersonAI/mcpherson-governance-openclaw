@@ -21,7 +21,7 @@ Third-party components
 
 This package contains no third-party or vendored source code.
 
-A provenance review of all 28 connector files confirmed:
+A provenance review of every module in this package confirmed:
 
   * Every module is original work authored by McPherson AI LLC.
   * There are no runtime, development, peer, or bundled dependencies.
@@ -40,7 +40,7 @@ Scope of this license
 --------------------------------------------------------------------------
 
 The Apache License, Version 2.0 applies to the public McPherson Governance
-v0.5 connector contained in this repository and package.
+v0.6 OpenClaw connector and V6 local diagnostics contained in this package.
 
 It does not license, grant rights to, or include any of the following, which
 are separate works and are not distributed here:
@@ -49,7 +49,7 @@ are separate works and are not distributed here:
   * the hosted McPherson Governance API
   * Observa commercial services
   * the McPherson Governance Dashboard
-  * McPherson Governance v0.6
+  * the commercial control plane
   * McPherson Governance v0.7 enforcement
   * private infrastructure
   * internal deployment tooling

@@ -1,268 +1,186 @@
-# Verification
+# Verify this package — v0.6.0
 
-**Connector v0.5.1.** How to confirm that what you have is what was released,
-and that it behaves as claimed. Everything here runs locally.
+Do not take the documentation's word for the safety posture. Check it.
 
-## 1. Verify the ClawHub artifact
-
-The public artifact is the ClawHub `.tgz`, not a GitHub release tarball:
+## 1. Verify the archive you downloaded
 
 ```sh
-clawhub package verify \
-  ./mcphersonai-mcpherson-governance-openclaw-0.5.1.tgz \
-  --package @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.5.1
+shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz
 ```
 
-It must report `verified: true`. To check the digest yourself:
+Compare against the published release checksum. The archive is a standard npm
+tarball with a single `package/` root.
+
+List its contents without installing:
 
 ```sh
-shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.5.1.tgz
+tar -tzf mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz | sort
 ```
 
-Compare against the published release manifest value. Do not install on a
-mismatch.
+## 2. Run the packaged verifier
 
-The remaining checks run against the installed package. With a profile install,
-that is:
+From the installed or extracted package root:
 
 ```sh
-cd "$HOME/.openclaw-<profile>/extensions/mcpherson-governance-connector"
+npm run verify
 ```
 
-## 2. Verify every file in the package
+This checks, and fails closed on any mismatch:
+
+- every packaged file against `PACKAGE-FILES.sha256`;
+- no unexpected and no missing files;
+- package name `@mcphersonai/mcpherson-governance-openclaw` and version `0.6.0`;
+- plugin ID `mcpherson-governance-connector`;
+- `package.json` and `openclaw.plugin.json` versions agree;
+- `openclaw.compat.pluginApi` is `>=2026.6.5`;
+- the config schema default `enabled: false`;
+- the package manifest's exact package, plugin, version, source commit/tree,
+  and immutable OpenClaw target identity;
+- the requirement for a separate exact local profile binding supporting only
+  explicit `DEFAULT` or `NAMED` modes;
+- the source-owned safety constants;
+- absence of any policy evaluator or gate module;
+- absence of absolute home-directory paths and credential-shaped material;
+- every import resolves to a sibling module or a `node:` built-in.
+
+> If it prints nothing and exits 0, check for a symlinked path component — see
+> [SUPPORT.md](./SUPPORT.md). Resolve the real path with `cd <dir> && pwd -P`
+> and re-run.
+
+## 3. Check provenance
+
+`RELEASE-PROVENANCE.json` records the exact source commit and tree the archive
+was built from, the archive name, its SHA-256, the file count, and the
+normalization rules used. `V6-PACKAGE-MANIFEST.json` additionally binds the
+observer modules by content hash and carries the immutable audited OpenClaw
+target. The target deliberately contains only portable, home-relative path
+identities. An operator-created local profile binding separately pins the exact
+physical home, profile, state, config, and runtime paths.
 
 ```sh
-shasum -a 256 -c RELEASE-CHECKSUMS.sha256
+cat RELEASE-PROVENANCE.json
 ```
 
-Every line must report `OK`.
+The build is deterministic: the same internal source commit produces a
+byte-identical archive, and two independent clean checkouts of that commit yield
+the same SHA-256. This is verified during the release itself. Because the build
+repository and its tooling are not public, treat it as a property of how this
+archive was produced rather than a check you can repeat — see
+[§6](#6-check-the-contents-against-the-published-source) for what you can verify
+independently.
 
-## 3. Verify the 29 connector files specifically
+## 4. Verify the safety claims yourself
 
-This is the important one. `CONNECTOR-FILES.sha256` covers exactly the 29
-connector files and nothing else:
+These are the checks worth doing by hand.
+
+**No policy evaluator or gate is packaged:**
 
 ```sh
-shasum -a 256 -c CONNECTOR-FILES.sha256
-wc -l < CONNECTOR-FILES.sha256      # must print 29
+find . \( -name 'evaluate.mjs' -o -name 'gate.mjs' \)
+# expect: no output
 ```
 
-All 29 must report `OK`. This is a self-consistency check against the
-public-package checksum manifest; it is not a claim that all 29 files match the
-v0.5.0 sealed inventory. Any `FAILED` line means your copy has been modified.
+Governability Diagnosis uses a diagnostic evidence-assessment module. Its
+findings do not grant execution authority, and it has no call path to tool
+execution.
 
-The provenance comparison is deliberately separate:
-
-- Sealed v0.5.0 connector inventory: **28 files**
-- Files v0.5.1 adds: **1** (`connector/host.mjs`)
-- Files v0.5.1 changes: **5** (`connector/config.mjs`, `connector/constants.mjs`,
-  `connector/hook.mjs`, `connector/index.mjs`, `connector/pipeline.mjs`)
-- Metadata files that differ from sealed: **2**
-  (`connector/package.json`, `connector/openclaw.plugin.json`)
-- Documentation files that differ from sealed: **1** (`connector/README.md`)
-- Sealed files carried over byte-identical: **20/28**
-- Runtime modules (`.mjs`): **24**
-
-The connector tree holds 24 `.mjs` runtime modules in total.
-
-`SEALED-CONNECTOR-FILES.sha256` records the sealed v0.5.0 reference hashes.
-`npm test` verifies that the difference from that sealed inventory is **exactly**
-the enumerated set above and nothing else — an unexpected change to any other
-connector file fails the check.
-
-Every changed runtime module is changed for a stated v0.5.1 finding; see
-[CHANGELOG.md](CHANGELOG.md).
-
-To confirm no extra runtime file was added to the connector tree:
+**Authority ceilings are source constants, not settings:**
 
 ```sh
-find connector -type f | wc -l      # must print 29
+grep -n 'REMOTE_AUTHORITY\|ENFORCEABLE_REMOTE_DECISIONS' \
+  plugins/openclaw-connector/constants.mjs
 ```
 
-## 4. Verify the embedded governance core
+Expect `REMOTE_AUTHORITY = false` and a frozen empty
+`ENFORCEABLE_REMOTE_DECISIONS`.
 
-The connector embeds a subset of the governance core and records its own source
-hashes. **v0.5.1 does not change it:**
+**Configuration cannot introduce authority:**
 
 ```sh
-cd connector/runtime/governance-core
-shasum -a 256 -c SOURCE.sha256
-cd -
+grep -n 'FORBIDDEN_AUTHORITY_CONFIG_KEYS' -A 16 \
+  plugins/openclaw-connector/constants.mjs
+grep -n 'additionalProperties' openclaw.plugin.json
 ```
 
-Five files must report `OK`. Note the embedded core deliberately **excludes** the
-policy evaluator and gate modules — the enforcement code is not shipped in a
-shadow-only release. Confirm they are absent:
+**Unconfigured tools make no request:**
 
 ```sh
-ls connector/runtime/governance-core/evaluate.mjs 2>/dev/null && echo UNEXPECTED
-ls connector/runtime/governance-core/gate.mjs 2>/dev/null && echo UNEXPECTED
+grep -n 'hasOwn(this.#config.toolMetadata' -B 6 -A 4 \
+  plugins/openclaw-connector/hook.mjs
 ```
 
-Neither should exist.
+Expect the unconfigured branch to call `recordLocal(summary, "NOT_ATTEMPTED",
+"SKIPPED")` and return without submitting to the network pipeline.
 
-## 5. Verify the shadow-only constants in your installed copy
-
-Do not take the README's word for it — read the constants:
+**The outbound field allowlist is fixed:**
 
 ```sh
-grep -nE 'REMOTE_AUTHORITY|ENFORCEABLE_REMOTE_DECISIONS|remote_shadow|remote_authority|deny_enforcement|approval_enforcement|RECEIPT_MODE|PLUGIN_VERSION|MIN_SUPPORTED_OPENCLAW_VERSION' \
-  connector/constants.mjs
+grep -n 'OUTBOUND_FIELDS' -A 22 plugins/openclaw-connector/constants.mjs
 ```
 
-Expected:
-
-| Constant | Required value |
-| --- | --- |
-| `PLUGIN_VERSION` | `"0.5.1"` |
-| `MIN_SUPPORTED_OPENCLAW_VERSION` | `"2026.6.5"` |
-| `REMOTE_AUTHORITY` | `false` |
-| `ENFORCEABLE_REMOTE_DECISIONS` | `[]` |
-| `remote_shadow` | `true` |
-| `remote_authority` | `false` |
-| `deny_enforcement` | `false` |
-| `approval_enforcement` | `false` |
-| `RECEIPT_MODE` | `"POST_HOOK"` |
-
-Machine-checkable version:
+**No dependencies:**
 
 ```sh
-node --input-type=module -e '
-import * as c from "./connector/constants.mjs";
-const ok =
-  c.PLUGIN_VERSION === "0.5.1" &&
-  c.MIN_SUPPORTED_OPENCLAW_VERSION === "2026.6.5" &&
-  c.REMOTE_AUTHORITY === false &&
-  c.ENFORCEABLE_REMOTE_DECISIONS.length === 0 &&
-  c.DEFAULT_MODES.remote_shadow === true &&
-  c.DEFAULT_MODES.remote_authority === false &&
-  c.DEFAULT_MODES.deny_enforcement === false &&
-  c.DEFAULT_MODES.approval_enforcement === false &&
-  c.RECEIPT_MODE === "POST_HOOK";
-console.log(ok ? "SHADOW-ONLY INVARIANTS OK" : "INVARIANT VIOLATION");
-process.exit(ok ? 0 : 1);
-'
+node -e 'const p=require("./package.json");console.log(p.dependencies,p.devDependencies,p.peerDependencies,p.bundledDependencies)'
+# expect: undefined undefined undefined undefined
 ```
 
-## 6. Verify the metadata parses
+## 5. Verify it stays inert before you trust it
+
+Install into a throwaway named profile, not your working one. Use an isolated
+physical home containing the independently installed audited OpenClaw runtime:
 
 ```sh
-node -e 'JSON.parse(require("fs").readFileSync("connector/openclaw.plugin.json","utf8")); console.log("plugin metadata OK")'
-node -e 'const p=JSON.parse(require("fs").readFileSync("connector/package.json","utf8")); console.log("package metadata OK, version", p.version)'
+VERIFY_HOME=/absolute/path/to/disposable-home
+VERIFY_PROFILE=verify-mcpherson-v060
+env HOME="$VERIFY_HOME" OPENCLAW_HOME="$VERIFY_HOME" \
+  "$VERIFY_HOME/.local/bin/openclaw" --profile "$VERIFY_PROFILE" plugins install \
+  /absolute/path/to/mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz
+env HOME="$VERIFY_HOME" OPENCLAW_HOME="$VERIFY_HOME" \
+  "$VERIFY_HOME/.local/bin/openclaw" --profile "$VERIFY_PROFILE" plugins inspect \
+  mcpherson-governance-connector
 ```
 
-Version must be `0.5.1`. The version OpenClaw itself reports must agree:
+Confirm connector `config.enabled` is `false`, that no deployment credential and
+no receipt ledger were created by installation alone, and that no login page or
+account flow appeared. Then remove the profile.
 
-```sh
-openclaw --profile <profile> plugins info mcpherson-governance-connector --json
-```
+Before live observation, follow [INSTALL.md](./INSTALL.md) §4 exactly: run
+the local SecretRef and loopback-health identity bootstrap, stop the bootstrap
+gateway, restore the profile state directory to `0700` as §4.1 requires, then
+run `init-profile-binding` and `verify-profile-binding`, with the
+same explicit NAMED profile and physical home. Capture initialization's exact
+`binding_id` separately and supply it as `--profile-binding-id`. Confirm both
+commands report `"ok": true`. Every live consumer must receive the same private
+binding file and independently captured ID; a wrong, changed, rehashed, stale,
+reformatted, package-mismatched, or other-profile receipt binding must fail
+closed.
 
-## 7. Verify no remote decision can block
+## 6. Check the contents against the published source
 
-The structural claim is that the pre-call hook's remote path ends in an
-unconditional non-authoritative return. Read it directly:
+The archive is built only from a clean, committed source tree, with normalized
+entry ordering, zeroed timestamps, fixed uid/gid, and fixed modes. What you can
+check independently is the **contents**, not the archive envelope:
 
-```sh
-grep -n -A4 'The remote observation path always rejoins here' connector/hook.mjs
-```
+1. `scripts/verify-package.mjs` recomputes the SHA-256 of every packaged file
+   and compares it with `PACKAGE-FILES.sha256`, which covers every file in the
+   package except itself. Any single changed byte fails.
+2. The identical file tree is published at
+   `https://github.com/McphersonAI/mcpherson-governance-openclaw` under tag
+   `v0.6.0`. Diff your extracted package against that tag; it should be empty.
 
-The remote path returns `undefined` — it constructs no hook result. The only
-`hookResult` in the package is in `connector/canary.mjs`, gated on the
-connector's own diagnostic tool plus an operator-activated local control file:
+`RELEASE-PROVENANCE.json` records the internal build commit and tree. That build
+repository is **not public**: those values are integrity references that bind
+this package to one exact internal source state, not a checkout you can fetch.
 
-```sh
-grep -rn 'hookResult\|block: true' connector/
-```
+The build tooling is likewise not part of this package, so re-creating the
+`.tgz` byte-for-byte is not something an external verifier can perform. Verify
+the file contents and the published source tree instead; that is what the
+checksums and the shipped verifier actually attest.
 
-You should find these only in `canary.mjs` and in `hook.mjs` where the canary
-result is returned. Nothing in `client.mjs` or `pipeline.mjs` — the remote path
-— can produce one.
+## What verification cannot tell you
 
-## 8. Verify configuration cannot raise authority
-
-```sh
-grep -n -A16 'FORBIDDEN_AUTHORITY_CONFIG_KEYS' connector/constants.mjs
-```
-
-Confirm the rejected key list includes `remote_authority`, `deny_enforcement`,
-`approval_enforcement`, and `ENFORCEABLE_REMOTE_DECISIONS`.
-
-## 9. Verify the outbound allowlist
-
-```sh
-grep -n -A22 'OUTBOUND_FIELDS' connector/constants.mjs
-```
-
-Confirm the list matches [PRIVACY.md](PRIVACY.md) and contains no field capable
-of carrying prompts, parameters, or content.
-
-## 10. Verify the compatibility gate reads the host, not a subprocess
-
-```sh
-grep -n 'runtime?.version\|readHostManifestVersion\|MIN_SUPPORTED_OPENCLAW_VERSION' \
-  connector/host.mjs
-grep -c 'child_process\|spawnSync\|execSync' connector/host.mjs   # must print 0
-```
-
-The gate reads the OpenClaw plugin SDK's `runtime.version`. When the host
-declares a version it could not itself resolve, the gate falls back to a
-bounded, read-only lookup of the host's own installed `package.json`. It
-executes no subprocess and opens no socket. A host below the minimum refuses
-activation and stays inert.
-
-## 11. Verify state resolves inside the active profile
-
-```sh
-grep -n -A12 'resolveOpenClawStateDir' connector/host.mjs
-```
-
-Confirm the order: the host's own `resolveStateDir`, then `OPENCLAW_STATE_DIR`,
-then the default profile root. No branch reads, copies, or migrates state from
-another profile.
-
-Check it against a live profile:
-
-```sh
-OPENCLAW_STATE_DIR="$HOME/.openclaw-<profile>" \
-  node connector/connector-ctl.mjs status
-```
-
-## 12. Check runtime state
-
-The connector's control CLI is not placed on your `PATH` by a ClawHub download
-plus an OpenClaw archive install. Invoke it by explicit path, with
-`OPENCLAW_STATE_DIR` naming the profile:
-
-```sh
-OPENCLAW_STATE_DIR="$HOME/.openclaw-<profile>" \
-  node connector/connector-ctl.mjs status
-```
-
-Reports mode, enabled state, disable/kill-switch/lock state, and receipt counts.
-
-## 13. Run the bundled verification
-
-The package ships a self-contained check with no dependencies and no network
-calls:
-
-```sh
-npm test
-# or equivalently
-node scripts/verify-package.mjs
-```
-
-It verifies the public connector checksum manifest; the exact enumerated
-difference from the sealed v0.5.0 inventory; documentation truth; the embedded
-governance-core hashes; absence of the enforcement modules; plugin and package
-metadata; LICENSE and NOTICE presence; compatibility metadata consistency; the
-shadow-only invariants; rejection of authority configuration; that only the
-canary constructs a block; and that the bundled configuration example still
-loads.
-
-## What this package does not let you re-run
-
-The upstream connector suite runs against the internal build repository's test
-tree, which is **not** shipped here (see [LIMITATIONS.md](LIMITATIONS.md) §10a).
-The checks above plus `npm test` are the supported local verification path for
-this release.
+It cannot certify the package against any compliance framework, prove the
+absence of every possible defect, or establish behavior on OpenClaw versions
+other than the pinned `2026.6.5` (commit `5181e4f`). See
+[LIMITATIONS.md](./LIMITATIONS.md).

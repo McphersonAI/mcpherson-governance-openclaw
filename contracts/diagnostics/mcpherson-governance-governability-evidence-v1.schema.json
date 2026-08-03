@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-governability-evidence-v1.schema.json",
+  "title": "McPherson Governance v0.6 governability evidence set",
+  "description": "Typed positive evidence supplied to the Governability Governor. A present field must carry asserts:true, evidence_kind (allowlisted per field), supports (the exact criterion.field it claims to prove), unit_ref (the evaluated unit), observed_at (currency), non-empty refs, a supplier, and a value in the field-specific typed vocabulary (strict identifier, calendar timestamp, explicit positive-assertion enum, or an explicit true/false relevance fact); merely avoiding a negative phrase list is never proof. Conditional relevance flags are required facts: false explicitly establishes non-applicability, true requires the conditional proof, and omission is missing evidence. The evaluator also binds stable_identity to unit_id, bounds asserted last_seen_at to its observation/evaluation freshness window, and reconciles repeated tenant, owner, and runtime facts across criteria. absent means not supplied (insufficiency, never failure); absent_confirmed and contradictory pass the same kind/support/unit/currentness discipline before they can demonstrate failure. The Governor only reads this document; it never revokes, blocks, activates, or modifies any state.",
+  "type": "object",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "observation_id": false
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "observation_id",
+        "target_binding_id",
+        "source_id",
+        "source_commit",
+        "profile_mode",
+        "profile",
+        "profile_identity",
+        "runtime_identity",
+        "endpoint_identity",
+        "runtime_semantic_version",
+        "runtime_build_identifier",
+        "authority",
+        "enforcement",
+        "automatic_mapping_activation",
+        "outbound_actions",
+        "registry_mutation"
+      ],
+      "properties": {}
+    }
+  ],
+  "required": [
+    "schema",
+    "evidence_set_id",
+    "sanitization_confirmed",
+    "captured_at",
+    "units"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-governability-evidence/v1"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^live-obs-[a-f0-9]{64}$"
+    },
+    "target_binding_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_id": {
+      "const": "openclaw-live"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "profile_mode": {
+      "enum": [
+        "DEFAULT",
+        "NAMED"
+      ]
+    },
+    "profile": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "profile_identity": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "runtime_identity": {
+      "const": ".local/lib/node_modules/openclaw/openclaw.mjs"
+    },
+    "endpoint_identity": {
+      "const": "ws://127.0.0.1:18789"
+    },
+    "runtime_semantic_version": {
+      "const": "2026.6.5"
+    },
+    "runtime_build_identifier": {
+      "$ref": "#/$defs/buildIdentifier"
+    },
+    "authority": {
+      "const": "NONE"
+    },
+    "enforcement": {
+      "const": false
+    },
+    "automatic_mapping_activation": {
+      "const": false
+    },
+    "outbound_actions": {
+      "const": false
+    },
+    "registry_mutation": {
+      "const": false
+    },
+    "evidence_set_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "sanitization_confirmed": {
+      "const": true
+    },
+    "captured_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    },
+    "units": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unit_type",
+          "unit_id",
+          "evidence"
+        ],
+        "properties": {
+          "unit_type": {
+            "enum": [
+              "connector",
+              "capability"
+            ]
+          },
+          "unit_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "visible": {
+                "$ref": "#/$defs/fieldMap"
+              },
+              "attributable": {
+                "$ref": "#/$defs/fieldMap"
+              },
+              "scoped": {
+                "$ref": "#/$defs/fieldMap"
+              },
+              "independently_revocable": {
+                "$ref": "#/$defs/fieldMap"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "buildIdentifier": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{1,64}$"
+        }
+      ]
+    },
+    "fieldMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "refs"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "present",
+              "absent",
+              "absent_confirmed",
+              "contradictory"
+            ]
+          },
+          "asserts": {
+            "type": "boolean"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "refs": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "expected_supplier": {
+            "enum": [
+              "source_platform",
+              "connector",
+              "runtime_integration",
+              "policy_configuration"
+            ]
+          },
+          "evidence_kind": {
+            "enum": [
+              "inventory_record",
+              "ownership_record",
+              "runtime_receipt",
+              "grant_record",
+              "policy_record",
+              "revocation_state_record",
+              "revocation_drill_record",
+              "integration_config",
+              "platform_documentation"
+            ]
+          },
+          "supports": {
+            "type": "string",
+            "pattern": "^(VISIBLE|ATTRIBUTABLE|SCOPED|INDEPENDENTLY_REVOCABLE)\\.[a-z_]{1,64}$"
+          },
+          "unit_ref": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+          },
+          "observed_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+            "maxLength": 32,
+            "format": "date-time-utc"
+          }
+        }
+      },
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z_]{1,64}$"
+      }
+    }
+  }
+}

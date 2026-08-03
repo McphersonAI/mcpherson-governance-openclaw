@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-schema-drift-event-set-v1.schema.json",
+  "title": "McPherson Governance v0.6 schema drift event set",
+  "description": "Envelope for drift command output. Each member of drift_events is additionally validated against mcpherson-governance-schema-drift-event/v1 by contract composition.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "automap_version",
+    "drift_event_schema",
+    "detected_at",
+    "drift_count",
+    "drift_events"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-schema-drift-event-set/v1"
+    },
+    "automap_version": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._+-]{1,32}$"
+    },
+    "drift_event_schema": {
+      "const": "mcpherson-governance-schema-drift-event/v1"
+    },
+    "detected_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    },
+    "drift_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65536
+    },
+    "drift_events": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

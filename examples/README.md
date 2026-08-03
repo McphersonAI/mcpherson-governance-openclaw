@@ -1,108 +1,73 @@
-# Configuration example
+# Examples
 
-[`connector-config.example.json`](connector-config.example.json) is an
-illustrative configuration. **Every value in it is a placeholder.** It contains
-no credentials, no real endpoints, and no real identifiers.
+Everything in this directory is a **placeholder**. No value here is real, and
+none of it points at a real endpoint, deployment, agent, or certificate.
+Replace every `REPLACE-...` value before use.
 
-It ships with `"enabled": false`. Keep it that way until you have completed the
-verification steps in [../VERIFY.md](../VERIFY.md).
+## `connector-config.example.json`
 
-## State location — leave it unset
+A complete configuration showing every supported key. The config schema is
+`additionalProperties: false`, so any key not shown here is rejected.
 
-The example **deliberately omits `stateDir` and `receiptDir`.** Do not add them
-unless you have a specific reason to.
+### You do not need most of this
 
-Left unset, the connector resolves its own state root inside the **active
-OpenClaw profile**, in this order:
-
-1. the host's own profile state directory, as OpenClaw reports it;
-2. `OPENCLAW_STATE_DIR`, which `openclaw --profile <name>` exports;
-3. `~/.openclaw`, reached only when neither names a profile.
-
-So a named profile keeps its connector state, receipts, controls, and
-credential with that profile:
-
-```
-~/.openclaw-<profile>/mcpherson-governance-connector/            state, controls, credential
-~/.openclaw-<profile>/mcpherson-governance-connector/receipts/   receipts
-```
-
-With no `--profile`, the same paths apply under `~/.openclaw`. Nothing is
-shared between profiles and nothing is migrated between them.
-
-### Optional explicit overrides
-
-`stateDir` and `receiptDir` remain supported for operators who deliberately
-want a different location — an encrypted volume, a separate evidence mount, or
-a path outside the profile. They are **not** required, and setting them opts out
-of profile-based isolation:
+For the **account-free local V6 workflow**, the entire configuration you need
+is:
 
 ```json
-{
-  "stateDir": "/absolute/path/you/own/mcpherson-governance-connector",
-  "receiptDir": "/absolute/path/you/own/mcpherson-governance-connector/receipts"
-}
+{ "enabled": false }
 ```
 
-If you set them, both must be absolute paths you own, and the connector will
-use those exact paths for **every** profile. Two profiles pointed at the same
-`stateDir` share state — that is the behavior you are asking for by setting it.
-The `MCP_GOVERNANCE_STATE_DIR` and `MCP_GOVERNANCE_RECEIPT_DIR` environment
-variables have the same effect and the same caveat.
+Everything else in the example file only matters if you deliberately enable
+remote shadow against a governance endpoint you control.
 
-## Do not put credentials here
+### Key notes
 
-The deployment credential is **never** read from configuration, a command
-argument, or an environment variable. It is read only from a `0600` file at
-`<stateDir>/deployment-credential`, inside a `0700` directory. Configuration
-containing credential-shaped values will be rejected.
-
-## Keys the loader rejects
-
-The configuration loader is strict — unknown keys fail the load rather than
-being ignored. In particular it rejects any attempt to raise authority:
-
-| Key | Result |
+| Key | Notes |
 | --- | --- |
-| `remote_authority` | `FORBIDDEN_AUTHORITY_CONFIG` |
-| `deny_enforcement` | `FORBIDDEN_AUTHORITY_CONFIG` |
-| `approval_enforcement` | `FORBIDDEN_AUTHORITY_CONFIG` |
-| `remote_shadow` | `CONFIG_UNKNOWN_KEY` |
-| any other unlisted key | `CONFIG_UNKNOWN_KEY` |
+| `enabled` | Defaults to `false`. Leave it false for local V6 use. |
+| `apiUrl` | Must match `^https://`. The example host is `.invalid` on purpose and will never resolve. |
+| `deploymentId`, `agentId` | Your identifiers, 1–96 chars from `A-Za-z0-9._:-`. |
+| `policyVersion` | Integer ≥ 1. |
+| `observationBudgetMs` | 0–500. Foreground wait budget per observation. |
+| `connectTimeoutMs` | 1–5000. |
+| `maxInFlight` | 1–4. |
+| `maxQueue` | 0–16. |
+| `stateDir`, `receiptDir` | Optional overrides. Omit to use the profile defaults. |
+| `caFile` | Absolute path to your own CA certificate, if you use a private CA. |
+| `toolMetadata` | Per-tool metadata. **This is what makes a tool "configured".** |
 
-This includes JSON comment keys such as `_comment` — the loader has no comment
-support, so do not add one.
+### `toolMetadata` decides whether a tool talks to the network
 
-## `toolMetadata` — manual capability mapping
+A tool is **configured** only if it has an entry here with all three required
+fields: `schemaVersion`, `schemaHash`, and `actionClass`.
 
-Mapping is manual. A tool with no entry here is reported as unknown and
-typically produces a registry 404 observation. That observation is recorded in
-the receipt and **does not block the tool**.
+- **Configured** + `enabled: true` → that tool may use the approved HTTPS shadow
+  path.
+- **Unconfigured** → the tool **remains local**, **no HTTPS request occurs**, and
+  the receipt records `remote_status: NOT_ATTEMPTED` with
+  `local_disposition: SKIPPED`. Tool execution is unchanged, and no fallback
+  metadata is manufactured or transmitted.
 
-Required per tool: `schemaVersion`, `schemaHash` (`sha256:` + 64 lowercase hex),
-`actionClass`.
+Earlier documentation described unconfigured tools as normally producing remote
+registry `404` observations. That is **not** current behavior — nothing is sent
+for an unconfigured tool. See [../LIMITATIONS.md](../LIMITATIONS.md) §4.
 
-Optional: `resourceClass`, `recipientType`, `recipientCount` (0–100000),
-`attachmentIndicator` (boolean), `dataSensitivityLabel`, `reversibilityLabel`.
+A **configured** tool can still receive a remote `404` if the service cannot
+resolve the deployment, agent, tool, or contract. That is a remote contract or
+registry failure, not an execution decision, and it cannot block your tool.
 
-### Valid `actionClass` values
+`schemaHash` must be `sha256:` followed by 64 lowercase hex characters. The
+zeroed hashes in the example are placeholders and will not match any real tool.
 
-Exact strings only — similar, suffixed, prefixed, or differently-cased names are
-rejected with `CONFIG_ACTION_CLASS_INVALID`:
+## Applying a configuration
 
-- `read_only_internal`
-- `reversible_internal_write`
-- `file_modification`
-- `command_execution`
-- `configuration_modification`
-- `service_gateway_control`
-- `external_outbound`
-- `credential_secret_access`
-- `destructive_irreversible`
-- `unknown`
+```sh
+openclaw config set \
+  plugins.entries.mcpherson-governance-connector.config \
+  "$(cat connector-config.example.json)" --strict-json
+openclaw config validate
+```
 
-## Remember what these labels are for
-
-Class labels are sent to the governance endpoint verbatim, and so are
-`agentId`, `deploymentId`, and tool IDs. Choose identifiers that are not
-themselves sensitive — see [../PRIVACY.md](../PRIVACY.md).
+Review what you are applying first. Do not paste a real configuration
+containing deployment or agent identifiers into an issue report.

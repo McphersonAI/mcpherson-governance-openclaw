@@ -1,0 +1,592 @@
+{
+  "schema": "mcpherson-governance-v06-internal-canary-package-manifest/v1",
+  "product_boundary": "AUTOMAP_GOVERNABILITY_AND_METADATA_ONLY_OPENCLAW_OBSERVATION",
+  "package_name": "@mcphersonai/mcpherson-governance-openclaw",
+  "plugin_id": "mcpherson-governance-connector",
+  "plugin_version": "0.6.0",
+  "source_commit": "d247b76e56fb10a8f14590a68e884f1c867ccf4b",
+  "source_tree": "a23151515789747787f9f2660e416a5405ecd774",
+  "safety": {
+    "runtime_authority": "NONE",
+    "enforcement_active": false,
+    "outbound_production_actions": false,
+    "automatic_mapping_activation": false,
+    "registry_mutation": false,
+    "remote_decisions": "SHADOW_ONLY",
+    "openclaw_version_pin": "2026.6.5",
+    "operator_read_methods": [
+      "agents.list",
+      "tools.catalog"
+    ],
+    "session_or_payload_access": false
+  },
+  "reproducibility": {
+    "archive_format": "USTAR_GZIP",
+    "archive_root": "package/",
+    "archive_entry_mtime_epoch_seconds": 0,
+    "gzip_mtime_epoch_seconds": 0,
+    "entry_order": "BYTE_SORTED_PATH",
+    "uid_gid": 0
+  },
+  "target_binding": {
+    "schema": "mcpherson-governance-openclaw-canary-target-binding/v2",
+    "profile_binding_required": true,
+    "supported_profile_modes": [
+      "DEFAULT",
+      "NAMED"
+    ],
+    "default_state_identity": ".openclaw",
+    "named_state_prefix": ".openclaw-",
+    "config_basename": "openclaw.json",
+    "runtime_identity": ".local/lib/node_modules/openclaw/openclaw.mjs",
+    "endpoint_identity": "ws://127.0.0.1:18789",
+    "semantic_version": "2026.6.5",
+    "full_build_commit": "5181e4f7c82bd373cb215a5619b0fa03c13862b7",
+    "runtime_entry_sha256": "ea04d15e53edc9ea4a1e7761b809703ffbc345e41defb8c6d7d69aa8c0969d1c",
+    "package_json_sha256": "af4e4f145ce5161eeba53c1408ac06c7df183b52edf5d199ddee5b85c492adb0",
+    "build_info_sha256": "6a63416e1a305710d943303019a952100015a6a1b5e515faa2987864878ef6c0",
+    "rpc_methods": [
+      "agents.list",
+      "tools.catalog"
+    ],
+    "authority": "NONE",
+    "enforcement": false,
+    "automatic_mapping_activation": false,
+    "outbound_actions": false,
+    "registry_mutation": false,
+    "source_commit": "d247b76e56fb10a8f14590a68e884f1c867ccf4b"
+  },
+  "target_binding_id": "0537e253b5f2be68578169fa616d827d68d06069c2c1bbcf51c65b6b71d790cf",
+  "source_files": [
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-advisory-classification-suggestion-v1.schema.json",
+      "bytes": 2236,
+      "sha256": "306e3d3937cad4c251744c22e2a79717f2695eb707f9070dc61f2f38a60f558f"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-capability-candidate-set-v1.schema.json",
+      "bytes": 2243,
+      "sha256": "616f0d4694ea4d33cbbc847ebfd107f128681c37ba5b1421c1d972b8978b62f1"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-capability-candidate-v1.schema.json",
+      "bytes": 12793,
+      "sha256": "111d45a3c7704d868ca33c49b112acf0e7a741ced78400e586f537d945b0c04a"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-capability-snapshot-v1.schema.json",
+      "bytes": 4174,
+      "sha256": "78b0fec715422ef78cdb617ee7a521c41e6eae945a05d32ce10be40cf041dd8d"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-code-owned-tool-registry-v1.schema.json",
+      "bytes": 3665,
+      "sha256": "4ccda7cbae980e0b9962390ca7bcba85d057a8fa1f1f901255f6bf89c877a2ef"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-governability-diagnosis-v1.schema.json",
+      "bytes": 9047,
+      "sha256": "710da61c674b308ec7db2d5f147776b60592f3ef74981df94c6734f7d9480ba9"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-governability-evidence-v1.schema.json",
+      "bytes": 7363,
+      "sha256": "1dfbbe3a019254a9ef47ba32bbfa7f78c70b44f93e5513adbb72e439e662c9fb"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-governability-finding-set-v1.schema.json",
+      "bytes": 3003,
+      "sha256": "d10dd9c806e26c0a8a9ea2190677c2bb9fcdc9ca52c0f247a7cf4721a746acc4"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-governability-result-v1.schema.json",
+      "bytes": 6526,
+      "sha256": "930a081120feddeaf10c1e98f8ba912be47f8292366ef02a53bf41b4e036deac"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-human-classification-confirmation-v1.schema.json",
+      "bytes": 2560,
+      "sha256": "4d6ea8b537a74e7caa857fe343144e87ef36387fb370a4efe59f68c825beae84"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-latency-event-set-v1.schema.json",
+      "bytes": 1480,
+      "sha256": "7f4dd1bc02cbe94f3796d0a1879c811d66f5458279296ae56a701d8b4debc2de"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-latency-event-v1.schema.json",
+      "bytes": 6349,
+      "sha256": "4dad526a5918a5f9b3718e05cd62cc909443534a0b1958ee0663cf29a6342d98"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-latency-summary-v1.schema.json",
+      "bytes": 6595,
+      "sha256": "6894f52ca0e21cf43bab8897e6e7c6b472e13022388d3b71f7ddc0b5b490b81a"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-live-capability-snapshot-v1.schema.json",
+      "bytes": 6127,
+      "sha256": "032b858ba902b3f699ec7b075dfd07c31d37cd5c12ec20c9199ec4bc7fe8c4f3"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-live-classification-confirmation-v1.schema.json",
+      "bytes": 4122,
+      "sha256": "ca88d9ca412347db2cf6242f68b52d8594198d25cbe86b14c6ccc63ab77e504e"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-live-latency-event-set-v1.schema.json",
+      "bytes": 2770,
+      "sha256": "3029dee2c35a305ed48e9fa52ce656fe2068c1dd8f8c3f00865a6785ded5a835"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-live-latency-event-v1.schema.json",
+      "bytes": 5565,
+      "sha256": "b627d23aa7bf6d227ee2ece6ee5e5dc43f42621367613dd763f4944daa9ba2b5"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-live-latency-summary-v1.schema.json",
+      "bytes": 4814,
+      "sha256": "a6db5a511e4bf5c2e860862af19e77e12c587338878866992aa7d9a4971ae529"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-live-observation-manifest-v1.schema.json",
+      "bytes": 7292,
+      "sha256": "8b98337526a69737fc9031e5d3f410a96a8cb931218b121ed89b47553331df4f"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-live-shadow-coverage-report-v1.schema.json",
+      "bytes": 8827,
+      "sha256": "cdb1d364d25054a01a5ab7843a6c9d7e2ed740e954042adb355ad518108e7793"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-live-shadow-receipt-summary-v1.schema.json",
+      "bytes": 4323,
+      "sha256": "0fd9fe1af4bb0a4874394131fbc7f8b97b1f0da39a5f4bb1a67600538680b34c"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-mapping-approval-v1.schema.json",
+      "bytes": 3073,
+      "sha256": "7e871e7163404c278c498d2feb3aa1606e723ac7341bd77558de58520187ab56"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-registry-ready-shadow-mapping-v1.schema.json",
+      "bytes": 5871,
+      "sha256": "e169371b653a1e9e9a2630c2d83bb9d9cde828a12b73505dfd476b3701c4451a"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-schema-drift-event-set-v1.schema.json",
+      "bytes": 1341,
+      "sha256": "913b4c85f55ca5fd74ba80414172dbd8c502d8cdc4dd735d4d7584a35eff3bd6"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-schema-drift-event-v1.schema.json",
+      "bytes": 4504,
+      "sha256": "05c8c27b133327128c6691460ddbbc007fdfabe92c62d53458f651abc37f0027"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-shadow-coverage-report-v1.schema.json",
+      "bytes": 9349,
+      "sha256": "5b08e026770f4d8372c43bb71b36914d192b2397fe4a9da4c0a69f540d32226a"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-shadow-mapping-registry-v1.schema.json",
+      "bytes": 7415,
+      "sha256": "c12783fbee55135c8e263a446a4e7fc5b9979708b7286e1118a275f57d238477"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-shadow-receipt-summary-v1.schema.json",
+      "bytes": 2851,
+      "sha256": "3d8a5599083a03abdc73e1e619454f5a57ad5213bb8beeeb5e641f087d7f33e3"
+    },
+    {
+      "path": "contracts/diagnostics/mcpherson-governance-shadow-registry-patch-v1.schema.json",
+      "bytes": 8079,
+      "sha256": "782e45da66a92b6c622c4164caab91533e4673c669dbb24c75a236e45b683cfe"
+    },
+    {
+      "path": "packages/governance-core/canonical.mjs",
+      "bytes": 3469,
+      "sha256": "b74e52eedd427289316255fd5fa34a5b3364f3688b2ddba9c9e7d455639d9bb2"
+    },
+    {
+      "path": "packages/governance-core/classify.mjs",
+      "bytes": 1043,
+      "sha256": "60291f30c0598e1d46467fc5869d255bba558b3aa3591cffb213e313032846be"
+    },
+    {
+      "path": "packages/governance-core/contracts.mjs",
+      "bytes": 16154,
+      "sha256": "a847d378474b362f366ea8f64694ba2a77a503ed5c3b1bb93d2cd7d50011ceb0"
+    },
+    {
+      "path": "packages/governance-core/errors.mjs",
+      "bytes": 1687,
+      "sha256": "b81ea92eec5d5bd4932f74a1acb9cc77c2434b526ee1cab55c210124449861b9"
+    },
+    {
+      "path": "packages/governance-core/policy-validate.mjs",
+      "bytes": 7778,
+      "sha256": "a7fd7771b9afdf347e45b09acd2a8b1522df77a18aa59c30de1e55f37c21afb1"
+    },
+    {
+      "path": "packages/governance-diagnostics/README.md",
+      "bytes": 12598,
+      "sha256": "3063a447230cc8dd8c15dc620a44028c969a47baf9b473c292e2c4358c471174"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/approval.mjs",
+      "bytes": 16869,
+      "sha256": "7360cc26c8c234cd9c1dc674651ca6eca29b33a5351cd061ecef0d329d60d85f"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/candidate-validate.mjs",
+      "bytes": 17820,
+      "sha256": "55e3b50c29ff9fb24fb1a16b89dfb87740693990abd2b4466c41ac2a4b39fe21"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/classification.mjs",
+      "bytes": 8026,
+      "sha256": "728e8a525eb07a0587b850a688a50a5114f8bdc56f47ead6f7663d98f416e8c8"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/confirmation.mjs",
+      "bytes": 9155,
+      "sha256": "416ce41b97d6de954f1260380e4d6e7b321d9735ca664fa707f697aa72a70b7c"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/discovery.mjs",
+      "bytes": 32632,
+      "sha256": "408486788c7ae264342f403ae014326eeaf2dadf0ab4e20c306356dd5906bb8e"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/drift.mjs",
+      "bytes": 20416,
+      "sha256": "4f57483e447be65ec6583aea864dacf0ec46446147c3801ec292ce6ef64c9b37"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/fingerprint.mjs",
+      "bytes": 10269,
+      "sha256": "02cd0f4b68c3d2e1194bd6e5f817e52f082ca113481d8130b043c618929853d7"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/input-safety.mjs",
+      "bytes": 5562,
+      "sha256": "dd587665fb1dfda81c202c69adf0606793148ec0291c9947576356f8f92c5b55"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/live-confirmation.mjs",
+      "bytes": 9519,
+      "sha256": "38f082a7f715e3757e34c48d0c207a0319946043f54ff94f2c2de5bf170ed6ba"
+    },
+    {
+      "path": "packages/governance-diagnostics/automap/pinned-content.mjs",
+      "bytes": 14681,
+      "sha256": "8c4d5dfb3dc179321a4dddf0b05471ed7da05db17df45c5f6ee5f56d17f48d37"
+    },
+    {
+      "path": "packages/governance-diagnostics/contracts.mjs",
+      "bytes": 9176,
+      "sha256": "ccbe715607e18f4f8372064e2d504c62f9367ac6354178705a021a0a8ae51888"
+    },
+    {
+      "path": "packages/governance-diagnostics/coverage.mjs",
+      "bytes": 28005,
+      "sha256": "ca74b80d0ad45d468a751663154e6988620b097a5a4a447546e81c3db70f4691"
+    },
+    {
+      "path": "packages/governance-diagnostics/governor/diagnose-evidence.mjs",
+      "bytes": 57669,
+      "sha256": "34261512c85996d7764abb4db36ed72bf041447f8a8842cd85d2fca6856de2df"
+    },
+    {
+      "path": "packages/governance-diagnostics/governor/render.mjs",
+      "bytes": 21071,
+      "sha256": "d0a1f5d3c848e43d40b865730aac23238c075087267afc3389aa1f914ac1f5e5"
+    },
+    {
+      "path": "packages/governance-diagnostics/index.mjs",
+      "bytes": 1503,
+      "sha256": "0b16b58d2e0a2774a9fc153960355caed7edea466a55b92aea240ce4577c917d"
+    },
+    {
+      "path": "packages/governance-diagnostics/latency/recorder.mjs",
+      "bytes": 12720,
+      "sha256": "070ff80cf6790ded6efc2b0a86afcb9227b87e35c44d517bd4bd481c406e08b6"
+    },
+    {
+      "path": "packages/governance-diagnostics/latency/summary.mjs",
+      "bytes": 19475,
+      "sha256": "8ac208c2f34e7dbfdf06a14b794ce7a3fd2e473c5434bec726d981563a198ead"
+    },
+    {
+      "path": "packages/governance-diagnostics/registry.mjs",
+      "bytes": 13687,
+      "sha256": "b1710c0135d9e5e6020261f35b3280c6f19eecae72f4048dd864cf1905b43f36"
+    },
+    {
+      "path": "packages/governance-diagnostics/schema-validate.mjs",
+      "bytes": 11044,
+      "sha256": "cf0eba22dec5fdd150413cbcaecff7402b6243c7cd07e37de114a9a124252a8a"
+    },
+    {
+      "path": "packages/governance-diagnostics/sensitive-values.mjs",
+      "bytes": 4044,
+      "sha256": "c1892e16e5d3b984e8203f8e346d318bd9a3c73ad2a58fde7ed1868031a73a30"
+    },
+    {
+      "path": "packages/governance-diagnostics/typed-values.mjs",
+      "bytes": 6686,
+      "sha256": "3178647d3fd8006b6e78816f4c2bfd72cbe1c9b072efcd0ab4495c1b8af3a947"
+    },
+    {
+      "path": "packages/governance-diagnostics/vocabulary.mjs",
+      "bytes": 5693,
+      "sha256": "ca8e0549bdf5719b935b11fb29323c59673c007e44f28a4b14fda2a7e747d472"
+    },
+    {
+      "path": "packages/openclaw-live-observer/index.mjs",
+      "bytes": 89164,
+      "sha256": "c35f64bc14caa9bc9a9e4a08425418d4c9d47c9c8db26f36ef3b482ee25abfbd"
+    },
+    {
+      "path": "packages/openclaw-live-observer/target-binding.mjs",
+      "bytes": 2986,
+      "sha256": "1ec773186976bad020936c9a7749db2f112ce81ce1e8da7a8c1530ddc73a173c"
+    },
+    {
+      "path": "plugins/openclaw-connector/README.md",
+      "bytes": 7006,
+      "sha256": "4f8cda8539382212a718a848a7586345a443c6a2fd9b99e8b6f9d7c36041e04d"
+    },
+    {
+      "path": "plugins/openclaw-connector/allowlist.mjs",
+      "bytes": 5550,
+      "sha256": "3aecabc92cb32f2eb94e59c68ffa717e933978c150951c6d52d61ae00f295c6f"
+    },
+    {
+      "path": "plugins/openclaw-connector/canary.mjs",
+      "bytes": 1231,
+      "sha256": "b01848a59975aea0b406518bffc66c84aa58379a278b47a68b041d12e21dea1b"
+    },
+    {
+      "path": "plugins/openclaw-connector/client.mjs",
+      "bytes": 22971,
+      "sha256": "349076756dd3267865773c1745f919a142e26fd06b308a95ac4ccb2c3a24c412"
+    },
+    {
+      "path": "plugins/openclaw-connector/config.mjs",
+      "bytes": 5535,
+      "sha256": "0c24bde8bff714c7a302ceedec4269e9bf99952d995d4799a02afa8a2bdfc85a"
+    },
+    {
+      "path": "plugins/openclaw-connector/connector-ctl.mjs",
+      "bytes": 4153,
+      "sha256": "125ff65634e824888c89afd285fb7a3d264d28b361aa39c063eee0756839abe6"
+    },
+    {
+      "path": "plugins/openclaw-connector/constants.mjs",
+      "bytes": 3461,
+      "sha256": "2e1a285d0d28c2afa7ec7f531cca4728a9a164da8303c1e9b3923d4c9a882ef0"
+    },
+    {
+      "path": "plugins/openclaw-connector/controls.mjs",
+      "bytes": 3806,
+      "sha256": "005ee0bb07a7000f206522e2ff3d386117788a234d0ae6e71db29054e080a47e"
+    },
+    {
+      "path": "plugins/openclaw-connector/credentials.mjs",
+      "bytes": 36857,
+      "sha256": "000637733172602d3ea5943af5b06f2cd40641ca3b004d82ff4d4b1d4b1e797d"
+    },
+    {
+      "path": "plugins/openclaw-connector/hook.mjs",
+      "bytes": 9664,
+      "sha256": "e6512c8e133604128e5f097672e38dc7e059cb4ca71f6cb203b781a2cec4b68c"
+    },
+    {
+      "path": "plugins/openclaw-connector/host.mjs",
+      "bytes": 8854,
+      "sha256": "f8d35f1f9360a2f70c904589147de4cfab21df5ef645eb4dcfce6b76a518932b"
+    },
+    {
+      "path": "plugins/openclaw-connector/index.mjs",
+      "bytes": 11433,
+      "sha256": "143b0c90e557ee19d717ff61e7f86df78fdf049c106ffac965b0984bbdc1e3ff"
+    },
+    {
+      "path": "plugins/openclaw-connector/openclaw.plugin.json",
+      "bytes": 2171,
+      "sha256": "69e15919f58aaa50fc0331e8aa2f8c065372371cb5695ef6d5095369c505b2d2"
+    },
+    {
+      "path": "plugins/openclaw-connector/operator.mjs",
+      "bytes": 29221,
+      "sha256": "dbc38a55e0028cbade72461b8f05515865c516a26f95c9a23ac2a088a55ded99"
+    },
+    {
+      "path": "plugins/openclaw-connector/package.json",
+      "bytes": 604,
+      "sha256": "f92113e87825be2a014133441cb7bba8610a5a5741b8008961d174f17f9eac2c"
+    },
+    {
+      "path": "plugins/openclaw-connector/pipeline.mjs",
+      "bytes": 18190,
+      "sha256": "88a5fee0cc31c86824b5414cab417a9cc6742f196b866d2dcebd5a8becbbcf4b"
+    },
+    {
+      "path": "plugins/openclaw-connector/plugin.mjs",
+      "bytes": 523,
+      "sha256": "f57f8a560ff822693a7540c44c2a7326b631fc8101a20f4c2fc28a3c019ace32"
+    },
+    {
+      "path": "plugins/openclaw-connector/receipts.mjs",
+      "bytes": 5876,
+      "sha256": "2993d626d171dd2fa89899cbb6ffdc6a9ce774463da680b915e72a42277bd25e"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/README.md",
+      "bytes": 844,
+      "sha256": "37ef5a392fae363fe94ae58e251dd47d068adce06c4df66299e3279354adaee9"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/SOURCE.sha256",
+      "bytes": 402,
+      "sha256": "36a931d5af9eb0f189a49e2d47fe1fa3943075bdd3910913f6477f3c69289de7"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/canonical.mjs",
+      "bytes": 3469,
+      "sha256": "b74e52eedd427289316255fd5fa34a5b3364f3688b2ddba9c9e7d455639d9bb2"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/classify.mjs",
+      "bytes": 1043,
+      "sha256": "60291f30c0598e1d46467fc5869d255bba558b3aa3591cffb213e313032846be"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/contracts.mjs",
+      "bytes": 16154,
+      "sha256": "a847d378474b362f366ea8f64694ba2a77a503ed5c3b1bb93d2cd7d50011ceb0"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/errors.mjs",
+      "bytes": 1687,
+      "sha256": "b81ea92eec5d5bd4932f74a1acb9cc77c2434b526ee1cab55c210124449861b9"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/index.mjs",
+      "bytes": 500,
+      "sha256": "6d67e76daf5737b37866e0f6aecf936b2e705d1f040bdd85007904609711214e"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/policy-validate.mjs",
+      "bytes": 7778,
+      "sha256": "a7fd7771b9afdf347e45b09acd2a8b1522df77a18aa59c30de1e55f37c21afb1"
+    },
+    {
+      "path": "plugins/openclaw-connector/secure-files.mjs",
+      "bytes": 8801,
+      "sha256": "90f9697899f3016a2508f1b570931cae2382868abe831faa97dbbc52b190175c"
+    },
+    {
+      "path": "plugins/openclaw-connector/tools.mjs",
+      "bytes": 1226,
+      "sha256": "b801e723f4a4f396ce44454ea43a300e7211ea3072dd144bf1c9bbad4a38777a"
+    },
+    {
+      "path": "plugins/openclaw-connector/verify.mjs",
+      "bytes": 2372,
+      "sha256": "6c85b205d7c6ad293b8fd46e7b5364fb55d6524f731570ca4988ff6599c647cf"
+    },
+    {
+      "path": "release/openclaw-public/CHANGELOG.md",
+      "bytes": 7074,
+      "sha256": "f6d18a0a214c186caae5bc3afb336fde517436ee3a65bf5d656d3ef9ab05cd76"
+    },
+    {
+      "path": "release/openclaw-public/INSTALL.md",
+      "bytes": 21818,
+      "sha256": "36f604b0bd0edc861064f8d4b62dcee7f6e14886d771209244945e38422e4cad"
+    },
+    {
+      "path": "release/openclaw-public/LICENSE",
+      "bytes": 11346,
+      "sha256": "d835dee4c05033dd8c80bba3ee72cefa699b268addabb3580682ba366caefb0e"
+    },
+    {
+      "path": "release/openclaw-public/LIFECYCLE.md",
+      "bytes": 6028,
+      "sha256": "3df4cc5b29a063bfeff1878da656e74f9333e25827929d1553eb78bc5705c7f6"
+    },
+    {
+      "path": "release/openclaw-public/LIMITATIONS.md",
+      "bytes": 6849,
+      "sha256": "3eec36e41637de7dde1e624132dbbb0434097bfb0583bd2df6a7d7ea5b87c325"
+    },
+    {
+      "path": "release/openclaw-public/NOTICE",
+      "bytes": 2672,
+      "sha256": "c486391345789f88c269e5a7195f27425dff308a8251dbe866348abc08c8594c"
+    },
+    {
+      "path": "release/openclaw-public/PRIVACY.md",
+      "bytes": 4824,
+      "sha256": "87bd16439f7a83c7c77d859914bc173bf8ed11c45a276a7c60e675a217379763"
+    },
+    {
+      "path": "release/openclaw-public/README.md",
+      "bytes": 7327,
+      "sha256": "83f8154fb944beaa3ca6214335c89f7c098f36af91af1c08b558c44f47f4161f"
+    },
+    {
+      "path": "release/openclaw-public/SECURITY.md",
+      "bytes": 4487,
+      "sha256": "b25791634fddf2a759ca40932ee76f87da08eee54ec6b604cea45678f08be9d7"
+    },
+    {
+      "path": "release/openclaw-public/SUPPORT.md",
+      "bytes": 3644,
+      "sha256": "436404c0d5953fb56b0a56a09cb514ffbb0949ed2454cb9fb7869488a3473a1d"
+    },
+    {
+      "path": "release/openclaw-public/VERIFY.md",
+      "bytes": 7236,
+      "sha256": "0f9f12f07fab58474041a75fbbaf5a26b7fc6e43fb0c6421c75da4757d06f81b"
+    },
+    {
+      "path": "release/openclaw-public/examples/README.md",
+      "bytes": 2952,
+      "sha256": "812b63e38f73b7b65f8be851d7fcb7f52be2f1468a12673fac695cacdcc7c7ca"
+    },
+    {
+      "path": "release/openclaw-public/examples/connector-config.example.json",
+      "bytes": 1085,
+      "sha256": "d1ed91646225ef0edcd1651ae1ee75719b2645c133f5fed616f7d91651104da1"
+    },
+    {
+      "path": "release/openclaw-public/openclaw.plugin.json",
+      "bytes": 3076,
+      "sha256": "2bb35a50c2fde218ea05449db2f2d4ad37eb09d38466b6699006ca43f8338e51"
+    },
+    {
+      "path": "release/openclaw-public/package.json",
+      "bytes": 1902,
+      "sha256": "cc85539da40083c0f437b22b9d107266c84e74b61606907cd6609602a6c97cb5"
+    },
+    {
+      "path": "release/openclaw-public/scripts/verify-package.mjs",
+      "bytes": 18104,
+      "sha256": "e0786c94024519e5977007be4f680f0063123029baa46791a7094dd167732c99"
+    },
+    {
+      "path": "release/openclaw-public/tests/public-package.test.mjs",
+      "bytes": 6861,
+      "sha256": "44888cfbf92507c5c5e9b55fb0a1d311f5b7a34b18be347006c045b4c9ce6c61"
+    },
+    {
+      "path": "scripts/governance-diagnostics.mjs",
+      "bytes": 30395,
+      "sha256": "10461d08628816e4c8fd597446656a4334654c0a5ebb93780d0626e71b105266"
+    }
+  ]
+}

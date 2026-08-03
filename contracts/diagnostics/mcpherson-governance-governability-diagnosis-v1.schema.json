@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-governability-diagnosis-v1.schema.json",
+  "title": "McPherson Governance v0.6 Governability Diagnosis",
+  "description": "The human-facing diagnosis document. It is content-bound to one deterministically identified finding set and the canonical SHA-256, ID, schema, and version of the exact validated evidence document; consumers require that document and rederive the complete finding set before accepting or rendering this diagnosis. It is a diagnosis, not a grade: no aggregate governance score exists anywhere in this schema; result counts are per unit type only; connector-level findings, capability-level findings, and per-owner gap lists stay separate; and every McPherson observation statement derives from separately supplied coverage evidence (coverage_evidence_supplied false means no observation claim is made anywhere).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "finding_set_id",
+    "finding_set_version",
+    "evidence_set_id",
+    "evidence_document_id",
+    "evidence_document_sha256",
+    "evidence_schema",
+    "evidence_schema_version",
+    "diagnosed_units",
+    "evaluator_version",
+    "evaluated_timestamp",
+    "max_evidence_age_days",
+    "framing",
+    "no_aggregate_score",
+    "coverage_evidence_supplied",
+    "coverage_evidence_kind",
+    "sections",
+    "gaps_by_owner",
+    "evidence_completeness_note"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-governability-diagnosis/v1"
+    },
+    "finding_set_id": {
+      "type": "string",
+      "pattern": "^mgfs-[a-f0-9]{64}$"
+    },
+    "finding_set_version": {
+      "const": "1"
+    },
+    "evidence_set_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "evidence_document_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "evidence_document_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "evidence_schema": {
+      "const": "mcpherson-governance-governability-evidence/v1"
+    },
+    "evidence_schema_version": {
+      "const": "1"
+    },
+    "diagnosed_units": {
+      "type": "array",
+      "maxItems": 4096,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unit_type",
+          "unit_id"
+        ],
+        "properties": {
+          "unit_type": {
+            "enum": [
+              "connector",
+              "capability"
+            ]
+          },
+          "unit_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+          }
+        }
+      }
+    },
+    "evaluator_version": {
+      "const": "0.6.3"
+    },
+    "evaluated_timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    },
+    "max_evidence_age_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3650
+    },
+    "framing": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "no_aggregate_score": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "coverage_evidence_supplied": {
+      "type": "boolean"
+    },
+    "coverage_evidence_kind": {
+      "oneOf": [
+        {
+          "const": "FIXTURE"
+        },
+        {
+          "const": "LIVE_SHADOW"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unit_type",
+          "unit_count",
+          "result_counts",
+          "units"
+        ],
+        "properties": {
+          "unit_type": {
+            "enum": [
+              "connector",
+              "capability"
+            ]
+          },
+          "unit_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65536
+          },
+          "result_counts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "PASS",
+              "PARTIAL",
+              "FAIL",
+              "UNKNOWN"
+            ],
+            "properties": {
+              "PASS": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "PARTIAL": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "FAIL": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "UNKNOWN": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              }
+            }
+          },
+          "units": {
+            "type": "array",
+            "maxItems": 65536,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "unit_id",
+                "findings",
+                "attention"
+              ],
+              "properties": {
+                "unit_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+                },
+                "findings": {
+                  "type": "array",
+                  "maxItems": 8,
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "attention": {
+                  "type": "array",
+                  "maxItems": 8,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "criterion",
+                      "result",
+                      "what_was_observed",
+                      "what_could_not_be_verified",
+                      "why_the_gap_matters",
+                      "likely_gap_owners",
+                      "smallest_reasonable_remediation",
+                      "what_mcpherson_can_do",
+                      "what_mcpherson_cannot_do"
+                    ],
+                    "properties": {
+                      "criterion": {
+                        "enum": [
+                          "VISIBLE",
+                          "ATTRIBUTABLE",
+                          "SCOPED",
+                          "INDEPENDENTLY_REVOCABLE"
+                        ]
+                      },
+                      "result": {
+                        "enum": [
+                          "PARTIAL",
+                          "FAIL",
+                          "UNKNOWN"
+                        ]
+                      },
+                      "what_was_observed": {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      "what_could_not_be_verified": {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      "why_the_gap_matters": {
+                        "type": "string",
+                        "maxLength": 512
+                      },
+                      "likely_gap_owners": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                          "enum": [
+                            "source_platform",
+                            "connector",
+                            "runtime_integration",
+                            "policy_configuration",
+                            "missing_evidence"
+                          ]
+                        }
+                      },
+                      "smallest_reasonable_remediation": {
+                        "type": "string",
+                        "maxLength": 512
+                      },
+                      "what_mcpherson_can_do": {
+                        "type": "string",
+                        "maxLength": 512
+                      },
+                      "what_mcpherson_cannot_do": {
+                        "type": "string",
+                        "maxLength": 512
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "gaps_by_owner": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "maxItems": 65536,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z_]{1,64}$"
+      }
+    },
+    "evidence_completeness_note": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    }
+  }
+}

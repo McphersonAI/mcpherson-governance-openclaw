@@ -1,491 +1,484 @@
 #!/usr/bin/env node
-// Self-contained public verification for the McPherson Governance Connector.
+// Verify this installed package against its own checksum manifest, declared
+// identities, and safety constants. Fails closed and exits non-zero on any
+// mismatch.
 //
-// This replaces the internal build's test script, whose path pointed at a test
-// tree that is not shipped in the public package. It has no dependencies and
-// makes no network calls. Run it from the package root:
-//
-//     npm test
-//     node scripts/verify-package.mjs
-//
-// It verifies package integrity and the shadow-only invariants that this
-// release's public claims rest on.
+// Run from the package root:  node scripts/verify-package.mjs
 
 import { createHash } from "node:crypto";
-import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { join, dirname, relative } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+} from "node:fs";
+import { basename, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-
-const VERSION = "0.5.1";
-const MIN_OPENCLAW = "2026.6.5";
-const CONNECTOR_FILE_COUNT = 29;
-const CONNECTOR_RUNTIME_COUNT = 24;
-const SEALED_FILE_COUNT = 28;
-
-// The EXACT, enumerated difference between this release's connector tree and
-// the sealed v0.5.0 connector inventory. Every entry corresponds to a stated
-// v0.5.1 finding in CHANGELOG.md. Anything outside this set — an unexpected
-// added file, a changed runtime module, a removed sealed file — fails.
-const SEALED_DELTA = Object.freeze({
-  added: Object.freeze(["connector/host.mjs"]),
-  changedRuntime: Object.freeze([
-    "connector/config.mjs",
-    "connector/constants.mjs",
-    "connector/hook.mjs",
-    "connector/index.mjs",
-    "connector/pipeline.mjs",
-  ]),
-  changedMetadata: Object.freeze([
-    "connector/openclaw.plugin.json",
-    "connector/package.json",
-  ]),
-  changedDocs: Object.freeze([
-    "connector/README.md",
-  ]),
+const PACKAGE_ROOT = resolve(join(fileURLToPath(new URL(".", import.meta.url)), ".."));
+const CHECKSUM_NAME = "PACKAGE-FILES.sha256";
+const PROVENANCE_NAME = "RELEASE-PROVENANCE.json";
+const PACKAGE_MANIFEST_NAME = "V6-PACKAGE-MANIFEST.json";
+const EXPECTED_PACKAGE = "@mcphersonai/mcpherson-governance-openclaw";
+const EXPECTED_PLUGIN_ID = "mcpherson-governance-connector";
+const EXPECTED_COMPAT = ">=2026.6.5";
+const EXPECTED_OPENCLAW_TARGET = Object.freeze({
+  profile_binding_required: true,
+  supported_profile_modes: Object.freeze(["DEFAULT", "NAMED"]),
+  default_state_identity: ".openclaw",
+  named_state_prefix: ".openclaw-",
+  config_basename: "openclaw.json",
+  runtime_identity: ".local/lib/node_modules/openclaw/openclaw.mjs",
+  endpoint_identity: "ws://127.0.0.1:18789",
+  semantic_version: "2026.6.5",
+  full_build_commit: "5181e4f7c82bd373cb215a5619b0fa03c13862b7",
+  runtime_entry_sha256:
+    "ea04d15e53edc9ea4a1e7761b809703ffbc345e41defb8c6d7d69aa8c0969d1c",
+  package_json_sha256:
+    "af4e4f145ce5161eeba53c1408ac06c7df183b52edf5d199ddee5b85c492adb0",
+  build_info_sha256:
+    "6a63416e1a305710d943303019a952100015a6a1b5e515faa2987864878ef6c0",
+  rpc_methods: Object.freeze(["agents.list", "tools.catalog"]),
+  authority: "NONE",
+  enforcement: false,
+  automatic_mapping_activation: false,
+  outbound_actions: false,
+  registry_mutation: false,
 });
 
-// CHANGELOG.md is a historical record: its superseded entries legitimately
-// state the file counts that were true for earlier releases. Current-state
-// documentation is checked against the current tree.
-const HISTORICAL_DOCS = new Set(["CHANGELOG.md"]);
+const PROHIBITED_CONTENT = Object.freeze([
+  ["private home path", /(?:\/Users\/[A-Za-z0-9._-]+\/|\/home\/[A-Za-z0-9._-]+\/|[A-Za-z]:\\Users\\[A-Za-z0-9._-]+\\)/],
+  ["credential token", /mgd1_[a-f0-9]{32}\.[A-Za-z0-9_-]{43}/],
+  ["private key", /-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED |DSA )?PRIVATE KEY-----/],
+  ["aws access key", /AKIA[0-9A-Z]{16}/],
+]);
+const PROHIBITED_ENTRYPOINT_BASENAMES = Object.freeze(new Set([
+  "evaluate.mjs",
+  "gate.mjs",
+]));
+const DIAGNOSTIC_ASSESSMENT_MODULE =
+  "packages/governance-diagnostics/governor/diagnose-evidence.mjs";
+const ALLOWED_GOVERNANCE_CORE_MODULES = Object.freeze(new Set([
+  "packages/governance-core/canonical.mjs",
+  "packages/governance-core/classify.mjs",
+  "packages/governance-core/contracts.mjs",
+  "packages/governance-core/errors.mjs",
+  "packages/governance-core/policy-validate.mjs",
+]));
+const ALLOWED_BUILTINS = Object.freeze(new Set([
+  "node:crypto", "node:fs", "node:https", "node:path", "node:os",
+  "node:url", "node:util", "node:child_process", "node:net",
+  "node:assert", "node:assert/strict", "node:test", "node:zlib",
+  "node:fs/promises", "node:buffer", "node:events", "node:stream",
+]));
 
-const results = [];
-const record = (ok, name, detail) => results.push({ ok, name, detail });
-const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
+const failures = [];
+const checks = [];
 
-async function check(name, fn) {
-  try { record(true, name, (await fn()) ?? ""); }
-  catch (e) { record(false, name, e.message); }
+function check(name, condition, detail = "") {
+  if (condition) {
+    checks.push(name);
+    return true;
+  }
+  failures.push(detail ? `${name}: ${detail}` : name);
+  return false;
 }
 
-const sha256 = (p) => createHash("sha256").update(readFileSync(p)).digest("hex");
-
-function verifyManifest(manifestPath, base) {
-  const lines = readFileSync(manifestPath, "utf8").split("\n").filter((l) => l.trim());
-  let ok = 0;
-  const failed = [];
-  for (const line of lines) {
-    const m = line.match(/^([a-f0-9]{64})\s+\*?(.+)$/);
-    if (!m) { failed.push(`unparseable: ${line}`); continue; }
-    const [, expected, rel] = m;
-    const target = join(base, rel);
-    if (!existsSync(target)) { failed.push(`missing: ${rel}`); continue; }
-    if (sha256(target) !== expected) { failed.push(`MISMATCH: ${rel}`); continue; }
-    ok += 1;
-  }
-  return { ok, failed, total: lines.length };
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
-function readManifest(manifestPath) {
-  const entries = new Map();
-  const lines = readFileSync(manifestPath, "utf8").split("\n").filter((line) => line.trim());
-  for (const line of lines) {
-    const match = line.match(/^([a-f0-9]{64})\s+\*?(.+)$/);
-    assert(match, `unparseable manifest line: ${line}`);
-    const [, hash, path] = match;
-    assert(!entries.has(path), `duplicate manifest path: ${path}`);
-    entries.set(path, hash);
+function canonicalizeJson(value) {
+  if (value === null || typeof value === "string"
+      || typeof value === "boolean") return JSON.stringify(value);
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return JSON.stringify(value);
   }
-  return entries;
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalizeJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => (
+      `${JSON.stringify(key)}:${canonicalizeJson(value[key])}`
+    )).join(",")}}`;
+  }
+  throw new TypeError("package_target_json_invalid");
 }
 
-function walk(dir) {
-  const out = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) out.push(...walk(full));
-    else out.push(full);
+function validateOpenClawTargetManifest(packageManifest) {
+  if (!packageManifest || typeof packageManifest !== "object"
+      || Array.isArray(packageManifest)
+      || packageManifest.schema
+        !== "mcpherson-governance-v06-internal-canary-package-manifest/v1"
+      || !Array.isArray(packageManifest.source_files)
+      || !/^[a-f0-9]{40}$/.test(packageManifest.source_commit ?? "")) {
+    throw new TypeError("package_manifest_invalid");
   }
-  return out;
-}
-
-// 1. connector byte manifest -------------------------------------------------
-await check(`connector byte manifest verifies (${CONNECTOR_FILE_COUNT} files)`, () => {
-  const { ok, failed, total } = verifyManifest(join(root, "CONNECTOR-FILES.sha256"), root);
-  assert(failed.length === 0, `${failed.length} problem(s): ${failed.slice(0, 5).join("; ")}`);
-  assert(total === CONNECTOR_FILE_COUNT,
-    `expected ${CONNECTOR_FILE_COUNT} manifest entries, found ${total}`);
-  return `${ok}/${total} match the public checksum manifest`;
-});
-
-// 2. sealed provenance identity ----------------------------------------------
-await check("difference from the sealed v0.5.0 inventory is exactly the enumerated v0.5.1 set", () => {
-  const sealed = readManifest(join(root, "SEALED-CONNECTOR-FILES.sha256"));
-  const files = walk(join(root, "connector"))
-    .map((path) => relative(root, path))
-    .sort();
-  assert(sealed.size === SEALED_FILE_COUNT,
-    `expected ${SEALED_FILE_COUNT} sealed entries, found ${sealed.size}`);
-  assert(files.length === CONNECTOR_FILE_COUNT,
-    `expected ${CONNECTOR_FILE_COUNT} public connector files, found ${files.length}`);
-
-  const expectedAdded = [...SEALED_DELTA.added].sort();
-  const expectedChanged = [
-    ...SEALED_DELTA.changedRuntime,
-    ...SEALED_DELTA.changedMetadata,
-    ...SEALED_DELTA.changedDocs,
-  ].sort();
-
-  const added = files.filter((path) => !sealed.has(path)).sort();
-  assert(JSON.stringify(added) === JSON.stringify(expectedAdded),
-    `unexpected added file set: ${added.join(", ") || "(none)"}`);
-
-  const removed = [...sealed.keys()].filter((path) => !files.includes(path)).sort();
-  assert(removed.length === 0, `sealed file removed: ${removed.join(", ")}`);
-
-  const changed = files
-    .filter((path) => sealed.has(path) && sha256(join(root, path)) !== sealed.get(path))
-    .sort();
-  assert(JSON.stringify(changed) === JSON.stringify(expectedChanged),
-    `changed-file set differs from the declared v0.5.1 delta: ${changed.join(", ") || "(none)"}`);
-
-  const unchanged = SEALED_FILE_COUNT - expectedChanged.length;
-  const runtime = files.filter((path) => path.endsWith(".mjs"));
-  assert(runtime.length === CONNECTOR_RUNTIME_COUNT,
-    `expected ${CONNECTOR_RUNTIME_COUNT} .mjs runtime files, found ${runtime.length}`);
-
-  // the embedded governance core must not drift in a patch release
-  const coreChanged = changed.filter((path) => path.includes("runtime/governance-core"));
-  assert(coreChanged.length === 0,
-    `embedded governance core changed: ${coreChanged.join(", ")}`);
-
-  return `${unchanged}/${SEALED_FILE_COUNT} sealed files byte-identical; `
-    + `+${expectedAdded.length} added, ${SEALED_DELTA.changedRuntime.length} runtime, `
-    + `${SEALED_DELTA.changedMetadata.length} metadata, `
-    + `${SEALED_DELTA.changedDocs.length} doc file(s) changed; core unchanged`;
-});
-
-// 3. complete release checksum manifest --------------------------------------
-await check("release checksum manifest covers the complete public package", () => {
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  const expected = new Set(["LICENSE", "README.md", "package.json"]);
-  for (const entry of pkg.files) {
-    const path = join(root, entry);
-    if (entry.endsWith("/")) {
-      for (const file of walk(path)) expected.add(relative(root, file));
-    } else {
-      expected.add(entry);
-    }
-  }
-  expected.delete("RELEASE-CHECKSUMS.sha256");
-
-  const manifest = readManifest(join(root, "RELEASE-CHECKSUMS.sha256"));
-  const expectedPaths = [...expected].sort();
-  const manifestPaths = [...manifest.keys()].sort();
-  assert(JSON.stringify(expectedPaths) === JSON.stringify(manifestPaths),
-    `release manifest inventory differs: expected ${expectedPaths.length}, found ${manifestPaths.length}`);
-  const mismatches = expectedPaths.filter((path) =>
-    sha256(join(root, path)) !== manifest.get(path));
-  assert(mismatches.length === 0,
-    `release checksum mismatch: ${mismatches.slice(0, 5).join(", ")}`);
-  return `${manifest.size}/${expected.size} public package files match`;
-});
-
-// 4. documentation truth -----------------------------------------------------
-await check("documentation states the exact connector identity boundary", () => {
-  const runtimeCount = walk(join(root, "connector")).filter((path) => path.endsWith(".mjs")).length;
-  const docs = walk(root).filter((path) => {
-    const rel = relative(root, path);
-    return path.endsWith(".md") && !rel.startsWith(".git/") && !HISTORICAL_DOCS.has(rel);
-  });
-  const documentedCounts = [];
-  for (const path of docs) {
-    const contents = readFileSync(path, "utf8");
-    for (const match of contents.matchAll(/\b(\d+)\s+`?\.mjs`?/g)) {
-      documentedCounts.push({
-        path: relative(root, path),
-        count: Number(match[1]),
-      });
-    }
-  }
-  assert(documentedCounts.length > 0, "no documented .mjs count found");
-  const wrong = documentedCounts.filter(({ count }) => count !== runtimeCount);
-  assert(wrong.length === 0,
-    `documented .mjs count differs from ${runtimeCount}: ${
-      wrong.map(({ path, count }) => `${path}=${count}`).join(", ")
-    }`);
-
-  // Every internal §N cross-reference must resolve to a real heading, so a
-  // documentation repair cannot leave a dangling pointer behind.
-  const limitations = readFileSync(join(root, "LIMITATIONS.md"), "utf8");
-  const headings = new Set(
-    [...limitations.matchAll(/^##\s+(\d+[a-z]?)\./gm)].map((m) => m[1]),
-  );
-  const dangling = [...new Set(
-    [...limitations.matchAll(/§(\d+[a-z]?)/g)].map((m) => m[1]),
-  )].filter((ref) => !headings.has(ref));
-  assert(dangling.length === 0,
-    `LIMITATIONS.md has dangling cross-reference(s): ${dangling.map((r) => `§${r}`).join(", ")}`);
-
-  const verify = readFileSync(join(root, "VERIFY.md"), "utf8").replace(/\s+/g, " ");
-  for (const required of [
-    "Sealed v0.5.0 connector inventory: **28 files**",
-    "Files v0.5.1 adds: **1** (`connector/host.mjs`)",
-    "Sealed files carried over byte-identical: **20/28**",
-    `Runtime modules (\`.mjs\`): **${CONNECTOR_RUNTIME_COUNT}**`,
-    "verifies that the difference from that sealed inventory is **exactly** the enumerated set above",
-  ]) {
-    assert(verify.includes(required), `VERIFY.md is missing: ${required}`);
-  }
-  return `${documentedCounts.length} .mjs count claim(s) agree with actual count ${runtimeCount}`;
-});
-
-// 5. durable public lifecycle and claim boundaries ---------------------------
-await check("public lifecycle wording is durable and makes no certification overclaim", () => {
-  const docs = walk(root).filter((path) => path.endsWith(".md"));
-  const joined = docs.map((path) => readFileSync(path, "utf8")).join("\n");
-  const stale = joined.match(
-    /\b(?:unreleased|unpublished|unaudited|pending audit|pending public release|release candidate only|public release candidate|not yet published|not been published|not been independently audited)\b/i,
-  );
-  assert(!stale, `stale lifecycle label remains: ${stale?.[0]}`);
-  for (const overclaim of [
-    /\bv0\.5\s+(?:is|provides)\s+(?:an?\s+)?active enforcement\b/i,
-    /\bv0\.5\s+(?:is|provides)\s+(?:a\s+)?(?:safety|security|compliance) certification\b/i,
-    /\bv0\.5\s+is\s+(?:safety|security|compliance)[ -]certified\b/i,
-    /\bv0\.5\s+is guaranteed to block\b/i,
-  ]) {
-    assert(!overclaim.test(joined), `public documentation contains an overclaim: ${overclaim}`);
-  }
-  return "no stale lifecycle label or certification/enforcement overclaim";
-});
-
-// 6. no extra runtime file ---------------------------------------------------
-await check(`connector tree contains exactly ${CONNECTOR_FILE_COUNT} files`, () => {
-  const files = walk(join(root, "connector"));
-  assert(files.length === CONNECTOR_FILE_COUNT, `found ${files.length} files in connector/`);
-  return `${CONNECTOR_FILE_COUNT} files, no extras`;
-});
-
-// 7. embedded governance-core source hashes ----------------------------------
-await check("embedded governance-core source hashes verify", () => {
-  const base = join(root, "connector", "runtime", "governance-core");
-  const { ok, failed, total } = verifyManifest(join(base, "SOURCE.sha256"), base);
-  assert(failed.length === 0, failed.join("; "));
-  return `${ok}/${total} match the embedded source manifest`;
-});
-
-// 8. enforcement modules absent ----------------------------------------------
-await check("policy evaluator and gate are not shipped", () => {
-  const base = join(root, "connector", "runtime", "governance-core");
-  for (const f of ["evaluate.mjs", "gate.mjs"]) {
-    assert(!existsSync(join(base, f)), `${f} is present but must not be shipped`);
-  }
-  return "evaluate.mjs absent, gate.mjs absent";
-});
-
-// 9. plugin manifest parses --------------------------------------------------
-await check("plugin manifest parses (openclaw.plugin.json)", () => {
-  const p = JSON.parse(readFileSync(join(root, "connector", "openclaw.plugin.json"), "utf8"));
-  assert(p.id === "mcpherson-governance-connector", `unexpected id ${p.id}`);
-  assert(p.configSchema?.additionalProperties === false, "config schema is not closed");
-  return `id=${p.id}, tools=${p.contracts.tools.length}, closed schema`;
-});
-
-// 10. package metadata parses ------------------------------------------------
-await check("package metadata parses and declares Apache-2.0", () => {
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  assert(pkg.version === VERSION, `version is ${pkg.version}`);
-  assert(pkg.license === "Apache-2.0", `license is ${pkg.license}`);
-  assert(pkg.type === "module", `type is ${pkg.type}`);
-  assert(pkg.private !== true, "package is marked private");
-  const conn = JSON.parse(readFileSync(join(root, "connector", "package.json"), "utf8"));
-  assert(conn.version === VERSION, `connector version is ${conn.version}`);
-  assert(conn.license === "Apache-2.0", `connector license is ${conn.license}`);
-  assert(conn.private !== true, "connector package is marked private");
-  return `${pkg.name}@${pkg.version}, license=${pkg.license}`;
-});
-
-// 11. CLI source contract ----------------------------------------------------
-await check("CLI bin targets have the node shebang and executable mode", () => {
-  const rootPackage = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  const connectorPackage = JSON.parse(readFileSync(join(root, "connector", "package.json"), "utf8"));
-  const targets = [
-    ...Object.values(rootPackage.bin ?? {}).map((path) => join(root, path)),
-    ...Object.values(connectorPackage.bin ?? {}).map((path) => join(root, "connector", path)),
-  ];
-  assert(targets.length > 0, "no CLI bin target declared");
-  for (const target of targets) {
-    assert(existsSync(target), `CLI bin target is missing: ${relative(root, target)}`);
-    const firstLine = readFileSync(target, "utf8").split("\n", 1)[0];
-    assert(firstLine === "#!/usr/bin/env node",
-      `CLI bin target has an incorrect shebang: ${relative(root, target)}`);
-    const mode = statSync(target).mode & 0o777;
-    assert(mode === 0o755,
-      `CLI bin target mode is ${mode.toString(8)}, expected 755: ${relative(root, target)}`);
-  }
-  return `${targets.length} bin declaration(s), shebang=node, mode=755`;
-});
-
-// 12. license and notice present ---------------------------------------------
-await check("LICENSE and NOTICE are present and correct", () => {
-  const lic = readFileSync(join(root, "LICENSE"), "utf8");
-  assert(/Apache License/.test(lic) && /Version 2\.0/.test(lic), "LICENSE is not Apache-2.0");
-  assert(/Copyright 2026 McPherson AI LLC/.test(lic), "LICENSE lacks the copyright line");
-  const notice = readFileSync(join(root, "NOTICE"), "utf8");
-  assert(/McPherson AI LLC/.test(notice), "NOTICE lacks the copyright holder");
-  assert(!existsSync(join(root, "LICENSE-DECISION-REQUIRED.md")), "license decision blocker still present");
-  return "Apache-2.0 + NOTICE, no unresolved license blocker";
-});
-
-// 13. compatibility metadata is grounded -------------------------------------
-await check("OpenClaw compatibility metadata matches the sealed connector", () => {
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  const conn = JSON.parse(readFileSync(join(root, "connector", "package.json"), "utf8"));
-  assert(pkg.openclaw.compat.pluginApi === conn.openclaw.compat.pluginApi,
-    "root and connector pluginApi disagree");
-  assert(pkg.openclaw.build.openclawVersion === conn.openclaw.build.openclawVersion,
-    "root and connector openclawVersion disagree");
-  assert(pkg.openclaw.build.receiptMode === "POST_HOOK", "receipt mode is not POST_HOOK");
-  return `pluginApi=${pkg.openclaw.compat.pluginApi}, openclawVersion=${pkg.openclaw.build.openclawVersion}`;
-});
-
-// 13a. release-artifact evidence root tracks the package version -------------
-await check("release-artifact evidence root matches the package version", () => {
-  // The release builder packages the committed HEAD and names its archive from
-  // a hardcoded EVIDENCE_ROOT. If that drifts from the package version it would
-  // emit an archive named for one version containing another.
-  const builder = readFileSync(join(root, "scripts", "build-release-artifacts.mjs"), "utf8");
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  const match = builder.match(/const EVIDENCE_ROOT = "([^"]+)";/);
-  assert(match, "EVIDENCE_ROOT is not declared in the expected form");
-  const expected = `mcpherson-governance-openclaw-v${pkg.version}`;
-  assert(match[1] === expected,
-    `EVIDENCE_ROOT is ${match[1]}, expected ${expected}`);
-  return `${match[1]} == v${pkg.version}`;
-});
-
-// 13b. the primary example does not defeat profile isolation -----------------
-await check("bundled example omits stateDir/receiptDir so profile isolation applies", () => {
-  const raw = JSON.parse(readFileSync(join(root, "examples", "connector-config.example.json"), "utf8"));
-  for (const key of ["stateDir", "receiptDir"]) {
-    assert(!Object.prototype.hasOwnProperty.call(raw, key),
-      `the bundled example hardcodes ${key}, which bypasses profile isolation`);
-  }
-  const readme = readFileSync(join(root, "examples", "README.md"), "utf8");
-  assert(readme.includes("deliberately omits `stateDir` and `receiptDir`"),
-    "examples/README.md does not explain the omission");
-  assert(readme.includes("Optional explicit overrides"),
-    "examples/README.md does not document the optional overrides separately");
-  return "no explicit state paths; overrides documented separately";
-});
-
-// 14. extension entry resolves -----------------------------------------------
-await check("declared OpenClaw extension entry resolves", () => {
-  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  const entries = pkg.openclaw.extensions;
-  assert(Array.isArray(entries) && entries.length > 0, "no extension entry declared");
-  for (const e of entries) {
-    assert(existsSync(join(root, e)), `extension entry does not exist: ${e}`);
-  }
-  return entries.join(", ");
-});
-
-// 15. shadow-only invariants -------------------------------------------------
-await check("shadow-only invariants hold in shipped source", async () => {
-  const c = await import(pathToFileURL(join(root, "connector", "constants.mjs")).href);
-  assert(c.PLUGIN_VERSION === VERSION, `version ${c.PLUGIN_VERSION}`);
-  assert(c.REMOTE_AUTHORITY === false, "REMOTE_AUTHORITY is not false");
-  assert(c.ENFORCEABLE_REMOTE_DECISIONS.length === 0, "enforceable remote decisions is not empty");
-  assert(c.DEFAULT_MODES.remote_shadow === true, "remote_shadow is not true");
-  assert(c.DEFAULT_MODES.remote_authority === false, "remote_authority is not false");
-  assert(c.DEFAULT_MODES.deny_enforcement === false, "deny_enforcement is not false");
-  assert(c.DEFAULT_MODES.approval_enforcement === false, "approval_enforcement is not false");
-  assert(c.RECEIPT_MODE === "POST_HOOK", "receipt mode is not POST_HOOK");
-  assert(c.MIN_SUPPORTED_OPENCLAW_VERSION === MIN_OPENCLAW,
-    `minimum supported OpenClaw is ${c.MIN_SUPPORTED_OPENCLAW_VERSION}`);
-  return "9/9 invariants";
-});
-
-// 16. configuration cannot raise authority -----------------------------------
-await check("configuration cannot raise authority", async () => {
-  const { loadConnectorConfig } = await import(pathToFileURL(join(root, "connector", "config.mjs")).href);
-  const { mkdtempSync, mkdirSync, chmodSync, rmSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-  const dir = mkdtempSync(join(tmpdir(), "mg-verify-"));
-  mkdirSync(join(dir, "receipts"), { recursive: true });
-  chmodSync(dir, 0o700); chmodSync(join(dir, "receipts"), 0o700);
-  const base = {
-    enabled: false, apiUrl: "https://governance.example.invalid:8443",
-    deploymentId: "d", agentId: "a", policyVersion: 1,
-    stateDir: dir, receiptDir: join(dir, "receipts"),
-    toolMetadata: { t: { schemaVersion: "1.0.0", schemaHash: `sha256:${"0".repeat(64)}`, actionClass: "read_only_internal" } },
+  const targetBinding = {
+    schema: "mcpherson-governance-openclaw-canary-target-binding/v2",
+    ...EXPECTED_OPENCLAW_TARGET,
+    supported_profile_modes: [...EXPECTED_OPENCLAW_TARGET.supported_profile_modes],
+    rpc_methods: [...EXPECTED_OPENCLAW_TARGET.rpc_methods],
+    source_commit: packageManifest.source_commit,
   };
-  try {
-    for (const key of ["remote_authority", "deny_enforcement", "approval_enforcement", "remote_shadow"]) {
-      let rejected = false;
-      try { loadConnectorConfig({ ...base, [key]: true }); } catch { rejected = true; }
-      assert(rejected, `${key} was not rejected`);
-    }
-    return "4/4 authority keys rejected";
-  } finally { rmSync(dir, { recursive: true, force: true }); }
-});
+  const targetBindingId = sha256(Buffer.from(canonicalizeJson(targetBinding), "utf8"));
+  if (canonicalizeJson(packageManifest.target_binding)
+        !== canonicalizeJson(targetBinding)
+      || packageManifest.target_binding_id !== targetBindingId) {
+    throw new TypeError("package_target_binding_invalid");
+  }
+  return Object.freeze({
+    target_binding: Object.freeze(targetBinding),
+    target_binding_id: targetBindingId,
+  });
+}
 
-// 17. only the local canary can construct a block ----------------------------
-await check("only the local canary constructs a hook result", () => {
-  const dir = join(root, "connector");
-  const offenders = [];
-  for (const f of walk(dir).filter((p) => p.endsWith(".mjs"))) {
-    if (/block:\s*true/.test(readFileSync(f, "utf8")) && !f.endsWith("canary.mjs")) {
-      offenders.push(relative(root, f));
+function walk(directory, found = []) {
+  for (const name of readdirSync(directory).sort()) {
+    const absolute = join(directory, name);
+    const stat = lstatSync(absolute);
+    if (stat.isSymbolicLink()) {
+      failures.push(`symlink present: ${relative(PACKAGE_ROOT, absolute)}`);
+      continue;
+    }
+    if (stat.isDirectory()) {
+      if (name === "node_modules" || name === ".git") continue;
+      walk(absolute, found);
+    } else if (stat.isFile()) {
+      found.push(relative(PACKAGE_ROOT, absolute).split(sep).join("/"));
     }
   }
-  assert(offenders.length === 0, `blocking construction found in: ${offenders.join(", ")}`);
-  return "block:true appears only in canary.mjs";
-});
+  return found;
+}
 
-// 18. configuration example is valid ----------------------------------------
-await check("bundled configuration example is valid", async () => {
-  const examplePath = join(root, "examples", "connector-config.example.json");
-  if (!existsSync(examplePath)) return "no example bundled (skipped)";
-  const raw = JSON.parse(readFileSync(examplePath, "utf8"));
-  assert(raw.enabled === false, "example does not ship disabled");
-  const { loadConnectorConfig } = await import(pathToFileURL(join(root, "connector", "config.mjs")).href);
-  const { mkdtempSync, mkdirSync, chmodSync, rmSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-  const dir = mkdtempSync(join(tmpdir(), "mg-example-"));
-  mkdirSync(join(dir, "receipts"), { recursive: true });
-  chmodSync(dir, 0o700); chmodSync(join(dir, "receipts"), 0o700);
-  const probe = { ...raw, stateDir: dir, receiptDir: join(dir, "receipts") };
-  delete probe.caFile;
-  try {
-    loadConnectorConfig(probe);
-    return "example loads cleanly against the real config loader";
-  } finally { rmSync(dir, { recursive: true, force: true }); }
-});
+function readJson(relativePath) {
+  return JSON.parse(readFileSync(join(PACKAGE_ROOT, relativePath), "utf8"));
+}
 
-// ---------------------------------------------------------------------------
-const pass = results.filter((r) => r.ok).length;
-const fail = results.length - pass;
-const actualVerificationCount = results.length;
-let documentedVerificationCount = null;
-let documentationCountError = null;
+export function verifyPackage() {
+  failures.length = 0;
+  checks.length = 0;
 
-try {
-  const limitations = readFileSync(join(root, "LIMITATIONS.md"), "utf8").replace(/\s+/g, " ");
-  const match = limitations.match(/Bundled package verification checks \| (\d+) \|/);
-  assert(match, "LIMITATIONS.md is missing the bundled package verification count");
-  documentedVerificationCount = Number(match[1]);
-  assert(Number.isSafeInteger(documentedVerificationCount),
-    "LIMITATIONS.md verification count is not an integer");
-  if (documentedVerificationCount !== actualVerificationCount) {
-    throw new Error("the documented verification-check count does not match the executed checks");
+  for (const required of [CHECKSUM_NAME, PROVENANCE_NAME, PACKAGE_MANIFEST_NAME, "package.json", "openclaw.plugin.json"]) {
+    if (!existsSync(join(PACKAGE_ROOT, required))) {
+      failures.push(`missing required file: ${required}`);
+    }
   }
-} catch (error) {
-  documentationCountError = error;
+  if (failures.length > 0) return report();
+
+  // ---- inventory and checksums -------------------------------------------
+  const declaredChecksums = new Map();
+  for (const line of readFileSync(join(PACKAGE_ROOT, CHECKSUM_NAME), "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
+    if (!match) {
+      failures.push(`malformed checksum line: ${line.slice(0, 80)}`);
+      continue;
+    }
+    declaredChecksums.set(match[2], match[1]);
+  }
+
+  const present = new Set(walk(PACKAGE_ROOT));
+  // The checksum manifest cannot contain its own hash.
+  present.delete(CHECKSUM_NAME);
+
+  const missing = [...declaredChecksums.keys()].filter((path) => !present.has(path));
+  const unexpected = [...present].filter((path) => !declaredChecksums.has(path));
+  check("no missing packaged files", missing.length === 0, missing.join(", "));
+  check("no unexpected packaged files", unexpected.length === 0, unexpected.join(", "));
+
+  let mismatched = 0;
+  for (const [path, expected] of declaredChecksums) {
+    if (!present.has(path)) continue;
+    const actual = sha256(readFileSync(join(PACKAGE_ROOT, path)));
+    if (actual !== expected) {
+      mismatched += 1;
+      failures.push(`checksum mismatch: ${path}`);
+    }
+  }
+  check("every packaged file matches its recorded SHA-256", mismatched === 0);
+
+  // ---- identities ---------------------------------------------------------
+  const pkg = readJson("package.json");
+  const manifest = readJson("openclaw.plugin.json");
+  const provenance = readJson(PROVENANCE_NAME);
+  const packageManifest = readJson(PACKAGE_MANIFEST_NAME);
+
+  check("package name preserved", pkg.name === EXPECTED_PACKAGE, String(pkg.name));
+  check("plugin id preserved", manifest.id === EXPECTED_PLUGIN_ID, String(manifest.id));
+  check(
+    "package.json and openclaw.plugin.json versions agree",
+    pkg.version === manifest.version,
+    `${pkg.version} vs ${manifest.version}`,
+  );
+  check(
+    "provenance version matches package",
+    provenance.version === pkg.version,
+    `${provenance.version} vs ${pkg.version}`,
+  );
+  check(
+    "OpenClaw compatibility floor preserved",
+    pkg.openclaw?.compat?.pluginApi === EXPECTED_COMPAT,
+    String(pkg.openclaw?.compat?.pluginApi),
+  );
+  check(
+    "config default enabled is false",
+    manifest.configSchema?.properties?.enabled?.default === false,
+  );
+  check(
+    "config schema refuses unknown keys",
+    manifest.configSchema?.additionalProperties === false,
+  );
+  check(
+    "no declared dependencies",
+    !pkg.dependencies && !pkg.devDependencies
+      && !pkg.peerDependencies && !pkg.bundledDependencies,
+  );
+
+  check(
+    "package manifest identity matches public package",
+    packageManifest.package_name === EXPECTED_PACKAGE
+      && packageManifest.plugin_id === EXPECTED_PLUGIN_ID
+      && packageManifest.plugin_version === pkg.version,
+  );
+  check(
+    "package manifest source matches provenance",
+    packageManifest.source_commit === provenance.source_commit
+      && packageManifest.source_tree === provenance.source_tree,
+  );
+  let auditedTarget;
+  try {
+    auditedTarget = validateOpenClawTargetManifest(packageManifest);
+  } catch (error) {
+    failures.push(`package target binding is valid: ${error?.code ?? error?.message}`);
+  }
+  if (auditedTarget) {
+    check(
+      "package target requires an explicit local profile binding",
+      auditedTarget.target_binding.profile_binding_required === true,
+    );
+    check(
+      "package target supports only explicit DEFAULT and NAMED modes",
+      JSON.stringify(auditedTarget.target_binding.supported_profile_modes)
+        === JSON.stringify(["DEFAULT", "NAMED"]),
+    );
+    check(
+      "package target paths are portable home-relative identities",
+      auditedTarget.target_binding.default_state_identity === ".openclaw"
+        && auditedTarget.target_binding.named_state_prefix === ".openclaw-"
+        && auditedTarget.target_binding.config_basename === "openclaw.json"
+        && auditedTarget.target_binding.runtime_identity
+          === ".local/lib/node_modules/openclaw/openclaw.mjs",
+    );
+  }
+
+  // ---- entrypoints resolve ------------------------------------------------
+  const entrypoints = [
+    pkg.main,
+    ...(pkg.openclaw?.extensions ?? []),
+    ...Object.values(pkg.bin ?? {}),
+  ].map((value) => String(value).replace(/^\.\//, ""));
+  const unresolved = entrypoints.filter((path) => !present.has(path));
+  check("every declared entrypoint is present", unresolved.length === 0, unresolved.join(", "));
+  const authorityEntrypoints = entrypoints.filter((path) => (
+    PROHIBITED_ENTRYPOINT_BASENAMES.has(basename(path))
+  ));
+  check(
+    "no evaluator or execution-gate entrypoint is declared",
+    authorityEntrypoints.length === 0,
+    authorityEntrypoints.join(", "),
+  );
+
+  const documentedCommands = [
+    "init-profile-binding", "verify-profile-binding",
+    "observe-live", "verify-observation", "discover",
+    "propose", "govern", "render-diagnosis",
+  ];
+  const cliPath = "scripts/governance-diagnostics.mjs";
+  if (check("diagnostics CLI is present", present.has(cliPath))) {
+    const cli = readFileSync(join(PACKAGE_ROOT, cliPath), "utf8");
+    const undocumented = documentedCommands.filter((command) => !cli.includes(`"${command}"`));
+    check(
+      "diagnostics CLI declares every documented command",
+      undocumented.length === 0,
+      undocumented.join(", "),
+    );
+    check(
+      "diagnostics CLI requires an independent profile binding commitment",
+      cli.includes('"profile-binding-id"'),
+    );
+  }
+
+  // ---- authority ceiling --------------------------------------------------
+  const constantsPath = "plugins/openclaw-connector/constants.mjs";
+  if (check("connector constants are present", present.has(constantsPath))) {
+    const constants = readFileSync(join(PACKAGE_ROOT, constantsPath), "utf8");
+    check(
+      "REMOTE_AUTHORITY is false",
+      /export const REMOTE_AUTHORITY\s*=\s*false/.test(constants),
+    );
+    check(
+      "ENFORCEABLE_REMOTE_DECISIONS is empty",
+      /export const ENFORCEABLE_REMOTE_DECISIONS\s*=\s*Object\.freeze\(\[\]\)/.test(constants),
+    );
+    check(
+      `plugin version constant is ${pkg.version}`,
+      constants.includes(`export const PLUGIN_VERSION = "${pkg.version}";`),
+    );
+  }
+
+  const observerPath = "packages/openclaw-live-observer/index.mjs";
+  if (check("live observer is present", present.has(observerPath))) {
+    const observer = readFileSync(join(PACKAGE_ROOT, observerPath), "utf8");
+    check(
+      "observer authority fields are NONE/off",
+      /authority:\s*"NONE"/.test(observer) && /enforcement:\s*false/.test(observer),
+    );
+    check(
+      `observer lifecycle pin is ${pkg.version}`,
+      observer.includes(`export const LIVE_LIFECYCLE_PLUGIN_VERSION = "${pkg.version}";`),
+    );
+    check(
+      "observer binds the exact profile-local receipt ledger",
+      observer.includes('CONNECTOR_RECEIPT_DIRECTORY = "receipts"')
+        && observer.includes('fail("live_receipt_path_binding_mismatch")'),
+    );
+    check(
+      "observer enforces canonical binding bytes and reserved profiles",
+      observer.includes('fail("live_profile_binding_noncanonical")')
+        && observer.includes('fail("live_named_reserved_profile_refused")'),
+    );
+  }
+
+  const installPath = "INSTALL.md";
+  if (check("install guide is present", present.has(installPath))) {
+    const install = readFileSync(join(PACKAGE_ROOT, installPath), "utf8");
+    check(
+      "install guide documents local identity bootstrap and exact ledger",
+      [
+        "--provider-mode singleValue",
+        "--ref-source file --ref-id value",
+        "gateway call health --json",
+        "plugins disable",
+        "plugins enable",
+        'chmod 0700 "$PROFILE_STATE"',
+        "LIVE_STATE_ROOT_INVALID_PERMISSIONS_INSECURE",
+        "$PROFILE_STATE/mcpherson-governance-connector/receipts/connector-receipts.jsonl",
+      ].every((marker) => install.includes(marker)),
+    );
+  }
+
+  check(
+    "provenance records AUTHORITY NONE and ENFORCEMENT OFF",
+    provenance.authority?.AUTHORITY === "NONE"
+      && provenance.authority?.ENFORCEMENT === "OFF",
+  );
+
+  // ---- no policy evaluator, gate, or second policy engine ----------------
+  const authorityShaped = [...present].filter((path) => (
+    PROHIBITED_ENTRYPOINT_BASENAMES.has(basename(path))
+  ));
+  check(
+    "zero evaluate.mjs and zero gate.mjs files are packaged",
+    authorityShaped.length === 0,
+    authorityShaped.join(", "),
+  );
+  const diagnosticCopies = [...present].filter((path) => (
+    path === DIAGNOSTIC_ASSESSMENT_MODULE
+  ));
+  check(
+    "the diagnostic evidence-assessment module is packaged exactly once",
+    diagnosticCopies.length === 1,
+    String(diagnosticCopies.length),
+  );
+  const unexpectedGovernanceCore = [...present].filter((path) => (
+    path.startsWith("packages/governance-core/")
+      && !ALLOWED_GOVERNANCE_CORE_MODULES.has(path)
+  ));
+  check(
+    "no second policy engine is packaged",
+    unexpectedGovernanceCore.length === 0,
+    unexpectedGovernanceCore.join(", "),
+  );
+
+  // ---- content hygiene and import discipline ------------------------------
+  let contentHits = 0;
+  const externalImports = new Set();
+  const executionAuthorityImports = new Set();
+  for (const path of present) {
+    const bytes = readFileSync(join(PACKAGE_ROOT, path));
+    const text = bytes.toString("utf8");
+    for (const [label, pattern] of PROHIBITED_CONTENT) {
+      if (pattern.test(text)) {
+        contentHits += 1;
+        failures.push(`${label} found in ${path}`);
+      }
+    }
+    if (!path.endsWith(".mjs")) continue;
+    const importRe = /(?:^|\s)(?:import|export)\s+(?:[\s\S]*?\sfrom\s+)?["']([^"']+)["']/g;
+    let match;
+    while ((match = importRe.exec(text)) !== null) {
+      const specifier = match[1];
+      if (specifier.startsWith(".")) {
+        const target = resolve(join(PACKAGE_ROOT, path), "..", specifier);
+        const packagedTarget = relative(PACKAGE_ROOT, target).split(sep).join("/");
+        if (!existsSync(target)) {
+          failures.push(`unresolved import ${specifier} in ${path}`);
+        }
+        const isExecutionRuntime = path.startsWith("plugins/openclaw-connector/")
+          || path.startsWith("packages/openclaw-live-observer/");
+        if (isExecutionRuntime
+            && (packagedTarget === DIAGNOSTIC_ASSESSMENT_MODULE
+              || PROHIBITED_ENTRYPOINT_BASENAMES.has(basename(packagedTarget)))) {
+          executionAuthorityImports.add(`${packagedTarget} (${path})`);
+        }
+        continue;
+      }
+      if (!ALLOWED_BUILTINS.has(specifier)) externalImports.add(`${specifier} (${path})`);
+    }
+  }
+  check("no private paths or credential-shaped material", contentHits === 0);
+  check(
+    "every import is a sibling module or an allowed Node built-in",
+    externalImports.size === 0,
+    [...externalImports].join(", "),
+  );
+  check(
+    "execution runtime has no evaluator, gate, or diagnostic-assessment import path",
+    executionAuthorityImports.size === 0,
+    [...executionAuthorityImports].join(", "),
+  );
+
+  return report();
 }
 
-console.log("\nMcPherson Governance Connector - package verification\n");
-for (const r of results) {
-  console.log(`  ${r.ok ? "PASS" : "FAIL"}  ${r.name}`);
-  if (r.detail) console.log(`        ${r.detail}`);
+function report() {
+  const ok = failures.length === 0;
+  const result = {
+    ok,
+    package_root: PACKAGE_ROOT,
+    checks_passed: checks.length,
+    failures,
+  };
+  console.log(JSON.stringify(result, null, 2));
+  return result;
 }
-console.log(`\n  ${pass} passed, ${fail} failed\n`);
-if (documentationCountError) {
-  console.error("DOCUMENTATION TRUTH FAILURE: verification accounting in LIMITATIONS.md is stale.");
-  console.error(`  documented verification count: ${documentedVerificationCount ?? "unparseable"}`);
-  console.error(`  actual executed verification count: ${actualVerificationCount}`);
-  console.error("  Update LIMITATIONS.md deliberately to match the executed verification checks.\n");
+
+// Entry guard resolved through realpath so an invocation via a symlinked path
+// (for example macOS $TMPDIR, where /var is a symlink to /private/var) still
+// runs instead of silently loading as an inert module and exiting 0.
+function isDirectInvocation() {
+  const argv = process.argv[1];
+  if (!argv) return false;
+  const self = fileURLToPath(import.meta.url);
+  try {
+    return realpathSync(argv) === realpathSync(self);
+  } catch {
+    return resolve(argv) === resolve(self);
+  }
 }
-process.exit(fail || documentationCountError ? 1 : 0);
+
+if (isDirectInvocation()) {
+  process.exit(verifyPackage().ok ? 0 : 1);
+}

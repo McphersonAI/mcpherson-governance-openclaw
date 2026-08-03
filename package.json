@@ -1,7 +1,7 @@
 {
   "name": "@mcphersonai/mcpherson-governance-openclaw",
-  "version": "0.5.1",
-  "description": "Shadow-only OpenClaw plugin that observes configured tool activity, sends metadata-minimized governance requests, and records local attempt and completion receipts. It does not block or alter tool execution.",
+  "version": "0.6.0",
+  "description": "Account-free OpenClaw plugin for local agent and tool discovery, non-authoritative AutoMap proposals, and a local Governability Diagnosis. Shadow-only: it does not block or alter tool execution.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "McPherson AI LLC",
@@ -20,31 +20,32 @@
     "observability",
     "shadow-mode",
     "audit",
-    "receipts"
+    "receipts",
+    "diagnostics"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
-  "main": "./connector/plugin.mjs",
+  "main": "./plugins/openclaw-connector/plugin.mjs",
   "exports": {
-    ".": "./connector/plugin.mjs",
+    ".": "./plugins/openclaw-connector/plugin.mjs",
     "./package.json": "./package.json"
   },
   "bin": {
-    "mcpherson-connector-ctl": "connector/connector-ctl.mjs"
+    "mcpherson-connector-ctl": "plugins/openclaw-connector/connector-ctl.mjs"
   },
   "files": [
     "openclaw.plugin.json",
-    "connector/",
+    "plugins/",
+    "packages/",
+    "contracts/",
+    "scripts/",
     "examples/",
     "tests/",
-    "scripts/verify-package.mjs",
-    "scripts/build-release-artifacts.mjs",
-    "scripts/run-public-tests.mjs",
     "NOTICE",
-    "CONNECTOR-FILES.sha256",
-    "SEALED-CONNECTOR-FILES.sha256",
-    "RELEASE-CHECKSUMS.sha256",
+    "V6-PACKAGE-MANIFEST.json",
+    "PACKAGE-FILES.sha256",
+    "RELEASE-PROVENANCE.json",
     "CHANGELOG.md",
     "INSTALL.md",
     "LIFECYCLE.md",
@@ -55,13 +56,12 @@
     "VERIFY.md"
   ],
   "scripts": {
-    "test": "node scripts/run-public-tests.mjs --package-only",
-    "test:public": "node scripts/run-public-tests.mjs",
+    "test": "node --test tests/public-package.test.mjs",
     "verify": "node scripts/verify-package.mjs"
   },
   "openclaw": {
     "extensions": [
-      "./connector/plugin.mjs"
+      "./plugins/openclaw-connector/plugin.mjs"
     ],
     "compat": {
       "pluginApi": ">=2026.6.5"

@@ -1,0 +1,30 @@
+{
+  "schema": "mcpherson-governance-openclaw-public-release-provenance/v1",
+  "package_name": "@mcphersonai/mcpherson-governance-openclaw",
+  "plugin_id": "mcpherson-governance-connector",
+  "version": "0.6.0",
+  "source_commit": "d247b76e56fb10a8f14590a68e884f1c867ccf4b",
+  "source_tree": "a23151515789747787f9f2660e416a5405ecd774",
+  "archive_name": "mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz",
+  "archive_root": "package/",
+  "file_count": 109,
+  "checksum_manifest": "PACKAGE-FILES.sha256",
+  "package_manifest": "V6-PACKAGE-MANIFEST.json",
+  "build": {
+    "deterministic": true,
+    "archive_format": "USTAR_GZIP",
+    "entry_order": "BYTE_SORTED_PATH",
+    "entry_mtime_epoch_seconds": 0,
+    "gzip_mtime_epoch_seconds": 0,
+    "uid_gid": 0,
+    "file_modes": "FROM_GIT_INDEX"
+  },
+  "authority": {
+    "AUTHORITY": "NONE",
+    "ENFORCEMENT": "OFF",
+    "AUTOMATIC_MAPPING_ACTIVATION": "OFF",
+    "OUTBOUND_ACTIONS": "OFF",
+    "REGISTRY_MUTATION": "OFF",
+    "REMOTE_DECISIONS": "SHADOW_ONLY"
+  }
+}

@@ -1,245 +1,155 @@
-# Disable, Uninstall, and Rollback
+# Lifecycle — McPherson Governance Connector v0.6.0
 
-**Connector v0.5.1.** Every control here is **local**. None of them requires the
-governance endpoint to be reachable, and none can be overridden remotely.
+How to enable, disable, stop, rotate, upgrade, and remove the connector, and
+what each action does and does not touch.
 
-## Two layers, two meanings of "off"
+## State layout
+
+Connector state lives in a fixed directory name inside the **active** OpenClaw
+profile state directory:
+
+```
+<OPENCLAW_PROFILE_STATE_DIR>/mcpherson-governance-connector/
+  receipts/
+    connector-receipts.jsonl   receipt ledger (owner-only, 0600)
+  deployment-credential        remote shadow credential, only if paired
+  governance-killswitch.on     kill switch marker
+  system.lock                  system lock marker
+  connector-disabled.on        operational disable marker
+  canary-control.json          canary tool control
+```
+
+Named profiles do not share controls, receipts, or state with the default
+profile or with each other.
+
+## Control CLI
+
+The package installs the `mcpherson-connector-ctl` command. It can also be run
+directly:
+
+```sh
+node <PACKAGE_ROOT>/plugins/openclaw-connector/connector-ctl.mjs status
+```
 
 | Command | Effect |
 | --- | --- |
-| `openclaw plugins disable <id>` | OpenClaw stops loading the plugin entirely |
-| `connector-ctl disable` | The connector stays loaded but becomes **inert** |
+| `status` | Report non-authoritative status as JSON |
+| `enable` | Clear the operational disable marker |
+| `disable` | Write the operational disable marker |
+| `rotate --rotation <id>` | Rotate the deployment credential |
+| `recover` | Recover credential state |
+| `unpair` | Remove the deployment credential |
+| `uninstall` | Remove connector state, preserving receipts |
 
-Both are valid full stops. Use OpenClaw's when you want the plugin gone from
-the host's load path; use the connector's when you want a durable, auditable
-local control that survives restarts and reload.
+`status` is informational only. Nothing in this CLI grants authority.
 
-**Operationally disabled means inert**, not merely quiet:
+## The three stop controls
 
-- both tool-observation hook handlers (`before_tool_call`, `after_tool_call`)
-  return immediately;
-- no governance request is sent;
-- no ordinary observation receipt is written;
-- no shadow observation is active.
+| Control | Remote contact | Local receipt | Notes |
+| --- | --- | --- | --- |
+| **Operational disable** (`connector-disabled.on`) | stopped | **none** | Fully inert for ordinary observations. Takes effect immediately, including for a call whose pre-hook ran while still enabled. |
+| **Kill switch** (`governance-killswitch.on`) | stopped | still written | Records `remote_status` reflecting the control and `local_disposition: SKIPPED`. |
+| **System lock** (`system.lock`) | stopped | still written | Same shape as the kill switch. |
 
-OpenClaw may still list the plugin as `enabled` and may still show registered
-hook entrypoints. That reflects the host's load state, not connector activity.
-Disabling takes effect immediately, including for a call whose pre-hook already
-ran.
+Disabling is the strongest: no completion receipt is written while
+operationally disabled.
 
-The gateway lifecycle hooks still write a `connector_lifecycle` record noting
-that the connector was loaded. It carries no tool, agent, or decision metadata
-and is not an observation receipt.
+## Default posture
 
-## Paths and the control CLI
+`enabled` defaults to `false`. In that shadow posture the connector emits
+**only** `gateway_start` and `gateway_stop` lifecycle records — no attempt or
+completion receipts. A local observation will therefore report zero receipt
+groups and zero latency events. **That is the correct, expected result.** Do not
+enable the connector merely to make those counts non-zero: enabling changes
+observation behavior and is a deliberate operator decision.
 
-The connector's control CLI is **not on your `PATH`** after a ClawHub download
-plus an OpenClaw archive install — that install method copies files into the
-profile and creates no command links. Invoke it by explicit path:
+## Receipt ledger
 
-```sh
-PROFILE=my-profile
-INSTALL_DIR="$HOME/.openclaw-$PROFILE/extensions/mcpherson-governance-connector"
-STATE_DIR="$HOME/.openclaw-$PROFILE/mcpherson-governance-connector"
+- JSONL, one record per line, owner-only `0600`.
+- Every line is validated. There is no window filter and no partial-parse mode.
+- Lifecycle records are pinned to **one exact connector version**.
+- An empty `0600` ledger is a valid state.
 
-export OPENCLAW_STATE_DIR="$HOME/.openclaw-$PROFILE"
-CTL="node $INSTALL_DIR/connector/connector-ctl.mjs"
-```
+## Version transitions — the ledger rotation contract
 
-`OPENCLAW_STATE_DIR` is what binds the CLI to the right profile. Every
-`$CTL` invocation below assumes it is exported. For the default profile, use
-`$HOME/.openclaw` and drop `--profile` from the OpenClaw commands.
+**This is required when upgrading between connector versions, including
+v0.5.1 → v0.6.0.**
 
-## Control precedence
+Because every line is validated against one exact version, a ledger holding
+records from two connector versions fails closed with
+`live_receipt_contract_invalid`. That is deliberate: mixed-version records must
+never be parsed as one current-version ledger.
 
-Local controls are evaluated before credentials are read and before any network
-I/O, in this order:
+Two traps, both learned from the previous version transition:
 
-```
-DISABLED  >  KILL_SWITCH  >  SYSTEM_LOCK  >  CANARY  >  REMOTE_OBSERVATION
-```
+1. **Upgrading the connector alone is not enough.** The ledger path is unchanged
+   across versions, so historical records keep failing forever until the ledger
+   is rotated.
+2. **Rotating before the restart is not enough.** The still-loaded old connector
+   writes one final `gateway_stop` at the **old** version during shutdown. The
+   true boundary is *after the old process exits*.
 
-A higher control short-circuits everything below it. When any of the first three
-is active, **zero network calls occur** — no credential read, no request built,
-no socket opened.
+The correct order:
 
-## Level 1 — Kill switch (stop remote contact, keep observing locally)
+1. Stop or restart the old connector so it writes its final old-version
+   `gateway_stop`.
+2. Wait for the old process to exit. Do not proceed while it is running.
+3. Rotate the ledger, moving it into an `0700` `archive/` directory with a
+   timestamped, version-labelled name.
+4. Start the new version.
+5. Initialize a fresh ledger as owner-only `0600` (empty is valid).
+6. Preserve the old ledger as evidence. Do not delete it and do not merge it.
+7. Never parse mixed-version records as one current-version ledger.
 
-Stops all remote contact before any network I/O. Local receipts continue —
-this is the difference between the kill switch and a full disable.
+Exact commands are in [INSTALL.md](./INSTALL.md) §6.
 
-```sh
-$CTL killswitch --on
-$CTL status            # confirm KILL_SWITCH_ACTIVE
-```
+## Upgrading the package
 
-Undo:
-
-```sh
-$CTL killswitch --off
-```
-
-## Level 2 — System lock
-
-A separate durable local control with the same before-any-network guarantee.
-Local receipts continue, as with the kill switch. Useful for maintenance
-windows where you want a distinct, independently auditable reason recorded.
+Set `PROFILE_HOME` to the same physical home and `PROFILE` to the exact named
+profile you intend to change. For an explicitly selected default profile, omit
+`--profile "$PROFILE"`.
 
 ```sh
-$CTL lock --on
-$CTL lock --off
+env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
+  "$PROFILE_HOME/.local/bin/openclaw" --profile "$PROFILE" plugins update \
+  mcpherson-governance-connector
 ```
 
-## Level 3 — Disable (make the connector inert, keep it installed)
+Your configuration is keyed by **plugin ID**
+(`plugins.entries.mcpherson-governance-connector.config`) and the state
+directory name is a source-owned constant, so both survive the upgrade. The
+plugin ID, package name, config schema, and the `mcpherson-connector-ctl`
+command name are unchanged from v0.5.1.
 
-The full stop. The plugin stays installed and loaded; it stops observing, stops
-all remote contact, and stops writing observation receipts.
+Perform the ledger rotation above as part of the upgrade.
 
-```sh
-$CTL disable
-$CTL status            # confirm disabled
-```
+## Uninstall
 
-This writes a **durable** local disabled control that survives restarts.
-
-Re-enable — deliberately, and note it takes both:
+Dry run first:
 
 ```sh
-openclaw --profile "$PROFILE" config set \
-  'plugins.entries.mcpherson-governance-connector.config.enabled' true --strict-json
-$CTL enable
-```
-
-`enable` only clears the durable control. It does not override plugin
-configuration, and configuration alone does not clear the durable control.
-Both must agree.
-
-To stop the host from loading the plugin at all:
-
-```sh
-openclaw --profile "$PROFILE" plugins disable mcpherson-governance-connector
-openclaw --profile "$PROFILE" plugins info mcpherson-governance-connector --json
-```
-
-Expect `"enabled": false` and no registered tools or hooks.
-
-## Level 4 — Unpair (revoke the credential)
-
-Revokes the deployment credential server-side **first**, then deletes it
-locally.
-
-```sh
-$CTL unpair \
-  --api-url https://YOUR-GOVERNANCE-ENDPOINT \
-  --deployment-id YOUR-DEPLOYMENT-ID \
-  --agent-id YOUR-AGENT-ID
-```
-
-Behavior worth knowing:
-
-- Unpair creates the durable disabled control **before** it does anything else,
-  so the connector is already inert while unpair proceeds.
-- It confirms idempotent server-side revocation against the exact local
-  credential ID, records that confirmation, and only then deletes the local
-  credential.
-- An ambiguous server response or a failed local delete **cannot report
-  success**.
-- An interrupted unpair is restart-safe: it either retries the idempotent
-  server confirmation or completes the already-confirmed local deletion.
-- **Your receipts stay with you.** Unpair does not touch them.
-
-If unpair cannot reach the endpoint and you need an immediate local stop:
-
-```sh
-$CTL disable
-rm -f "$STATE_DIR/deployment-credential"
-```
-
-Then complete the server-side revocation when you can.
-
-## Level 5 — Uninstall
-
-Uninstall through OpenClaw, in the same profile you installed into. Preview
-first:
-
-```sh
-openclaw --profile "$PROFILE" plugins uninstall \
+env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
+  "$PROFILE_HOME/.local/bin/openclaw" --profile "$PROFILE" plugins uninstall \
   mcpherson-governance-connector --dry-run
-
-openclaw --profile "$PROFILE" plugins uninstall \
-  mcpherson-governance-connector --force
 ```
 
-The dry run lists exactly what will be removed: the plugin config entry, the
-install record, and the installed directory under that profile's `extensions/`.
-
-- **The state directory and receipts are preserved.** Uninstall removes the
-  installed plugin files; it does not delete your evidence.
-- **Only the named profile is touched.** Another profile's installation and
-  state are unaffected.
-- A gateway reload or restart completes removal of the host-owned hook registry.
-- Gateway stop aborts and bounded-drains every connector-owned operation.
-
-Verify removal:
+Then:
 
 ```sh
-openclaw --profile "$PROFILE" plugins info mcpherson-governance-connector --json
-# expect: Plugin not found
-openclaw --profile "$PROFILE" plugins list --json
+env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
+  "$PROFILE_HOME/.local/bin/openclaw" --profile "$PROFILE" plugins uninstall \
+  mcpherson-governance-connector
 ```
 
-Recommended order:
+`connector-ctl uninstall` removes connector state while **preserving the receipt
+ledger** as evidence. If you want the receipts gone, remove them yourself,
+deliberately, after confirming you no longer need them.
 
-```sh
-$CTL disable                          # make it inert first
-$CTL unpair --api-url ...             # if paired
-openclaw --profile "$PROFILE" plugins uninstall \
-  mcpherson-governance-connector --force
-# restart or reload the OpenClaw gateway
-```
+Uninstalling removes the plugin from the profile you targeted. It does not
+modify other profiles.
 
-To remove your local data as well — this is irreversible, and affects only this
-profile:
+## What is never done automatically
 
-```sh
-rm -rf "$STATE_DIR"
-```
-
-Archive your receipts first if you need them for evidence.
-
-## Level 6 — Rollback
-
-The connector is shadow-only, so **there is no enforcement state to unwind**. It
-never blocked, approved, or modified anything, so removing it cannot leave your
-agents in a changed decision state.
-
-Rollback is therefore simply removal:
-
-1. `$CTL disable`
-2. `$CTL unpair ...` if paired
-3. `openclaw --profile "$PROFILE" plugins uninstall mcpherson-governance-connector --force`
-4. Reload or restart the OpenClaw gateway
-5. Confirm OpenClaw no longer lists `mcpherson-governance-connector`
-6. Optionally restore your previous plugin set through OpenClaw's supported
-   mechanism
-
-Your receipts remain valid records of what was observed while it ran. Nothing
-about rollback invalidates them.
-
-## Verifying a clean stop
-
-```sh
-$CTL status
-```
-
-Shutdown reports:
-
-| State | Meaning |
-| --- | --- |
-| `CLEAN` | Zero connector-owned queue, timer, request, response, socket, promise, and correlation residue |
-| `CLEAN_AFTER_DEADLINE` | Settled cleanly, but after the shutdown deadline |
-| `NON_CLEAN_DEADLINE` | A transport ignored abort and is still genuinely owned |
-
-`NON_CLEAN_DEADLINE` is reported honestly rather than being rounded up to
-"clean" — the connector does not claim zero residue until residue is actually
-zero. If you see it persist, capture the `status` output for a support report.
+The connector never rotates, truncates, deletes, or merges your receipt ledger
+on its own, never modifies another profile, never activates a mapping, and never
+changes tool execution.

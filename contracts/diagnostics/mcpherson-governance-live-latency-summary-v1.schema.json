@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-live-latency-summary-v1.schema.json",
+  "title": "McPherson Governance v0.6 live shadow latency summary",
+  "description": "Deterministic nearest-rank summary over LIVE_SHADOW connector receipt-pair durations. Groups remain separated by path, cache state, status, and metric; tails below twenty samples are withheld. This is not an SLA or a complete governance-overhead measurement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "observation_id",
+    "source_id",
+    "authority",
+    "enforcement",
+    "automatic_mapping_activation",
+    "outbound_actions",
+    "percentile_method",
+    "tail_percentile_floor",
+    "measurement_kinds",
+    "events_considered",
+    "events_skipped",
+    "groups",
+    "caveats"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-live-latency-summary/v1"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^live-obs-[a-f0-9]{64}$"
+    },
+    "source_id": {
+      "const": "openclaw-live"
+    },
+    "authority": {
+      "const": "NONE"
+    },
+    "enforcement": {
+      "const": false
+    },
+    "automatic_mapping_activation": {
+      "const": false
+    },
+    "outbound_actions": {
+      "const": false
+    },
+    "percentile_method": {
+      "const": "nearest_rank"
+    },
+    "tail_percentile_floor": {
+      "const": 20
+    },
+    "measurement_kinds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "const": "LIVE_SHADOW"
+      }
+    },
+    "events_considered": {
+      "$ref": "#/$defs/count"
+    },
+    "events_skipped": {
+      "$ref": "#/$defs/count"
+    },
+    "groups": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    },
+    "caveats": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    }
+  },
+  "$defs": {
+    "count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000
+    },
+    "nullable_duration": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullable_note": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_kind",
+        "path_kind",
+        "cache_state",
+        "remote_status_class",
+        "metric",
+        "sample_count",
+        "min_ms",
+        "p50_ms",
+        "p95_ms",
+        "p99_ms",
+        "max_ms",
+        "tail_percentiles_sufficient",
+        "tail_note"
+      ],
+      "properties": {
+        "measurement_kind": {
+          "const": "LIVE_SHADOW"
+        },
+        "path_kind": {
+          "enum": [
+            "LOCAL",
+            "REMOTE",
+            "UNKNOWN"
+          ]
+        },
+        "cache_state": {
+          "enum": [
+            "HIT",
+            "MISS",
+            "NONE",
+            "UNKNOWN"
+          ]
+        },
+        "remote_status_class": {
+          "enum": [
+            "OK",
+            "TIMEOUT",
+            "NOT_ATTEMPTED",
+            "UNKNOWN",
+            "UNAVAILABLE"
+          ]
+        },
+        "metric": {
+          "enum": [
+            "intercept_ms",
+            "normalization_ms",
+            "automap_lookup_ms",
+            "local_policy_ms",
+            "remote_policy_roundtrip_ms",
+            "decision_processing_ms",
+            "receipt_write_ms",
+            "total_governance_ms",
+            "tool_execution_ms",
+            "total_end_to_end_ms"
+          ]
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "min_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "p50_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "p95_ms": {
+          "$ref": "#/$defs/nullable_duration"
+        },
+        "p99_ms": {
+          "$ref": "#/$defs/nullable_duration"
+        },
+        "max_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "tail_percentiles_sufficient": {
+          "type": "boolean"
+        },
+        "tail_note": {
+          "$ref": "#/$defs/nullable_note"
+        }
+      }
+    }
+  }
+}

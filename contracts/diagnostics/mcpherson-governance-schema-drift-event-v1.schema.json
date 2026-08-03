@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-schema-drift-event-v1.schema.json",
+  "title": "McPherson Governance v0.6 schema drift event",
+  "description": "Deterministic drift record between two AutoMap candidate sets, keyed on the single per-candidate semantic identity (candidate_content_hash). STRUCTURAL drift changes the structural schema fingerprint; SEMANTIC drift changes the content hash with an unchanged structural fingerprint (e.g. declared effects, labels, or risk inputs) — both are MATERIAL and mark bound artifacts stale and require human review. DESCRIPTIVE drift changes only the metadata fingerprint with an unchanged content hash and is informational. UNKNOWN drift means the comparison evidence was missing or malformed. Drift never updates, approves, rejects, activates, or deploys anything.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "drift_id",
+    "candidate_id",
+    "change_kind",
+    "drift_type",
+    "drift_severity",
+    "previous_structural_fingerprint",
+    "current_structural_fingerprint",
+    "previous_metadata_fingerprint",
+    "current_metadata_fingerprint",
+    "previous_content_hash",
+    "current_content_hash",
+    "fields_added",
+    "fields_removed",
+    "fields_changed",
+    "detection_timestamp",
+    "existing_mapping_state",
+    "bound_artifacts_considered",
+    "approval_stale",
+    "human_review_required"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-schema-drift-event/v1"
+    },
+    "drift_id": {
+      "type": "string",
+      "pattern": "^mgd-[a-f0-9]{24}$"
+    },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^mgc-[a-f0-9]{24}$"
+    },
+    "change_kind": {
+      "enum": [
+        "MODIFIED",
+        "ADDED",
+        "REMOVED"
+      ]
+    },
+    "drift_type": {
+      "enum": [
+        "STRUCTURAL",
+        "SEMANTIC",
+        "DESCRIPTIVE",
+        "UNKNOWN"
+      ]
+    },
+    "drift_severity": {
+      "enum": [
+        "MATERIAL",
+        "INFORMATIONAL",
+        "UNKNOWN"
+      ]
+    },
+    "previous_structural_fingerprint": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "current_structural_fingerprint": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "previous_metadata_fingerprint": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "current_metadata_fingerprint": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "previous_content_hash": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "current_content_hash": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "fields_added": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    },
+    "fields_removed": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    },
+    "fields_changed": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    },
+    "detection_timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    },
+    "existing_mapping_state": {
+      "enum": [
+        "DISCOVERED",
+        "PROPOSED",
+        "APPROVED_DOCUMENTATION_ONLY"
+      ]
+    },
+    "bound_artifacts_considered": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65536
+    },
+    "approval_stale": {
+      "type": "boolean"
+    },
+    "human_review_required": {
+      "type": "boolean"
+    }
+  }
+}

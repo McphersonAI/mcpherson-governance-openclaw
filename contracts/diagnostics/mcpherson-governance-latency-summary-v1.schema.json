@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-latency-summary-v1.schema.json",
+  "title": "McPherson Governance v0.6 latency summary",
+  "description": "Deterministic nearest-rank percentile summary over latency events. Groups are split by measurement kind, path, cache state, status class, and metric — governance and tool-execution timing are never merged. Tail percentiles below the documented sample floor are withheld (null) with a note instead of invented precision. An empty summary is schema-valid, retains its explicit FIXTURE measurement context, and carries both the empty-summary and fixture-only caveats. A summary is never an SLA.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "percentile_method",
+    "tail_percentile_floor",
+    "measurement_kinds",
+    "events_considered",
+    "events_skipped",
+    "groups",
+    "caveats"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-latency-summary/v1"
+    },
+    "percentile_method": {
+      "const": "nearest_rank"
+    },
+    "tail_percentile_floor": {
+      "const": 20
+    },
+    "measurement_kinds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "const": "FIXTURE"
+      }
+    },
+    "events_considered": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000
+    },
+    "events_skipped": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000
+    },
+    "groups": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "measurement_kind",
+          "path_kind",
+          "cache_state",
+          "remote_status_class",
+          "metric",
+          "sample_count",
+          "min_ms",
+          "p50_ms",
+          "p95_ms",
+          "p99_ms",
+          "max_ms",
+          "tail_percentiles_sufficient",
+          "tail_note"
+        ],
+        "properties": {
+          "measurement_kind": {
+            "const": "FIXTURE"
+          },
+          "path_kind": {
+            "enum": [
+              "LOCAL",
+              "REMOTE",
+              "UNKNOWN"
+            ]
+          },
+          "cache_state": {
+            "enum": [
+              "HIT",
+              "MISS",
+              "NONE",
+              "UNKNOWN"
+            ]
+          },
+          "remote_status_class": {
+            "enum": [
+              "OK",
+              "TIMEOUT",
+              "NOT_ATTEMPTED",
+              "UNKNOWN",
+              "UNAVAILABLE"
+            ]
+          },
+          "metric": {
+            "enum": [
+              "intercept_ms",
+              "normalization_ms",
+              "automap_lookup_ms",
+              "local_policy_ms",
+              "remote_policy_roundtrip_ms",
+              "decision_processing_ms",
+              "receipt_write_ms",
+              "total_governance_ms",
+              "tool_execution_ms",
+              "total_end_to_end_ms"
+            ]
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "min_ms": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "p50_ms": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "p95_ms": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "p99_ms": {
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_ms": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "tail_percentiles_sufficient": {
+            "type": "boolean"
+          },
+          "tail_note": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "sample_count",
+              "p95_ms",
+              "p99_ms",
+              "tail_percentiles_sufficient",
+              "tail_note"
+            ],
+            "properties": {
+              "sample_count": {
+                "type": "integer",
+                "minimum": 20,
+                "maximum": 1000000
+              },
+              "p95_ms": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "p99_ms": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "tail_percentiles_sufficient": {
+                "const": true
+              },
+              "tail_note": {
+                "type": "null"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "sample_count",
+              "p95_ms",
+              "p99_ms",
+              "tail_percentiles_sufficient",
+              "tail_note"
+            ],
+            "properties": {
+              "sample_count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 19
+              },
+              "p95_ms": {
+                "type": "null"
+              },
+              "p99_ms": {
+                "type": "null"
+              },
+              "tail_percentiles_sufficient": {
+                "const": false
+              },
+              "tail_note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            }
+          }
+        ]
+      }
+    },
+    "caveats": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    }
+  }
+}

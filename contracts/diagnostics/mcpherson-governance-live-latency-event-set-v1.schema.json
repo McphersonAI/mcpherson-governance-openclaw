@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-live-latency-event-set-v1.schema.json",
+  "title": "McPherson Governance v0.6 live shadow latency event set",
+  "description": "Canonical LIVE_SHADOW sequence of paired connector receipt durations. Members are additionally validated against the live latency-event contract by contract composition.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "observation_id",
+    "target_binding_id",
+    "source_id",
+    "source_commit",
+    "profile_mode",
+    "profile",
+    "profile_identity",
+    "runtime_identity",
+    "endpoint_identity",
+    "runtime_semantic_version",
+    "runtime_build_identifier",
+    "source_note",
+    "measurement_kind",
+    "authority",
+    "enforcement",
+    "automatic_mapping_activation",
+    "outbound_actions",
+    "registry_mutation",
+    "events"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-live-latency-event-set/v1"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^live-obs-[a-f0-9]{64}$"
+    },
+    "target_binding_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_id": {
+      "const": "openclaw-live"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "profile_mode": {
+      "enum": [
+        "DEFAULT",
+        "NAMED"
+      ]
+    },
+    "profile": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "profile_identity": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "runtime_identity": {
+      "const": ".local/lib/node_modules/openclaw/openclaw.mjs"
+    },
+    "endpoint_identity": {
+      "const": "ws://127.0.0.1:18789"
+    },
+    "runtime_semantic_version": {
+      "const": "2026.6.5"
+    },
+    "runtime_build_identifier": {
+      "$ref": "#/$defs/buildIdentifier"
+    },
+    "source_note": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "measurement_kind": {
+      "const": "LIVE_SHADOW"
+    },
+    "authority": {
+      "const": "NONE"
+    },
+    "enforcement": {
+      "const": false
+    },
+    "automatic_mapping_activation": {
+      "const": false
+    },
+    "outbound_actions": {
+      "const": false
+    },
+    "registry_mutation": {
+      "const": false
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "$defs": {
+    "buildIdentifier": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{1,64}$"
+        }
+      ]
+    }
+  }
+}

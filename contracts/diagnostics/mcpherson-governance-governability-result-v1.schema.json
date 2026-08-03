@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-governability-result-v1.schema.json",
+  "title": "McPherson Governance v0.6 governability criterion result",
+  "description": "One deterministic finding for one criterion on one evaluated unit. Every member is content-bound to one finding-set ID and the canonical SHA-256 of the exact validated evidence document. evidence_references are criterion-specific and are rederived from that document before acceptance, rendering, or export. PASS requires complete typed positive current unit-linked evidence; PARTIAL means some usable evidence exists with incomplete proof; FAIL requires affirmative demonstration (cited confirmed absence, contradiction, or internal inconsistency — never mere missing evidence); UNKNOWN means no usable evidence (never a demonstrated failure). confirmed_absent_fields and independence_conflict_fields preserve the proof state needed to reproduce the result. Reasons, remediations, and gap-owner summaries are canonical derived output, not caller-authored narrative.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "finding_set_id",
+    "finding_set_version",
+    "evidence_document_id",
+    "evidence_document_sha256",
+    "evidence_schema",
+    "evidence_schema_version",
+    "criterion",
+    "evaluated_unit_type",
+    "evaluated_unit_id",
+    "result",
+    "reason",
+    "evidence_references",
+    "observed_fields",
+    "missing_fields",
+    "confirmed_absent_fields",
+    "independence_conflict_fields",
+    "unusable_evidence",
+    "contradictory_evidence",
+    "field_owners",
+    "gap_owners",
+    "gap_impact",
+    "remediation_suggestion",
+    "evaluator_version",
+    "evaluated_timestamp"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-governability-result/v1"
+    },
+    "finding_set_id": {
+      "type": "string",
+      "pattern": "^mgfs-[a-f0-9]{64}$"
+    },
+    "finding_set_version": {
+      "const": "1"
+    },
+    "evidence_document_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "evidence_document_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "evidence_schema": {
+      "const": "mcpherson-governance-governability-evidence/v1"
+    },
+    "evidence_schema_version": {
+      "const": "1"
+    },
+    "criterion": {
+      "enum": [
+        "VISIBLE",
+        "ATTRIBUTABLE",
+        "SCOPED",
+        "INDEPENDENTLY_REVOCABLE"
+      ]
+    },
+    "evaluated_unit_type": {
+      "enum": [
+        "connector",
+        "capability"
+      ]
+    },
+    "evaluated_unit_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "result": {
+      "enum": [
+        "PASS",
+        "PARTIAL",
+        "FAIL",
+        "UNKNOWN"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "evidence_references": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "observed_fields": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 96
+      }
+    },
+    "missing_fields": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 96
+      }
+    },
+    "confirmed_absent_fields": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 96
+      }
+    },
+    "independence_conflict_fields": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 96
+      }
+    },
+    "unusable_evidence": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "reason"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 96
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "contradictory_evidence": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "note",
+          "refs"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 96
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "refs": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        }
+      }
+    },
+    "field_owners": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "source_platform",
+          "connector",
+          "runtime_integration",
+          "policy_configuration"
+        ]
+      },
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z_]{1,64}$"
+      }
+    },
+    "gap_owners": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "source_platform",
+          "connector",
+          "runtime_integration",
+          "policy_configuration",
+          "missing_evidence"
+        ]
+      }
+    },
+    "gap_impact": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "remediation_suggestion": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evaluator_version": {
+      "const": "0.6.3"
+    },
+    "evaluated_timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    }
+  }
+}

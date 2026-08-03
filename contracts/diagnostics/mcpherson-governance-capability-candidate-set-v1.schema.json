@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-capability-candidate-set-v1.schema.json",
+  "title": "McPherson Governance v0.6 capability candidate set",
+  "description": "Envelope for discovery and proposal outputs. Each member of candidates is additionally validated against mcpherson-governance-capability-candidate/v1 by contract composition in validateCandidateSet; the envelope alone never legitimizes a member. Duplicate candidate IDs are rejected at the same boundary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "automap_version",
+    "discovery_method",
+    "discovery_source",
+    "generated_at",
+    "candidate_count",
+    "candidates",
+    "errors"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-capability-candidate-set/v1"
+    },
+    "automap_version": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._+-]{1,32}$"
+    },
+    "discovery_method": {
+      "enum": [
+        "sanitized_static_snapshot_v1",
+        "openclaw_live_gateway_v1",
+        "openclaw_plugin_manifest",
+        "committed_registry_v1"
+      ]
+    },
+    "discovery_source": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "generated_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    },
+    "candidate_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65536
+    },
+    "candidates": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": {
+        "type": "object"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "reason"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    }
+  }
+}

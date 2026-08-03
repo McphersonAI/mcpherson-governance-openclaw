@@ -1,122 +1,119 @@
-# Privacy and Metadata Boundary
-
-**Connector v0.5.1.** This document describes exactly what can leave your host,
-what cannot, and where the boundary's limits are.
+# Privacy — McPherson Governance Connector v0.6.0
 
 ## Summary
 
-When enabled, the connector sends **metadata-minimized governance requests**:
-identifiers, class labels, one-way hashes, and timestamps. It does not send
-prompts, message bodies, tool parameters, file contents, or credentials.
+For the local V6 workflow, **nothing leaves your machine**. There is no account,
+no telemetry, no analytics, no crash reporting, and no phone-home. The package
+has no third-party dependencies that could add any of those.
 
-When not enabled — or when the kill switch, system lock, or disable control is
-active — **no network contact occurs at all**.
+## Local V6 diagnostics: what is read
 
-## The closed outbound allowlist
+The observer collects operational metadata from exactly three sources:
 
-A governance request may contain only these fields
-(`connector/constants.mjs`, `OUTBOUND_FIELDS`). Anything else fails closed.
+1. `agents.list` from your local OpenClaw gateway;
+2. `tools.catalog` from your local OpenClaw gateway;
+3. your local connector receipt ledger, through a bounded, descriptor-bound
+   reader.
 
-| Field | What it is |
-| --- | --- |
-| `api_version` | Wire protocol version (`mgp/1`) |
-| `request_id` | Random UUID v4, generated per request |
-| `nonce` | 16 random bytes, hex |
-| `timestamp` | ISO-8601 time of the request |
-| `agent_id` | The agent identifier **you configure** |
-| `tool_id` | The tool name as registered in OpenClaw |
-| `tool_schema_version` | From your `toolMetadata` mapping |
-| `tool_schema_hash` | `sha256:…` from your `toolMetadata` mapping |
-| `action_class` | Class label from your mapping (e.g. `read_only_internal`) |
-| `resource_class` | Optional class label from your mapping |
-| `recipient_type` | Optional class label from your mapping |
-| `recipient_count` | Optional non-negative integer from your mapping |
-| `attachment_indicator` | Optional boolean from your mapping |
-| `data_sensitivity_label` | Optional label from your mapping |
-| `reversibility_label` | Optional label from your mapping |
-| `request_hash` | One-way SHA-256 over the request fields |
-| `policy_version` | Integer you configure |
-| `correlation_ref` | One-way reference derived from the tool-call/run ID |
+Before collecting it, the observer locally validates the shipped package
+manifest, the operator-created profile binding, the bound profile's private
+configuration, the bound OpenClaw runtime identity/build metadata, and the
+profile's local device identity and operator token. The gateway authentication
+SecretRef in configuration is validated structurally but is never resolved,
+read, copied, or written to evidence. Device and operator credentials are used
+only to authenticate the fixed loopback RPCs and are never included in output.
 
-Note that most of these values come from **your own configuration**, not from
-the traffic being observed.
+It executes two `operator.read` gateway RPCs against a package-bound OpenClaw
+executable over the fixed loopback endpoint. It has no activation, registration,
+hook, session, payload, or action path.
 
-## What never leaves your host
+## Local V6 diagnostics: what is deliberately excluded
 
-- Prompts, completions, and message bodies
-- Tool parameters — complete or partial
-- File contents, paths from tool arguments, and command output
-- Credentials, API keys, bearer tokens, cookies, session values
-- Customer records and personal data
-- Receipt ledgers (receipts stay on your host)
+The observation output **never** contains:
 
-## How the boundary is held
+- chat or message content;
+- tool arguments or tool results;
+- session identifiers;
+- request hashes;
+- correlation references;
+- deployment identifiers;
+- credentials or credential material;
+- runtime or source filesystem paths;
+- receipt bodies;
+- command output or descriptions.
 
-Four independent layers, in order:
+## Local V6 diagnostics: what is written
 
-1. **Structural.** The metadata builder `deriveSafeToolSummary()` has *no
-   parameter for tool arguments*. A caller cannot pass `event.params` into the
-   outbound request builder even by mistake — there is nowhere to put it. Raw
-   arguments are read in exactly one place, the local canary, which is local-only
-   and never reaches the network path.
-2. **Closed allowlist.** `serializeAllowlistedRequest()` rejects the entire
-   request (`PRIVACY_GUARD_TRIPPED`) if any key is not on the allowlist above, or
-   if any required field is missing.
-3. **Value shape enforcement.** Every string must match a safe-label pattern and
-   stay within 256 characters. Values containing newlines, `http(s)://` URLs,
-   `Bearer` tokens, deployment-credential patterns, `api_key`/`password`/
-   `private_key` assignments, PEM private-key headers, or US SSN-shaped digits
-   are rejected outright.
-4. **Serialized-byte cap.** The canonicalized payload is rejected above 8 KB.
+Binding initialization first writes one local `0600` profile-binding JSON file
+in the private `0700` directory you name. It contains package/source identity,
+the selected profile mode/name, physical home/state/config/runtime paths, exact
+connector state and receipt-ledger paths, and creation/expiry timestamps. It
+contains no credential value. Treat it as local private operational metadata;
+it is not uploaded and is never silently overwritten. Its one canonical byte
+serialization is enforced. Initialization also prints its non-secret content
+hash as `binding_id`; the operator retains that value separately so later
+commands can detect even a binding whose contents and self-hash were both
+changed.
 
-The guard runs on the **serialized bytes actually sent**, not on an
-intermediate object, so it cannot be bypassed by a field added later in the
-pipeline.
+Observation then writes only metadata artifacts, in a directory you name,
+created `0700`, each file `0600`:
 
-## Limits of the boundary — read this
+- `capability-snapshot.json`
+- `governability-evidence.json`
+- `shadow-receipt-summary.json`
+- `latency-events.json`
+- `observation-manifest.json`
 
-The guard protects against *content* leaking. It cannot protect against
-identifiers you deliberately configure:
+Plus, from the later commands, `discovery.json`, `automap-proposals.json`,
+`governability-findings.json`, and `governability-diagnosis.md` — also `0600`.
+Existing paths are never overwritten.
 
-- **`agent_id`, `deployment_id`, `tool_id`, and your `toolMetadata` labels are
-  sent as-is.** If you name a tool `export_acme_corp_payroll`, that name leaves
-  your host. Choose identifiers that are not themselves sensitive.
-- **`policy_version` and class labels are your values.** They are transmitted
-  verbatim.
-- **Traffic metadata still exists.** The governance endpoint learns that *some*
-  tool ran, when, and how often, plus the network-level facts of the connection.
-- `correlation_ref` and `request_hash` are one-way, but they are stable — the
-  endpoint can correlate repeated activity for the same call.
+These files are yours. Nothing uploads them.
 
-## Local receipts
+## Remote shadow: only if you explicitly enable it
 
-Receipts are written to `<receiptDir>/connector-receipts.jsonl`:
+`enabled` defaults to `false`. The local V6 workflow does not need it.
 
-- Append-only, opened `O_APPEND`, mode `0600` in a `0700` directory, `fsync`ed.
-- **Metadata only** — the same class of fields as above, plus outcome and
-  timestamps. Receipts contain no prompts, parameters, or content.
-- They stay on your host. The connector never uploads them.
+If you set `enabled: true` and supply an `apiUrl`, `deploymentId`, `agentId`,
+and complete per-tool metadata, then **for those configured tools only** the
+connector may send a metadata-minimized observation over HTTPS.
 
-Two record types are written per observed call:
+### The exact outbound field set
 
-- `attempt_receipt` — written pre-call, with outcome `UNKNOWN` or `NOT_OBSERVED`.
-- `completion_receipt` — written only after a directly observed
-  `after_tool_call`, with outcome `COMPLETED`, `FAILED`, or `TIMED_OUT`.
+Nothing outside this list is ever sent:
 
-Receipts are yours. Rotate, archive, or delete them per your own retention
-policy — the connector does not manage retention for you.
+`api_version`, `request_id`, `nonce`, `timestamp`, `agent_id`, `tool_id`,
+`tool_schema_version`, `tool_schema_hash`, `action_class`, `resource_class`,
+`recipient_type`, `recipient_count`, `attachment_indicator`,
+`data_sensitivity_label`, `reversibility_label`, `request_hash`,
+`policy_version`, `correlation_ref`.
 
-## Network
+Tool arguments, tool results, prompts, message content, file contents, and
+filesystem paths are **not** in that set and are never transmitted.
 
-- Outbound HTTPS only, to the endpoint you configure. TLS verification is never
-  disabled.
-- No inbound ports, no webhooks into your host, no remote control channel.
-- A local kill-switch file stops all remote contact **before any network I/O**.
+`request_hash` is a hash, not recoverable content. `correlation_ref` links an
+attempt to its completion locally.
 
-## Operator responsibility
+### Unconfigured tools send nothing
 
-Production use requires you to review this boundary against your own privacy
-obligations — including your tool naming, your identifier choices, your
-retention of receipts, and the jurisdiction and operator of whatever governance
-endpoint you point the connector at. This document describes the connector's
-behavior; it is not legal advice and not a compliance certification.
+A tool without complete configured metadata makes **no HTTPS request at all**.
+It is recorded locally with `remote_status: NOT_ATTEMPTED` and
+`local_disposition: SKIPPED`. No fallback metadata is manufactured, so nothing
+about that tool reaches the wire.
+
+## Receipts
+
+Receipts are written to a local JSONL ledger in your OpenClaw profile state
+directory, owner-only. They are not uploaded. Their content is bounded by the
+same metadata-only discipline described above.
+
+## Data controller
+
+For the local workflow there is no data controller other than you: no data is
+transmitted. If you enable remote shadow against a McPherson-operated endpoint,
+that connection is governed by the separate agreement covering that service,
+which is not part of this package.
+
+## Contact
+
+See [SUPPORT.md](./SUPPORT.md) and [SECURITY.md](./SECURITY.md).

@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-live-shadow-receipt-summary-v1.schema.json",
+  "title": "McPherson Governance v0.6 live shadow receipt summary",
+  "description": "Sanitized LIVE_SHADOW tool-level aggregate from a bounded local connector receipt ledger. Raw receipt IDs and bodies, request hashes, correlation references, deployment IDs, decisions, arguments, results, and credentials are excluded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "observation_id",
+    "target_binding_id",
+    "source_id",
+    "source_commit",
+    "profile_mode",
+    "profile",
+    "profile_identity",
+    "runtime_identity",
+    "endpoint_identity",
+    "runtime_semantic_version",
+    "runtime_build_identifier",
+    "source_note",
+    "sanitization_confirmed",
+    "measurement_kind",
+    "authority",
+    "enforcement",
+    "automatic_mapping_activation",
+    "outbound_actions",
+    "registry_mutation",
+    "captured_at",
+    "window_start",
+    "window_end",
+    "receipts"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mcpherson-governance-live-shadow-receipt-summary/v1"
+    },
+    "observation_id": {
+      "type": "string",
+      "pattern": "^live-obs-[a-f0-9]{64}$"
+    },
+    "target_binding_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_id": {
+      "const": "openclaw-live"
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "profile_mode": {
+      "enum": [
+        "DEFAULT",
+        "NAMED"
+      ]
+    },
+    "profile": {
+      "$ref": "#/$defs/id"
+    },
+    "profile_identity": {
+      "$ref": "#/$defs/id"
+    },
+    "runtime_identity": {
+      "const": ".local/lib/node_modules/openclaw/openclaw.mjs"
+    },
+    "endpoint_identity": {
+      "const": "ws://127.0.0.1:18789"
+    },
+    "runtime_semantic_version": {
+      "const": "2026.6.5"
+    },
+    "runtime_build_identifier": {
+      "$ref": "#/$defs/buildIdentifier"
+    },
+    "source_note": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "sanitization_confirmed": {
+      "const": true
+    },
+    "measurement_kind": {
+      "const": "LIVE_SHADOW"
+    },
+    "authority": {
+      "const": "NONE"
+    },
+    "enforcement": {
+      "const": false
+    },
+    "automatic_mapping_activation": {
+      "const": false
+    },
+    "outbound_actions": {
+      "const": false
+    },
+    "registry_mutation": {
+      "const": false
+    },
+    "captured_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "window_start": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "window_end": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "receipts": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receipt_id",
+          "granularity",
+          "native_tool_name",
+          "attempt_receipts",
+          "completion_receipts",
+          "receipt_mode"
+        ],
+        "properties": {
+          "receipt_id": {
+            "type": "string",
+            "pattern": "^rcpt-[A-Za-z0-9._:-]{1,64}$"
+          },
+          "granularity": {
+            "const": "TOOL_LEVEL"
+          },
+          "native_tool_name": {
+            "$ref": "#/$defs/id"
+          },
+          "attempt_receipts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "completion_receipts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "receipt_mode": {
+            "enum": [
+              "POST_HOOK",
+              "ATTEMPT_ONLY"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "buildIdentifier": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{1,64}$"
+        }
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    }
+  }
+}
