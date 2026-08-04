@@ -1,4 +1,4 @@
-# Support — McPherson Governance Connector v0.6.0
+# Support — McPherson Governance Connector v0.6.1
 
 ## Where to go
 
@@ -17,7 +17,7 @@ Please include:
 
 - the output of `openclaw --version`;
 - `node --version`;
-- the package version (`0.6.0`) and the archive SHA-256 if you have it;
+- the package version (`0.6.1`) and the archive SHA-256 if you have it;
 - what you ran and what happened;
 - any error code (they are stable identifiers, e.g. `live_receipt_contract_invalid`).
 
@@ -36,7 +36,8 @@ containing real deployment or agent identifiers.
 | `live_package_manifest_invalid` | `--package-manifest` must be an absolute path to the `V6-PACKAGE-MANIFEST.json` shipped in this package. |
 | `live_package_source_binding_invalid` | The observer modules do not match the manifest. The package has been modified after build; re-verify with `npm run verify`. |
 | `live_profile_binding_*` | The local binding is missing, malformed, altered, rehashed, stale, insecure, package-mismatched, has the wrong independently captured ID, or does not match the requested profile/path. Do not edit it. Follow [INSTALL.md](./INSTALL.md) §4 to initialize a new binding at a new private path, capture its exact `binding_id`, and verify it. |
-| `live_runtime_*` during binding | The explicit profile home does not contain the exact audited OpenClaw `2026.6.5 (5181e4f)` runtime at its bound home-relative path, or the runtime changed. Restore the independently sourced audited runtime and initialize a new binding. |
+| `live_runtime_*` during binding | The explicit profile home does not contain an audited OpenClaw runtime — `2026.6.5 (5181e4f)`, `2026.6.33 (7af0cfc)`, or `2026.7.1-2 (0790d9f)` — at its bound home-relative path, or the runtime changed. Restore an independently sourced audited runtime and initialize a new binding. |
+| `LIVE_PATH_COMPONENT_UNREADABLE` at `identity/device-auth.json` on 2026.7.1-2 | That OpenClaw build does not issue a device-bound operator token to a local CLI using shared-secret auth on a loopback Gateway, so the file is never created. This is expected on `2026.7.1-2`; the observer will not accept the shared Gateway token instead. Run live observation on `2026.6.33` (preferred) or `2026.6.5`. |
 | Output path refuses to be written | By design: existing paths are never overwritten. Choose a new output directory or file. |
 | A configured tool records a remote `404` | The service could not resolve the deployment, agent, tool, or contract. It is a remote contract or registry failure, not an execution decision, and it cannot block your tool. |
 

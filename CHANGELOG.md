@@ -5,7 +5,91 @@ All notable changes to the public McPherson Governance OpenClaw connector.
 This project adheres to semantic versioning for its public package identity.
 The plugin ID (`mcpherson-governance-connector`), package name
 (`@mcphersonai/mcpherson-governance-openclaw`), configuration schema, and the
-`mcpherson-connector-ctl` command name are stable across 0.5.x and 0.6.0.
+`mcpherson-connector-ctl` command name are stable across 0.5.x, 0.6.0, and
+0.6.1.
+
+---
+
+## [0.6.1] — Manifest, schema, and disclosure corrections
+
+A metadata, documentation, and disclosure patch. **No runtime behavior
+changed.** `AUTHORITY` remains `NONE`, `ENFORCEMENT` remains `OFF`,
+automatic mapping activation remains off, outbound actions and registry
+mutation remain off, and remote decisions remain `SHADOW_ONLY`. No policy
+evaluator and no gate were added. No feature was added.
+
+### Fixed
+
+- **`openclaw.plugin.json` no longer declares package-style fields.**
+  `license`, `homepage`, and `repository` were top-level manifest keys that
+  the OpenClaw `PluginManifest` type does not define, which the ClawHub
+  plugin inspector reports as `manifest-unknown-fields` (P2). They were
+  verified as unsupported against the OpenClaw `2026.6.5`, `2026.7.1`, and
+  `2026.7.2-beta.7` manifest type surfaces, then removed from the plugin
+  manifest. The same values remain in `package.json`, which is where npm and
+  ClawHub read them. `id`, `name`, `description`, `version`, `activation`,
+  `contracts`, and `configSchema` are each confirmed supported and unchanged,
+  so plugin ID, tool registration, and the config schema are preserved.
+
+- **Live observation manifest schema now states its path policy exactly.**
+  `mcpherson-governance-live-observation-manifest-v1` described runtime and
+  receipt paths as excluded while also requiring a fixed `runtime_identity`
+  value, which reads as a contradiction. The schema now states that absolute
+  host-specific runtime paths and all receipt paths are excluded, and that
+  `runtime_identity` is a fixed portable *relative* identity declared by the
+  contract and retained solely to bind an observation to the audited OpenClaw
+  target. `runtime_identity` and the `runtime_paths` exclusion each gained a
+  direct description. The constant value, every other constant, the required
+  field set, and `additionalProperties: false` closure are unchanged, so all
+  existing target-binding guarantees hold.
+
+### Documented
+
+- **`child_process.spawnSync` is now disclosed in [SECURITY.md](./SECURITY.md).**
+  Static scanners flag the single call in the live observer. It is necessary,
+  local, and bounded, so it was documented rather than removed: the executable
+  is digest-pinned to the audited runtime, argv is code-built with an
+  allowlisted RPC method, `shell: false`, the environment is a frozen
+  allowlist, and timeout, `cwd`, and output ceilings are explicit. Removing it
+  would have broken live observation for a cosmetic scanner result.
+
+### Added
+
+- **OpenClaw `2026.6.33` extended-stable is an approved live-observation
+  target.** The published extended-stable build was pinned to its exact
+  identity — full commit `7af0cfc9c5488e03c4e2f528bdc7ac9f7778b35e`, plus the
+  SHA-256 of its runtime entrypoint, `package.json`, and
+  `dist/build-info.json` — and the complete live lifecycle was run against
+  that exact build: device-bound `operator.read` bootstrap, `observe-live`,
+  `verify-observation`, `discover`, `propose`, `govern`, and
+  `render-diagnosis`, followed by disable, uninstall, and cleanup.
+  `2026.6.33` is now the **preferred** baseline for live observation.
+
+  It is a `2026.6` maintenance build produced *after* the `2026.7` line, so
+  nothing about it was assumed from `2026.6.5`; its host shape was
+  re-reviewed independently. It does not carry the `2026.7`
+  `isLocalCliSharedAuth` change, so a local CLI on a loopback Gateway still
+  pairs a device identity and still receives an `operator.read` device token.
+
+  Approval is bound to the five exact identity fields, **not** to the
+  `extended-stable` dist-tag. That tag is a moving pointer; a build upstream
+  later points it at is not covered by this release.
+
+### Compatibility
+
+- `openclaw.compat.pluginApi` remains `>=2026.6.5`. The connector's own
+  runtime floor is unchanged and admits the entire `2026.7.x` line. The floor
+  was deliberately not raised: `2026.6.5` remains fully supported and
+  lifecycle-proven.
+- `openclaw.build` now records `openclawVersion 2026.6.33` /
+  `openclawCommit 7af0cfc`. That block names the single preferred audited
+  build, not the whole approved set.
+- The approved target set is now three exact builds: `2026.6.5` (`5181e4f`)
+  and `2026.6.33` (`7af0cfc`), both live-lifecycle proven, and `2026.7.1-2`
+  (`0790d9f`), which remains target-bound and installable but is **not**
+  live-observation supported — OpenClaw does not issue the required
+  device-bound operator token there, and the shared Gateway token is still
+  refused as a substitute.
 
 ---
 

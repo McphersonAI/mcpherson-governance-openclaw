@@ -1,4 +1,4 @@
-# Security — McPherson Governance Connector v0.6.0
+# Security — McPherson Governance Connector v0.6.1
 
 ## Reporting a vulnerability
 
@@ -31,6 +31,51 @@ import resolves to a sibling module in this package or to a Node.js built-in
 (`node:crypto`, `node:fs`, `node:https`, `node:path`, `node:os`, `node:url`,
 `node:util`, `node:child_process`). This removes the third-party supply-chain
 surface entirely.
+
+### Local subprocess execution
+
+Static scanners flag the single `child_process.spawnSync` call in
+`packages/openclaw-live-observer/index.mjs`. It is disclosed here rather than
+removed, because it is how live observation reads the local OpenClaw runtime
+without modifying it. Its full boundary:
+
+- **Executable.** Only the OpenClaw runtime entrypoint named by a verified
+  local profile binding. Before any spawn, every path component is checked for
+  symlinks; the file must be a non-symlink regular file, owned by the invoking
+  account, with `realpath` equal to itself; and the SHA-256 of the runtime
+  entry, the OpenClaw `package.json`, and `dist/build-info.json` must each
+  equal the pinned target digests. Package name, version, `bin.openclaw`, and
+  the full build commit must also match. A substituted or modified runtime
+  fails closed before execution.
+- **Arguments.** Fixed argv arrays built in code — never string concatenation.
+  The version probe is exactly `["--version"]`. Gateway calls are
+  `[...profilePrefix, "gateway", "call", <method>, "--url", <loopback>,
+  "--token", <token>, ("--params", <canonical JSON>), "--json", "--timeout",
+  "5000"]`, where `<method>` must be in a frozen RPC allowlist and the profile
+  prefix derives from a name matching `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`.
+- **No shell.** `shell: false`, with `windowsHide: true`. There is no shell
+  interpretation, expansion, or metacharacter handling on any platform.
+- **Environment.** The ambient environment is never inherited. A frozen,
+  allowlisted environment is constructed per call — `HOME`, a constant `PATH`
+  of `/usr/local/bin:/usr/bin:/bin`, a read-only auth-store marker, and the
+  explicit profile, home, state, and config values — plus a fixed list of
+  redirect-capable variables deliberately set empty.
+- **Timeout, cwd, output.** Every call sets an explicit timeout (5s version
+  probe, 7.5s gateway call), a `cwd` of the bound account home, and a
+  `maxBuffer` ceiling (64 KiB probe, 2 MiB gateway). Oversized output fails as
+  `live_rpc_response_too_large` rather than being truncated and parsed.
+- **Failure behavior.** Fails closed. Any spawn error, signal, or non-zero exit
+  raises a typed `live_*` error. There is no retry with relaxed constraints and
+  no fallback path.
+- **Untrusted input.** None reaches the executable or the argv. The runtime is
+  digest-pinned, methods are allowlisted, and the profile name is pattern-
+  validated. The command runner is injectable **only** for deterministic
+  adversarial tests; the shipped CLI exposes no injection point.
+- **Locality.** Gateway calls address the loopback endpoint only.
+
+This is local, bounded, non-shell, and covered by the adversarial trust-boundary
+tests. It is disclosed, not hidden — verify it yourself at
+`packages/openclaw-live-observer/index.mjs`.
 
 ### Bounded outbound behavior
 
@@ -87,8 +132,16 @@ These are stated so they are not mistaken for defects:
   descriptor-bound reads, and identity rechecks substantially narrow namespace
   races but cannot eliminate a malicious concurrent process rewriting path
   components between syscalls.
-- **Version-pinned evidence.** Behavior is evidenced against OpenClaw
-  `2026.6.5` (commit `5181e4f`) only.
+- **Version-pinned evidence.** Live observation refuses any build outside the
+  approved target set — OpenClaw `2026.6.5` (commit `5181e4f`), `2026.6.33`
+  (commit `7af0cfc`), and `2026.7.1-2` (commit `0790d9f`) — including the
+  `2026.7.2` prerelease line. Approval requires all five identity fields of one
+  approved entry; the `extended-stable` dist-tag grants nothing by itself.
+  **The complete live-observation lifecycle is proven on `2026.6.5` and
+  `2026.6.33`**, with `2026.6.33` the preferred extended-stable baseline. On
+  `2026.7.1-2` the connector installs and the target binding resolves, but
+  OpenClaw does not issue the device-bound operator token the observer
+  requires; see [LIMITATIONS.md](./LIMITATIONS.md).
 
 ## Verifying this package
 

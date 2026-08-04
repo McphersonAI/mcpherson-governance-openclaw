@@ -54,13 +54,22 @@ import {
   validateEnvelope,
 } from "../governance-diagnostics/contracts.mjs";
 import {
+  OPENCLAW_APPROVED_RUNTIME_VERSIONS,
   OPENCLAW_CANARY_TARGET,
+  OPENCLAW_CANARY_TARGETS,
+  approvedTargetBindingById,
+  approvedTargetBindingIdFor,
+  resolveOpenClawCanaryTarget,
   validateOpenClawCanaryTargetManifest,
 } from "./target-binding.mjs";
 
 export const OPENCLAW_LIVE_ADAPTER_VERSION = "0.6-live.2";
+// The originally audited runtime. Retained as the primary target identity;
+// every approved runtime version is in OPENCLAW_LIVE_RUNTIME_VERSIONS.
 export const OPENCLAW_LIVE_RUNTIME_VERSION =
   OPENCLAW_CANARY_TARGET.semantic_version;
+export const OPENCLAW_LIVE_RUNTIME_VERSIONS =
+  OPENCLAW_APPROVED_RUNTIME_VERSIONS;
 export const OPENCLAW_LIVE_RPC_METHODS = OPENCLAW_CANARY_TARGET.rpc_methods;
 export const OPENCLAW_LIVE_PROFILE_MODES = Object.freeze([
   "DEFAULT",
@@ -169,8 +178,14 @@ const MAX_RECEIPT_LINES = 1_000_000;
 const MAX_RECEIPT_LINE_BYTES = 32 * 1024;
 const MAX_OUTPUT_ARTIFACT_BYTES = 64 * 1024 * 1024;
 const MAX_RUNTIME_VERSION_OUTPUT_BYTES = 128;
+// OpenClaw stable releases are MAJOR.MINOR.PATCH with an optional numeric
+// revision suffix, as in `2026.7.1-2`. The suffix is deliberately restricted
+// to digits so prerelease-shaped versions such as `2026.7.2-beta.7` do not
+// parse at all. Approval is still decided solely by the approved target set;
+// this grammar only bounds what may be read.
 const SEMANTIC_VERSION_PATTERN =
-  "(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)";
+  "(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)"
+  + "(?:-(?:0|[1-9][0-9]*))?";
 const BARE_VERSION_OUTPUT_RE = new RegExp(`^(${SEMANTIC_VERSION_PATTERN})$`);
 const DECORATED_VERSION_OUTPUT_RE = new RegExp(
   `^OpenClaw (${SEMANTIC_VERSION_PATTERN}) \\(([0-9a-f]{1,64})\\)$`,
@@ -193,7 +208,7 @@ const LIFECYCLE_KEYS = Object.freeze([
 // `plugins/openclaw-connector/constants.mjs`. It is duplicated rather than
 // imported so the observer keeps no runtime edge into the connector tree; the
 // two are held equal by tests/release/version-synchronization.test.mjs.
-export const LIVE_LIFECYCLE_PLUGIN_VERSION = "0.6.0";
+export const LIVE_LIFECYCLE_PLUGIN_VERSION = "0.6.1";
 // Exact OpenClaw 2026.6.5 gateway credential surface, taken from the
 // installed runtime schema keys `gateway.auth.*` and `gateway.tailscale.*`
 // and the shipped gateway configuration reference. Unknown members of either
@@ -365,9 +380,21 @@ function hasLiveBindingFields(value) {
     && value?.profile_identity === value?.profile
     && value?.runtime_identity === OPENCLAW_CANARY_TARGET.runtime_identity
     && value?.endpoint_identity === OPENCLAW_LIVE_ENDPOINT
-    && value?.runtime_semantic_version === OPENCLAW_LIVE_RUNTIME_VERSION
-    && value?.runtime_build_identifier
-      === OPENCLAW_CANARY_TARGET.full_build_commit.slice(0, 7);
+    && approvedTargetForReportedRuntime(
+      value?.runtime_semantic_version,
+      value?.runtime_build_identifier,
+    ) !== null;
+}
+
+// Resolve the approved target a recorded (version, short-commit) pair names.
+// Fails closed: the pair must identify exactly one approved target, so a
+// version from one approved build can never be paired with another's commit.
+function approvedTargetForReportedRuntime(semanticVersion, buildIdentifier) {
+  const matched = OPENCLAW_CANARY_TARGETS.filter((target) => (
+    target.semantic_version === semanticVersion
+      && target.full_build_commit.slice(0, 7) === buildIdentifier
+  ));
+  return matched.length === 1 ? matched[0] : null;
 }
 
 function sameLiveBinding(left, right) {
@@ -383,7 +410,13 @@ function sameLiveBinding(left, right) {
 }
 
 function matchesAuditedTarget(value, auditedPackage, approvedBinding) {
-  const target = auditedPackage.target_binding;
+  // The profile binding pins exactly one approved target. Resolve it from the
+  // approved set and fail closed if the pinned id is not a member.
+  const target = approvedTargetBindingById(
+    auditedPackage.source_commit,
+    approvedBinding.package_target_binding_id,
+  );
+  if (target === null) return false;
   return value?.target_binding_id === approvedBinding.binding_id
     && value?.source_commit === auditedPackage.source_commit
     && value?.profile_mode === approvedBinding.profile_mode
@@ -572,8 +605,8 @@ export function readAuditedOpenClawPackageManifest(packageManifestPath) {
     plugin_version: manifest.plugin_version,
     source_commit: target.source_commit,
     source_tree: manifest.source_tree,
-    target_binding: target.target_binding,
-    target_binding_id: target.target_binding_id,
+    target_bindings: target.target_bindings,
+    target_binding_ids: target.target_binding_ids,
   });
 }
 
@@ -647,6 +680,7 @@ function buildProfileBindingDocument({
   account,
   createdAt,
   expiresAt,
+  targetBindingId,
 }) {
   const payload = {
     schema: PROFILE_BINDING_SCHEMA,
@@ -658,7 +692,7 @@ function buildProfileBindingDocument({
     source_commit: auditedPackage.source_commit,
     source_tree: auditedPackage.source_tree,
     package_manifest_sha256: auditedPackage.manifest_sha256,
-    package_target_binding_id: auditedPackage.target_binding_id,
+    package_target_binding_id: targetBindingId,
     profile_mode: profileSelection.mode,
     profile_identity: profileSelection.identity,
     home_path: account.home,
@@ -788,7 +822,9 @@ function readApprovedOpenClawProfileBinding({
       || binding.source_commit !== auditedPackage.source_commit
       || binding.source_tree !== auditedPackage.source_tree
       || binding.package_manifest_sha256 !== auditedPackage.manifest_sha256
-      || binding.package_target_binding_id !== auditedPackage.target_binding_id) {
+      || !auditedPackage.target_binding_ids.includes(
+        binding.package_target_binding_id,
+      )) {
     fail("live_profile_binding_package_mismatch");
   }
   const requestedMode = profileMode ?? binding.profile_mode;
@@ -1125,32 +1161,52 @@ export function validateOpenClawCanaryRuntime({
     ownerUid: account.uid,
     code: "live_build_info_invalid",
   });
-  if (createHash("sha256").update(runtimeBytes).digest("hex")
-        !== OPENCLAW_CANARY_TARGET.runtime_entry_sha256) {
-    fail("live_runtime_entry_hash_mismatch");
-  }
-  if (createHash("sha256").update(packageBytes).digest("hex")
-        !== OPENCLAW_CANARY_TARGET.package_json_sha256) {
-    fail("live_package_json_hash_mismatch");
-  }
-  if (createHash("sha256").update(buildInfoBytes).digest("hex")
-        !== OPENCLAW_CANARY_TARGET.build_info_sha256) {
-    fail("live_build_info_hash_mismatch");
-  }
+  const runtimeEntrySha256 =
+    createHash("sha256").update(runtimeBytes).digest("hex");
+  const packageJsonSha256 =
+    createHash("sha256").update(packageBytes).digest("hex");
+  const buildInfoSha256 =
+    createHash("sha256").update(buildInfoBytes).digest("hex");
   const packageJson = parsePrivateJson(
     packageBytes, "live_package_json_invalid",
   );
   const buildInfo = parsePrivateJson(
     buildInfoBytes, "live_build_info_invalid",
   );
+  // The build coordinate names at most one approved target. Everything after
+  // this is checked against that one candidate, so approved values are never
+  // combined across targets.
+  const candidates = OPENCLAW_CANARY_TARGETS.filter((entry) => (
+    entry.semantic_version === buildInfo.version
+      && entry.full_build_commit === buildInfo.commit
+  ));
+  if (candidates.length !== 1) fail("live_build_info_identity_mismatch");
+  const target = candidates[0];
+  if (runtimeEntrySha256 !== target.runtime_entry_sha256) {
+    fail("live_runtime_entry_hash_mismatch");
+  }
+  if (packageJsonSha256 !== target.package_json_sha256) {
+    fail("live_package_json_hash_mismatch");
+  }
+  if (buildInfoSha256 !== target.build_info_sha256) {
+    fail("live_build_info_hash_mismatch");
+  }
+  // Re-resolve from all five identity fields at once. This is redundant with
+  // the checks above and deliberately so: it is the single place that decides
+  // a runtime is approved, and it fails closed on any mixed or unknown build.
+  if (resolveOpenClawCanaryTarget({
+    semantic_version: buildInfo.version,
+    full_build_commit: buildInfo.commit,
+    runtime_entry_sha256: runtimeEntrySha256,
+    package_json_sha256: packageJsonSha256,
+    build_info_sha256: buildInfoSha256,
+  }) !== target) {
+    fail("live_runtime_target_not_approved");
+  }
   if (packageJson.name !== "openclaw"
-      || packageJson.version !== OPENCLAW_LIVE_RUNTIME_VERSION
+      || packageJson.version !== target.semantic_version
       || packageJson.bin?.openclaw !== "openclaw.mjs") {
     fail("live_package_json_identity_mismatch");
-  }
-  if (buildInfo.version !== OPENCLAW_LIVE_RUNTIME_VERSION
-      || buildInfo.commit !== OPENCLAW_CANARY_TARGET.full_build_commit) {
-    fail("live_build_info_identity_mismatch");
   }
   let result;
   try {
@@ -1167,9 +1223,9 @@ export function validateOpenClawCanaryRuntime({
     fail("live_runtime_version_probe_failed");
   }
   const reported = parseRuntimeVersionStdout(
-    result.stdout, OPENCLAW_LIVE_RUNTIME_VERSION,
+    result.stdout, target.semantic_version,
   );
-  const decorated = OPENCLAW_CANARY_TARGET.full_build_commit.slice(0, 7);
+  const decorated = target.full_build_commit.slice(0, 7);
   if (reported.format !== "openclaw_decorated"
       || reported.buildIdentifier !== decorated) {
     fail("live_runtime_build_identifier_mismatch");
@@ -1180,7 +1236,8 @@ export function validateOpenClawCanaryRuntime({
     versionOutputFormat: reported.format,
     buildIdentifier: reported.buildIdentifier,
     fullBuildCommit: buildInfo.commit,
-    runtimeIdentity: OPENCLAW_CANARY_TARGET.runtime_identity,
+    runtimeIdentity: target.runtime_identity,
+    semanticVersion: target.semantic_version,
   });
 }
 
@@ -1234,12 +1291,21 @@ export function initializeOpenClawProfileBinding(options) {
     commandRunner,
     environment: safeEnvironment,
   });
+  // Pin the one approved target this host actually runs. A binding never
+  // carries the approved set, only the exact build it was initialized against.
+  const targetBindingId = approvedTargetBindingIdFor(
+    auditedPackage.source_commit,
+    runtime.semanticVersion,
+    runtime.fullBuildCommit,
+  );
+  if (targetBindingId === null) fail("live_runtime_target_not_approved");
   const binding = buildProfileBindingDocument({
     auditedPackage,
     profileSelection,
     account,
     createdAt,
     expiresAt,
+    targetBindingId,
   });
   const outputPath = assertPrivateBindingOutputPath(profileBindingPath);
   try {

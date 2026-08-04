@@ -1,4 +1,4 @@
-# Lifecycle — McPherson Governance Connector v0.6.0
+# Lifecycle — McPherson Governance Connector v0.6.1
 
 How to enable, disable, stop, rotate, upgrade, and remove the connector, and
 what each action does and does not touch.

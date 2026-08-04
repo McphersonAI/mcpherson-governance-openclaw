@@ -1,4 +1,4 @@
-# Limitations — McPherson Governance Connector v0.6.0
+# Limitations — McPherson Governance Connector v0.6.1
 
 Read this before deciding what this package is for. Everything here is a real
 limitation, stated plainly.
@@ -79,9 +79,29 @@ certifications.
 
 ## 7. Platform and availability
 
-- **Not multi-platform.** Evidence binds this release to OpenClaw `2026.6.5`
-  (commit `5181e4f`) on POSIX hosts, with Node.js 22+. Other OpenClaw versions
-  are permitted by the declared `>=` range but are not covered by that evidence.
+- **Not multi-platform.** The approved live-observation target set is three
+  exact OpenClaw builds — `2026.6.5` (commit `5181e4f`), `2026.6.33` (commit
+  `7af0cfc`, the published extended-stable build), and `2026.7.1-2` (commit
+  `0790d9f`) — on POSIX hosts, with Node.js 22+. Other OpenClaw versions are
+  permitted by the declared `>=` range for the connector, but are not covered by
+  that evidence and are refused by live observation.
+- **Support is exact-target based, never label-based.** A build is approved
+  only when its semantic version, full commit, runtime-entry SHA-256,
+  `package.json` SHA-256, and `dist/build-info.json` SHA-256 all match one
+  approved entry. Neither membership in the `2026.6` line nor the
+  `extended-stable` dist-tag approves anything on its own: that tag is a
+  moving pointer, and a future build it points at is not covered here.
+- **Live observation is proven on `2026.6.5` and `2026.6.33`.** `2026.6.33` is
+  the preferred extended-stable baseline. Both completed the full lifecycle
+  against their exact builds.
+- **Live observation is not supported on `2026.7.1-2`.** The connector
+  installs, loads, and the target binding resolves, but the full
+  live-observation lifecycle cannot complete. A local CLI on a loopback Gateway
+  using shared-secret auth omits its device identity from the connect
+  handshake on that build, so OpenClaw never creates a device-pairing request
+  and never issues the device-bound operator token this observer requires. The
+  observer deliberately refuses to accept the shared Gateway token in its
+  place. Use `2026.6.33` or `2026.6.5` until this is resolved upstream.
 - **No public dashboard.** The connected dashboard is a separate beta and is not
   publicly available as part of this package.
 - **No billing or paid-plan activation.** There is no billing, credits, or
@@ -93,7 +113,8 @@ certifications.
 - Live observation requires an explicit, local profile binding. The binding
   pins the exact package/source identity, profile mode and identity, physical
   home, state/config/runtime paths, exact profile-local connector state and
-  receipt ledger, and the audited OpenClaw `2026.6.5 (5181e4f)` runtime. Its
+  receipt ledger, and one audited OpenClaw runtime — `2026.6.5 (5181e4f)`,
+  `2026.6.33 (7af0cfc)`, or `2026.7.1-2 (0790d9f)`. Its
   canonical bytes are enforced, it expires after at most 24 hours, and every
   consumer requires the independently captured ID printed at initialization.
 - Named mode uses exactly `<profile-home>/.openclaw-<profile>` and never falls

@@ -182,5 +182,6 @@ checksums and the shipped verifier actually attest.
 
 It cannot certify the package against any compliance framework, prove the
 absence of every possible defect, or establish behavior on OpenClaw versions
-other than the pinned `2026.6.5` (commit `5181e4f`). See
+outside the approved target set — `2026.6.5` (commit `5181e4f`), `2026.6.33`
+(commit `7af0cfc`), and `2026.7.1-2` (commit `0790d9f`). See
 [LIMITATIONS.md](./LIMITATIONS.md).

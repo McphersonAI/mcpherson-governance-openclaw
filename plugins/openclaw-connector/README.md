@@ -1,4 +1,4 @@
-# McPherson Governance Connector v0.6.0
+# McPherson Governance Connector v0.6.1
 
 This private OpenClaw connector is structurally shadow-only. Remotely sourced data is observed and receipted but cannot block, pause, approve, modify, or duplicate an ordinary tool call. The only blocking path is the exact-match, operator-enabled local harmless canary; it does not read or depend on remote data.
 

@@ -1,6 +1,6 @@
 # McPherson Governance Connector for OpenClaw
 
-**Version 0.6.0 — account-free local governance diagnostics.**
+**Version 0.6.1 — account-free local governance diagnostics.**
 
 This package is the distributed McPherson Governance OpenClaw plugin. It is not
 the McPherson Governance monorepo: it contains the connector runtime, the V6
@@ -71,6 +71,12 @@ case where a `404` can still legitimately appear.
 - **OpenClaw 2026.6.5 or newer.** This minimum is source-owned and enforced by
   the connector itself at activation time. See [INSTALL.md](./INSTALL.md) for
   the exact provenance of that number.
+- **For live observation, one of three exact audited builds.** Support is
+  exact-target based, not range-based: `2026.6.5` (`5181e4f`) and `2026.6.33`
+  (`7af0cfc`, extended-stable) are both live-lifecycle proven, with
+  `2026.6.33` preferred. `2026.7.1-2` (`0790d9f`) is target-bound and
+  installable but **not** live-observation supported. Live observation
+  refuses every other build. See [LIMITATIONS.md](./LIMITATIONS.md).
 - **Node.js 22 or newer** (the V6 diagnostics CLI requires it).
 - No third-party dependencies. Every import resolves to a sibling module in this
   package or to a Node.js built-in.
@@ -84,13 +90,13 @@ OPENCLAW="$PROFILE_HOME/.local/bin/openclaw"
 PROFILE_STATE="$PROFILE_HOME/.openclaw-$PROFILE"
 PACKAGE_ROOT=/absolute/path/to/the/verified/package
 clawhub package download @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.6.0 --output ./mcpherson-governance-download
+  --version 0.6.1 --output ./mcpherson-governance-download
 clawhub package verify \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz \
-  --package @mcphersonai/mcpherson-governance-openclaw --version 0.6.0
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz \
+  --package @mcphersonai/mcpherson-governance-openclaw --version 0.6.1
 env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
   "$OPENCLAW" --profile "$PROFILE" plugins install \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz
 env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
   "$OPENCLAW" --profile "$PROFILE" config set \
   plugins.entries.mcpherson-governance-connector.config \

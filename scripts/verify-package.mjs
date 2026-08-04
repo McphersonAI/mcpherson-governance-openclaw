@@ -23,7 +23,7 @@ const PACKAGE_MANIFEST_NAME = "V6-PACKAGE-MANIFEST.json";
 const EXPECTED_PACKAGE = "@mcphersonai/mcpherson-governance-openclaw";
 const EXPECTED_PLUGIN_ID = "mcpherson-governance-connector";
 const EXPECTED_COMPAT = ">=2026.6.5";
-const EXPECTED_OPENCLAW_TARGET = Object.freeze({
+const EXPECTED_OPENCLAW_TARGET_SHAPE = Object.freeze({
   profile_binding_required: true,
   supported_profile_modes: Object.freeze(["DEFAULT", "NAMED"]),
   default_state_identity: ".openclaw",
@@ -31,14 +31,6 @@ const EXPECTED_OPENCLAW_TARGET = Object.freeze({
   config_basename: "openclaw.json",
   runtime_identity: ".local/lib/node_modules/openclaw/openclaw.mjs",
   endpoint_identity: "ws://127.0.0.1:18789",
-  semantic_version: "2026.6.5",
-  full_build_commit: "5181e4f7c82bd373cb215a5619b0fa03c13862b7",
-  runtime_entry_sha256:
-    "ea04d15e53edc9ea4a1e7761b809703ffbc345e41defb8c6d7d69aa8c0969d1c",
-  package_json_sha256:
-    "af4e4f145ce5161eeba53c1408ac06c7df183b52edf5d199ddee5b85c492adb0",
-  build_info_sha256:
-    "6a63416e1a305710d943303019a952100015a6a1b5e515faa2987864878ef6c0",
   rpc_methods: Object.freeze(["agents.list", "tools.catalog"]),
   authority: "NONE",
   enforcement: false,
@@ -47,6 +39,40 @@ const EXPECTED_OPENCLAW_TARGET = Object.freeze({
   registry_mutation: false,
 });
 
+// Every approved OpenClaw build, in audit order. Declared independently here
+// so verification never trusts the package's own copy.
+const EXPECTED_OPENCLAW_TARGET_IDENTITIES = Object.freeze([
+  Object.freeze({
+    semantic_version: "2026.6.5",
+    full_build_commit: "5181e4f7c82bd373cb215a5619b0fa03c13862b7",
+    runtime_entry_sha256:
+      "ea04d15e53edc9ea4a1e7761b809703ffbc345e41defb8c6d7d69aa8c0969d1c",
+    package_json_sha256:
+      "af4e4f145ce5161eeba53c1408ac06c7df183b52edf5d199ddee5b85c492adb0",
+    build_info_sha256:
+      "6a63416e1a305710d943303019a952100015a6a1b5e515faa2987864878ef6c0",
+  }),
+  Object.freeze({
+    semantic_version: "2026.7.1-2",
+    full_build_commit: "0790d9f593ad30c940ed93b5872a8cf6d6f3cf8c",
+    runtime_entry_sha256:
+      "f643b005d6db233a0b45204e8d8e943256874ccc6897b8a6e0cf42a9b376a188",
+    package_json_sha256:
+      "695b6ee36df7fc69606dc390cf97bb2ca809114337b18c573707637cd2a4e3db",
+    build_info_sha256:
+      "e45942b82f7e17d0be4ce38483f1da99c2dbfdfabad3c55fbfd3b3bb970b9e33",
+  }),
+  Object.freeze({
+    semantic_version: "2026.6.33",
+    full_build_commit: "7af0cfc9c5488e03c4e2f528bdc7ac9f7778b35e",
+    runtime_entry_sha256:
+      "f1f1c6ae5745ba0cb71bfbb72f4ae43f9b3bdb5ca0af84d5fcdf60eb5ab71430",
+    package_json_sha256:
+      "3f959e5b4463e603dbe238b4ee47b33ee2c58b71030a17bdeb69e480086f0774",
+    build_info_sha256:
+      "cfba85b4a9f5997210044a1a6576b50f8839fd974d2951ce027bcd66fcda7925",
+  }),
+]);
 const PROHIBITED_CONTENT = Object.freeze([
   ["private home path", /(?:\/Users\/[A-Za-z0-9._-]+\/|\/home\/[A-Za-z0-9._-]+\/|[A-Za-z]:\\Users\\[A-Za-z0-9._-]+\\)/],
   ["credential token", /mgd1_[a-f0-9]{32}\.[A-Za-z0-9_-]{43}/],
@@ -115,22 +141,30 @@ function validateOpenClawTargetManifest(packageManifest) {
       || !/^[a-f0-9]{40}$/.test(packageManifest.source_commit ?? "")) {
     throw new TypeError("package_manifest_invalid");
   }
-  const targetBinding = {
+  const targetBindings = EXPECTED_OPENCLAW_TARGET_IDENTITIES.map((identity) => ({
     schema: "mcpherson-governance-openclaw-canary-target-binding/v2",
-    ...EXPECTED_OPENCLAW_TARGET,
-    supported_profile_modes: [...EXPECTED_OPENCLAW_TARGET.supported_profile_modes],
-    rpc_methods: [...EXPECTED_OPENCLAW_TARGET.rpc_methods],
+    ...EXPECTED_OPENCLAW_TARGET_SHAPE,
+    supported_profile_modes: [
+      ...EXPECTED_OPENCLAW_TARGET_SHAPE.supported_profile_modes,
+    ],
+    rpc_methods: [...EXPECTED_OPENCLAW_TARGET_SHAPE.rpc_methods],
+    ...identity,
     source_commit: packageManifest.source_commit,
-  };
-  const targetBindingId = sha256(Buffer.from(canonicalizeJson(targetBinding), "utf8"));
-  if (canonicalizeJson(packageManifest.target_binding)
-        !== canonicalizeJson(targetBinding)
-      || packageManifest.target_binding_id !== targetBindingId) {
+  }));
+  const targetBindingIds = targetBindings.map((binding) => (
+    sha256(Buffer.from(canonicalizeJson(binding), "utf8"))
+  ));
+  if (!Array.isArray(packageManifest.target_bindings)
+      || !Array.isArray(packageManifest.target_binding_ids)
+      || canonicalizeJson(packageManifest.target_bindings)
+        !== canonicalizeJson(targetBindings)
+      || canonicalizeJson(packageManifest.target_binding_ids)
+        !== canonicalizeJson(targetBindingIds)) {
     throw new TypeError("package_target_binding_invalid");
   }
   return Object.freeze({
-    target_binding: Object.freeze(targetBinding),
-    target_binding_id: targetBindingId,
+    target_bindings: Object.freeze(targetBindings.map(Object.freeze)),
+    target_binding_ids: Object.freeze(targetBindingIds),
   });
 }
 
@@ -222,6 +256,34 @@ export function verifyPackage() {
     pkg.openclaw?.compat?.pluginApi === EXPECTED_COMPAT,
     String(pkg.openclaw?.compat?.pluginApi),
   );
+  // The build block names the preferred audited build. Re-derive it from the
+  // independently declared approved target set rather than trusting the
+  // package's own copy: the recorded version and short commit must belong to
+  // one approved entry, and the short commit must prefix that entry's full
+  // build commit.
+  const declaredBuildTarget = EXPECTED_OPENCLAW_TARGET_IDENTITIES.find(
+    (target) => target.semantic_version === pkg.openclaw?.build?.openclawVersion,
+  );
+  check(
+    "build metadata names an approved OpenClaw target",
+    Boolean(declaredBuildTarget),
+    String(pkg.openclaw?.build?.openclawVersion),
+  );
+  check(
+    "build metadata commit matches that target's full build commit",
+    Boolean(declaredBuildTarget)
+      && typeof pkg.openclaw?.build?.openclawCommit === "string"
+      && pkg.openclaw.build.openclawCommit.length >= 7
+      && declaredBuildTarget.full_build_commit.startsWith(
+        pkg.openclaw.build.openclawCommit,
+      ),
+    `${pkg.openclaw?.build?.openclawCommit} vs ${declaredBuildTarget?.full_build_commit}`,
+  );
+  check(
+    "build metadata records the POST_HOOK receipt mode",
+    pkg.openclaw?.build?.receiptMode === "POST_HOOK",
+    String(pkg.openclaw?.build?.receiptMode),
+  );
   check(
     "config default enabled is false",
     manifest.configSchema?.properties?.enabled?.default === false,
@@ -256,19 +318,19 @@ export function verifyPackage() {
   if (auditedTarget) {
     check(
       "package target requires an explicit local profile binding",
-      auditedTarget.target_binding.profile_binding_required === true,
+      auditedTarget.target_bindings[0].profile_binding_required === true,
     );
     check(
       "package target supports only explicit DEFAULT and NAMED modes",
-      JSON.stringify(auditedTarget.target_binding.supported_profile_modes)
+      JSON.stringify(auditedTarget.target_bindings[0].supported_profile_modes)
         === JSON.stringify(["DEFAULT", "NAMED"]),
     );
     check(
       "package target paths are portable home-relative identities",
-      auditedTarget.target_binding.default_state_identity === ".openclaw"
-        && auditedTarget.target_binding.named_state_prefix === ".openclaw-"
-        && auditedTarget.target_binding.config_basename === "openclaw.json"
-        && auditedTarget.target_binding.runtime_identity
+      auditedTarget.target_bindings[0].default_state_identity === ".openclaw"
+        && auditedTarget.target_bindings[0].named_state_prefix === ".openclaw-"
+        && auditedTarget.target_bindings[0].config_basename === "openclaw.json"
+        && auditedTarget.target_bindings[0].runtime_identity
           === ".local/lib/node_modules/openclaw/openclaw.mjs",
     );
   }

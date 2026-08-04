@@ -124,17 +124,31 @@ test("package target requires an exact explicit local profile binding", () => {
     "@mcphersonai/mcpherson-governance-openclaw",
   );
   assert.equal(packageManifest.plugin_id, "mcpherson-governance-connector");
-  assert.equal(packageManifest.plugin_version, "0.6.0");
-  assert.equal(packageManifest.target_binding.profile_binding_required, true);
+  assert.equal(packageManifest.plugin_version, "0.6.1");
+  assert.equal(packageManifest.target_bindings[0].profile_binding_required, true);
   assert.deepEqual(
-    packageManifest.target_binding.supported_profile_modes,
+    packageManifest.target_bindings[0].supported_profile_modes,
     ["DEFAULT", "NAMED"],
   );
-  assert.equal(packageManifest.target_binding.default_state_identity, ".openclaw");
-  assert.equal(packageManifest.target_binding.named_state_prefix, ".openclaw-");
-  assert.equal(packageManifest.target_binding.config_basename, "openclaw.json");
+  assert.equal(packageManifest.target_bindings[0].default_state_identity, ".openclaw");
+  assert.equal(packageManifest.target_bindings[0].named_state_prefix, ".openclaw-");
+  assert.equal(packageManifest.target_bindings[0].config_basename, "openclaw.json");
+  // The package carries the full approved target set, and no approved target
+  // is a prerelease build.
+  assert.equal(packageManifest.target_bindings.length, 3);
+  assert.equal(packageManifest.target_binding_ids.length, 3);
+  assert.deepEqual(
+    packageManifest.target_bindings.map((b) => b.semantic_version),
+    ["2026.6.5", "2026.7.1-2", "2026.6.33"],
+  );
+  for (const binding of packageManifest.target_bindings) {
+    assert.doesNotMatch(binding.semantic_version, /alpha|beta|rc/i);
+    assert.match(binding.full_build_commit, /^[a-f0-9]{40}$/);
+    assert.equal(binding.authority, "NONE");
+    assert.equal(binding.enforcement, false);
+  }
   assert.equal(
-    packageManifest.target_binding.runtime_identity,
+    packageManifest.target_bindings[0].runtime_identity,
     ".local/lib/node_modules/openclaw/openclaw.mjs",
   );
 });

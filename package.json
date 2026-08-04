@@ -1,6 +1,6 @@
 {
   "name": "@mcphersonai/mcpherson-governance-openclaw",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Account-free OpenClaw plugin for local agent and tool discovery, non-authoritative AutoMap proposals, and a local Governability Diagnosis. Shadow-only: it does not block or alter tool execution.",
   "type": "module",
   "license": "Apache-2.0",
@@ -67,8 +67,8 @@
       "pluginApi": ">=2026.6.5"
     },
     "build": {
-      "openclawVersion": "2026.6.5",
-      "openclawCommit": "5181e4f",
+      "openclawVersion": "2026.6.33",
+      "openclawCommit": "7af0cfc",
       "receiptMode": "POST_HOOK"
     }
   }

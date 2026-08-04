@@ -1,4 +1,4 @@
-# Install and run — McPherson Governance Connector v0.6.0
+# Install and run — McPherson Governance Connector v0.6.1
 
 ## 1. Requirements
 
@@ -21,15 +21,38 @@ This number is not a guess and not merely package metadata:
   enforced by every installer.
 - It is *also* declared as `openclaw.compat.pluginApi: ">=2026.6.5"` in
   `package.json`, for installers that do check.
-- The build metadata in `package.json` records the exact runtime this release
-  was built and tested against: `openclawVersion 2026.6.5`,
-  `openclawCommit 5181e4f`, `receiptMode POST_HOOK`.
+- The build metadata in `package.json` records the preferred audited runtime
+  for this release — the build the full lifecycle is run against first:
+  `openclawVersion 2026.6.33`, `openclawCommit 7af0cfc`,
+  `receiptMode POST_HOOK`. It names one preferred build, not the whole
+  approved set; `2026.6.5` remains fully supported and separately proven.
 
-**Caveat, stated exactly:** the evidence in this repository binds this release
-to OpenClaw `2026.6.5` at commit `5181e4f`. It does **not** establish behavior
-on any other OpenClaw version. Newer OpenClaw releases are permitted by the
-`>=` range but are not covered by that evidence. On a host below 2026.6.5 the
-connector stays inert rather than activating.
+**Caveat, stated exactly:** the approved live-observation target set is three
+exact OpenClaw builds — `2026.6.5` at commit `5181e4f`, `2026.6.33` at commit
+`7af0cfc`, and `2026.7.1-2` at commit `0790d9f`. It does **not** establish
+behavior on any other OpenClaw version. Other releases in the `>=` range may
+load the connector but are not covered by that evidence, and live observation
+refuses them outright. On a host below 2026.6.5 the connector stays inert
+rather than activating.
+
+Support is **exact-target based**. A build is approved only when its semantic
+version, full commit, runtime-entry SHA-256, `package.json` SHA-256, and
+`dist/build-info.json` SHA-256 all match one approved entry. Being in the
+`2026.6` line, or carrying the `extended-stable` dist-tag, approves nothing on
+its own — that tag is a moving pointer and upstream may repoint it at a build
+this release has never audited.
+
+| OpenClaw build | Target binding | Live lifecycle |
+| --- | --- | --- |
+| `2026.6.5` (`5181e4f`) | exact, supported | **proven** |
+| `2026.6.33` (`7af0cfc`) extended-stable | exact, supported | **proven** — preferred baseline |
+| `2026.7.1-2` (`0790d9f`) | exact, supported | **not supported** — blocked upstream |
+
+**The full local V6 workflow in section 4 is proven on `2026.6.5` and on
+`2026.6.33`.** Prefer `2026.6.33`, the published extended-stable build. The
+connector installs and runs on `2026.7.1-2`, but that build does not issue the
+device-bound operator token the observer requires — see
+[LIMITATIONS.md](./LIMITATIONS.md).
 
 ## 2. Install the plugin
 
@@ -59,11 +82,11 @@ changes its gateway port; the V6 binding deliberately refuses that alias.
 
 ```sh
 clawhub package download @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.6.0 \
+  --version 0.6.1 \
   --output ./mcpherson-governance-download
 ```
 
-This writes `mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz`. That single
+This writes `mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz`. That single
 `.tgz` is the artifact you install — do not extract it and do not install a
 subdirectory on its own.
 
@@ -73,12 +96,12 @@ Never install an artifact you have not verified.
 
 ```sh
 clawhub package verify \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz \
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz \
   --package @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.6.0
+  --version 0.6.1
 
 shasum -a 256 \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz
 ```
 
 It must report `verified: true`, and the SHA-256 must match the value published
@@ -89,7 +112,7 @@ with the release. Do not proceed on any mismatch.
 ```sh
 env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
   "$OPENCLAW" --profile "$PROFILE" plugins install \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz
 ```
 
 Expect these warnings on a normal install. All are benign:
@@ -247,6 +270,43 @@ Require a successful health result, then stop terminal 1 with Ctrl-C. Confirm
 This bootstrap is local loopback only and requires no email, login, remote
 service, pairing UI, billing, or credits.
 
+#### Two different credentials — do not confuse them
+
+This step establishes **two** separate things, and live observation needs both:
+
+1. **The shared Gateway token** (`gateway.auth.token`, the SecretRef above).
+   It authenticates the *connection* to your local Gateway. It is not an
+   operator identity.
+2. **The device-bound operator token**, which OpenClaw issues to this
+   profile's persistent device identity during the health call and persists at
+   `$PROFILE_STATE/identity/device-auth.json` with role `operator` and scope
+   `operator.read`.
+
+**The shared Gateway token does not replace the device-bound token.** The
+observer requires the device-bound token specifically, and will not fall back
+to the shared Gateway token, `gateway.remote.token`, a token from another
+profile, or a token from another device. Verify the file exists and carries the
+operator role before continuing:
+
+```sh
+stat -f '%Lp' "$PROFILE_STATE/identity/device-auth.json"   # require 600
+```
+
+`device-auth.json` is sensitive owner-only state. Treat it like a credential:
+never copy it between profiles or machines, never commit it, and never paste
+its contents. Each named profile keeps its own device identity and its own
+token; profile separation is what keeps one profile's observation from reading
+another's.
+
+> **On OpenClaw `2026.7.1-2` this file is not created.** That build omits the
+> device identity from the connect handshake for a local CLI using
+> shared-secret auth on a loopback Gateway, so OpenClaw never opens a
+> device-pairing request and never issues the token. `observe-live` therefore
+> fails closed with `LIVE_PATH_COMPONENT_UNREADABLE`. Run the section 4
+> workflow on `2026.6.33` or `2026.6.5` until this is resolved upstream.
+> `2026.6.33` does not carry that change: a local CLI still pairs and still
+> receives an `operator.read` device token there.
+
 OpenClaw's first-run state initialization leaves the profile state directory
 group- and world-readable (`0755`). Restore owner-only access before continuing;
 the binding refuses a state root that is not private:
@@ -264,8 +324,11 @@ for a new profile; later gateway restarts and health calls preserve `0700`.
 
 The observer will not accept a profile merely because its name is syntactically
 valid. Create a short-lived local binding that pins this package and source,
-the exact named profile, physical home, state and config paths, and the audited
-OpenClaw `2026.6.5 (5181e4f)` runtime. Initialization validates all of those
+the exact named profile, physical home, state and config paths, and one audited
+OpenClaw runtime — `2026.6.5 (5181e4f)`, `2026.6.33 (7af0cfc)`, or
+`2026.7.1-2 (0790d9f)`. The binding
+records the single build that host actually runs. Initialization validates all
+of those
 inputs before writing the binding, never overwrites an existing file, and does
 not read or copy a gateway secret value.
 
@@ -454,9 +517,12 @@ The derived files `discovery.json`, `automap-proposals.json`,
 `governability-findings.json`, and `governability-diagnosis.md` are also `0600`.
 **Existing paths are never overwritten.**
 
-## 6. Upgrading from v0.5.1 — receipt-ledger transition
+## 6. Upgrading from an earlier version — receipt-ledger transition
 
-**Read this before starting v0.6.0 against an existing v0.5.1 ledger.**
+**Read this before starting v0.6.1 against a ledger written by any earlier
+connector version, including v0.5.1 and v0.6.0.** v0.6.1 moves the lifecycle
+version pin from `0.6.0` to `0.6.1`, so a v0.6.0 ledger needs this same
+rotation — upgrading the connector alone is not sufficient.
 
 The observer pins connector lifecycle records to one exact version, and
 `parseReceiptLedger` validates **every** line of the ledger with no window
@@ -471,18 +537,20 @@ the old process has exited.**
 
 Perform the transition in exactly this order:
 
-1. **Stop or restart the old connector** so it writes its final v0.5.1
-   `gateway_stop` record.
+1. **Stop or restart the old connector** so it writes its final
+   `gateway_stop` record at its own version.
 2. **Confirm the old process has exited.** Do not proceed while it is running.
-3. **Rotate the receipt ledger**, preserving the old file as evidence:
+3. **Rotate the receipt ledger**, preserving the old file as evidence. Replace
+   `<old-version>` with the version you are leaving, for example `v0.5.1` or
+   `v0.6.0`:
 
    ```sh
    mv ~/.openclaw/mcpherson-governance-connector/receipts/connector-receipts.jsonl \
-      ~/.openclaw/mcpherson-governance-connector/archive/connector-receipts-v0.5.1-$(date -u +%Y%m%dT%H%M%SZ).jsonl
+      ~/.openclaw/mcpherson-governance-connector/archive/connector-receipts-<old-version>-$(date -u +%Y%m%dT%H%M%SZ).jsonl
    ```
 
    Create the `archive/` directory `0700` first if it does not exist.
-4. **Start v0.6.0.**
+4. **Start v0.6.1.**
 5. **Initialize the new ledger as owner-only `0600`:**
 
    ```sh
@@ -496,10 +564,21 @@ Perform the transition in exactly this order:
 7. **Never parse mixed-version records as one current-version ledger.** If you
    need to read historical records, read the archived file separately with the
    connector version that wrote it.
+8. **Re-initialize and verify the profile binding, then complete one full
+   lifecycle.** A binding captured before the upgrade pins the previous plugin
+   version and will not verify against v0.6.1. Run `init-profile-binding`,
+   record the new binding ID, run `verify-profile-binding`, then run
+   `observe-live` and `verify-observation` as in section 4. Confirm the
+   binding reports `plugin_version 0.6.1` and the exact runtime you intend —
+   `2026.6.33 (7af0cfc)` or `2026.6.5 (5181e4f)`.
 
 If you skip the rotation, `observe-live` fails closed with
 `live_receipt_contract_invalid` rather than silently mixing versions. That
 failure is the contract working, not a defect.
+
+This transition is independent of which approved OpenClaw build you run: the
+ledger boundary is a *connector* version boundary, and it applies identically
+on `2026.6.5` and `2026.6.33`.
 
 ## 7. Uninstall
 

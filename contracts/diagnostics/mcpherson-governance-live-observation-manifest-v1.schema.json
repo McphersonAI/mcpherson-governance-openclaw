@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.mcpherson.ai/governance/diagnostics/mcpherson-governance-live-observation-manifest-v1.schema.json",
   "title": "McPherson Governance v0.6 live observation manifest",
-  "description": "Integrity and scope manifest for one bounded metadata-only OpenClaw live observation run. Runtime and receipt paths are deliberately excluded.",
+  "description": "Integrity and scope manifest for one bounded metadata-only OpenClaw live observation run. Absolute host-specific runtime paths and all receipt paths are deliberately excluded: no OpenClaw home, state root, config path, resolved entrypoint location, user name, or receipt body is ever recorded. The one exception is deliberate and is not host-derived: `runtime_identity` carries a fixed portable relative runtime identity that this contract declares as a constant, retained solely to bind the observation to the audited OpenClaw target. See `runtime_identity` and the `runtime_paths` entry of `excluded_data`.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -69,13 +69,19 @@
       "pattern": "^[A-Za-z0-9._:-]{1,96}$"
     },
     "runtime_identity": {
+      "description": "Fixed portable relative runtime identity of the audited OpenClaw target, retained solely for target binding. This value is a constant declared by this contract and asserted against the audited target manifest; it is never read from, discovered on, or derived from the observing host, and it does not vary by host. It is a relative locator only: it carries no absolute path, no home directory, no user name, no profile or state directory, and no secret. It is deliberately not covered by the `runtime_paths` exclusion, which governs recorded host-specific paths.",
       "const": ".local/lib/node_modules/openclaw/openclaw.mjs"
     },
     "endpoint_identity": {
       "const": "ws://127.0.0.1:18789"
     },
     "runtime_semantic_version": {
-      "const": "2026.6.5"
+      "description": "Exact semantic version of the observed OpenClaw runtime. Closed to the approved target set; each value corresponds to one exact audited build whose commit and content digests are pinned by the package target bindings.",
+      "enum": [
+        "2026.6.5",
+        "2026.7.1-2",
+        "2026.6.33"
+      ]
     },
     "runtime_build_identifier": {
       "$ref": "#/$defs/buildIdentifier"
@@ -129,7 +135,12 @@
           "const": "openclaw"
         },
         "version": {
-          "const": "2026.6.5"
+          "description": "Exact semantic version of the observed OpenClaw runtime. Closed to the approved target set; each value corresponds to one exact audited build whose commit and content digests are pinned by the package target bindings.",
+          "enum": [
+            "2026.6.5",
+            "2026.7.1-2",
+            "2026.6.33"
+          ]
         },
         "build_identifier": {
           "$ref": "#/$defs/buildIdentifier"
@@ -260,6 +271,7 @@
       }
     },
     "excluded_data": {
+      "description": "Closed, ordered inventory of the data classes this observation never records. Each entry is a constant asserted by the producer and re-checked by the verifier.",
       "type": "array",
       "minItems": 10,
       "maxItems": 10,
@@ -290,9 +302,11 @@
           "const": "credentials"
         },
         {
+          "description": "No absolute or otherwise host-specific runtime filesystem path is recorded: not the OpenClaw home, state root, config path, profile directory, receipt directory, or the resolved absolute location of the runtime entrypoint on the observing host. This exclusion governs recorded host-derived paths. It does not apply to the `runtime_identity` constant, which is a fixed portable relative target-binding identifier declared by this contract rather than an observed host path.",
           "const": "runtime_paths"
         },
         {
+          "description": "No receipt body, payload, or receipt file path is recorded; only bounded counts and integrity digests of the four named artifacts.",
           "const": "receipt_bodies"
         }
       ],
