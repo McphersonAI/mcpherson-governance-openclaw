@@ -1,11 +1,11 @@
-# Verify this package — v0.6.0
+# Verify this package — v0.6.2
 
 Do not take the documentation's word for the safety posture. Check it.
 
 ## 1. Verify the archive you downloaded
 
 ```sh
-shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz
+shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
 ```
 
 Compare against the published release checksum. The archive is a standard npm
@@ -14,7 +14,7 @@ tarball with a single `package/` root.
 List its contents without installing:
 
 ```sh
-tar -tzf mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz | sort
+tar -tzf mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz | sort
 ```
 
 ## 2. Run the packaged verifier
@@ -29,7 +29,7 @@ This checks, and fails closed on any mismatch:
 
 - every packaged file against `PACKAGE-FILES.sha256`;
 - no unexpected and no missing files;
-- package name `@mcphersonai/mcpherson-governance-openclaw` and version `0.6.0`;
+- package name `@mcphersonai/mcpherson-governance-openclaw` and version `0.6.2`;
 - plugin ID `mcpherson-governance-connector`;
 - `package.json` and `openclaw.plugin.json` versions agree;
 - `openclaw.compat.pluginApi` is `>=2026.6.5`;
@@ -49,25 +49,45 @@ This checks, and fails closed on any mismatch:
 
 ## 3. Check provenance
 
-`RELEASE-PROVENANCE.json` records the exact source commit and tree the archive
-was built from, the archive name, its SHA-256, the file count, and the
-normalization rules used. `V6-PACKAGE-MANIFEST.json` additionally binds the
-observer modules by content hash and carries the immutable audited OpenClaw
-target. The target deliberately contains only portable, home-relative path
-identities. An operator-created local profile binding separately pins the exact
-physical home, profile, state, config, and runtime paths.
+`RELEASE-PROVENANCE.json` (schema `…/v2`, corrected in 0.6.2) binds this
+archive to the **public** release source. `V6-PACKAGE-MANIFEST.json`
+additionally binds every source file by content hash and carries the immutable
+audited OpenClaw target. The target deliberately contains only portable,
+home-relative path identities. An operator-created local profile binding
+separately pins the exact physical home, profile, state, config, and runtime
+paths.
 
 ```sh
 cat RELEASE-PROVENANCE.json
 ```
 
-The build is deterministic: the same internal source commit produces a
-byte-identical archive, and two independent clean checkouts of that commit yield
-the same SHA-256. This is verified during the release itself. Because the build
-repository and its tooling are not public, treat it as a property of how this
-archive was produced rather than a check you can repeat — see
-[§6](#6-check-the-contents-against-the-published-source) for what you can verify
-independently.
+**What changed in 0.6.2, and why.** Through 0.6.1 this record named the
+private build commit as `source_commit`, and the package manifest listed
+seventeen source files under private `release/openclaw-public/…` paths. Both
+described a repository you cannot fetch, so neither claim could be checked by
+anyone holding the artifact. They are corrected here.
+
+Three bindings genuinely cannot be written into the artifact that they
+describe: the release commit SHA (a commit's identifier covers its own
+content), the release tree SHA (writing it into a tracked file changes that
+tree), and the archive SHA-256 (the archive contains this file). Rather than
+guess a future commit or stay silent, each is declared under
+`external_bindings` with the exact command that resolves it:
+
+```sh
+git rev-parse refs/tags/v0.6.2^{commit}
+git rev-parse refs/tags/v0.6.2^{tree}
+shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
+```
+
+Everything that *can* be stated truthfully at write time is stated as a value:
+`source_commit` and `source_tree` are the public base commit and tree this
+release was built from — both already published, both labelled
+`PUBLIC_BASE_COMMIT` / `PUBLIC_BASE_TREE` so neither can be misread as a
+self-reference — along with the release tag, the package version, and the
+complete internal checksum coverage. `release_ordering` records the order the
+manifests must be written in; `scripts/build-release-manifests.mjs --check`
+re-derives all three and fails on any drift.
 
 ## 4. Verify the safety claims yourself
 
@@ -132,10 +152,10 @@ physical home containing the independently installed audited OpenClaw runtime:
 
 ```sh
 VERIFY_HOME=/absolute/path/to/disposable-home
-VERIFY_PROFILE=verify-mcpherson-v060
+VERIFY_PROFILE=verify-mcpherson-v062
 env HOME="$VERIFY_HOME" OPENCLAW_HOME="$VERIFY_HOME" \
   "$VERIFY_HOME/.local/bin/openclaw" --profile "$VERIFY_PROFILE" plugins install \
-  /absolute/path/to/mcphersonai-mcpherson-governance-openclaw-0.6.0.tgz
+  /absolute/path/to/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
 env HOME="$VERIFY_HOME" OPENCLAW_HOME="$VERIFY_HOME" \
   "$VERIFY_HOME/.local/bin/openclaw" --profile "$VERIFY_PROFILE" plugins inspect \
   mcpherson-governance-connector
@@ -159,24 +179,38 @@ closed.
 ## 6. Check the contents against the published source
 
 The archive is built only from a clean, committed source tree, with normalized
-entry ordering, zeroed timestamps, fixed uid/gid, and fixed modes. What you can
-check independently is the **contents**, not the archive envelope:
+entry ordering, zeroed timestamps, fixed uid/gid, and fixed modes. From 0.6.2
+you can check both the **contents** and the **archive envelope** yourself:
 
 1. `scripts/verify-package.mjs` recomputes the SHA-256 of every packaged file
    and compares it with `PACKAGE-FILES.sha256`, which covers every file in the
    package except itself. Any single changed byte fails.
 2. The identical file tree is published at
    `https://github.com/McphersonAI/mcpherson-governance-openclaw` under tag
-   `v0.6.0`. Diff your extracted package against that tag; it should be empty.
+   `v0.6.2`. Diff your extracted package against that tag; it should be empty.
 
-`RELEASE-PROVENANCE.json` records the internal build commit and tree. That build
-repository is **not public**: those values are integrity references that bind
-this package to one exact internal source state, not a checkout you can fetch.
+**You can now rebuild the archive yourself.** From 0.6.2 the release is built
+by `npm pack` from the tagged public tree — no private tooling is involved, so
+the byte-identical archive is reproducible outside McPherson AI:
 
-The build tooling is likewise not part of this package, so re-creating the
-`.tgz` byte-for-byte is not something an external verifier can perform. Verify
-the file contents and the published source tree instead; that is what the
-checksums and the shipped verifier actually attest.
+```sh
+git clone https://github.com/McphersonAI/mcpherson-governance-openclaw
+cd mcpherson-governance-openclaw && git checkout v0.6.2
+npm pack
+shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
+```
+
+That digest must equal the one published on the GitHub release and on
+ClawHub. You can also re-derive the three release manifests and confirm they
+match what shipped:
+
+```sh
+node scripts/build-release-manifests.mjs --check
+```
+
+Through 0.6.1 neither check was possible: the build ran in a private
+repository with private tooling, and the recorded provenance pointed there.
+That is the defect 0.6.2 removes.
 
 ## What verification cannot tell you
 

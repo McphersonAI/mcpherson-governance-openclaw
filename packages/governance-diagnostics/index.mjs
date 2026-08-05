@@ -10,6 +10,7 @@
 
 export * from "./vocabulary.mjs";
 export * from "./sensitive-values.mjs";
+export * from "./redaction.mjs";
 export * from "./typed-values.mjs";
 export * from "./schema-validate.mjs";
 export * from "./contracts.mjs";

@@ -1,6 +1,6 @@
 # McPherson Governance Connector for OpenClaw
 
-**Version 0.6.1 — account-free local governance diagnostics.**
+**Version 0.6.2 — account-free local governance diagnostics.**
 
 This package is the distributed McPherson Governance OpenClaw plugin. It is not
 the McPherson Governance monorepo: it contains the connector runtime, the V6
@@ -90,13 +90,13 @@ OPENCLAW="$PROFILE_HOME/.local/bin/openclaw"
 PROFILE_STATE="$PROFILE_HOME/.openclaw-$PROFILE"
 PACKAGE_ROOT=/absolute/path/to/the/verified/package
 clawhub package download @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.6.1 --output ./mcpherson-governance-download
+  --version 0.6.2 --output ./mcpherson-governance-download
 clawhub package verify \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz \
-  --package @mcphersonai/mcpherson-governance-openclaw --version 0.6.1
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz \
+  --package @mcphersonai/mcpherson-governance-openclaw --version 0.6.2
 env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
   "$OPENCLAW" --profile "$PROFILE" plugins install \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
 env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
   "$OPENCLAW" --profile "$PROFILE" config set \
   plugins.entries.mcpherson-governance-connector.config \

@@ -2,7 +2,7 @@
   "id": "mcpherson-governance-connector",
   "name": "McPherson Governance Connector",
   "description": "Account-free OpenClaw plugin for local agent and tool discovery, non-authoritative AutoMap proposals, and a local Governability Diagnosis. Shadow-only metadata connector with local authority retained and truthful post-hook receipts. It does not block or alter ordinary tool execution; remote decisions have no execution authority.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "activation": {
     "onStartup": true
   },

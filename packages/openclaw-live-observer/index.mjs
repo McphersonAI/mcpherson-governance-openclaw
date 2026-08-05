@@ -50,6 +50,10 @@ import {
 import { canonicalizeJson } from "../governance-core/canonical.mjs";
 import { isCalendarUtcTimestamp } from "../governance-diagnostics/schema-validate.mjs";
 import {
+  redactSecretsWithReport,
+  scanForSecrets,
+} from "../governance-diagnostics/redaction.mjs";
+import {
   assertValidArtifact,
   validateEnvelope,
 } from "../governance-diagnostics/contracts.mjs";
@@ -208,7 +212,7 @@ const LIFECYCLE_KEYS = Object.freeze([
 // `plugins/openclaw-connector/constants.mjs`. It is duplicated rather than
 // imported so the observer keeps no runtime edge into the connector tree; the
 // two are held equal by tests/release/version-synchronization.test.mjs.
-export const LIVE_LIFECYCLE_PLUGIN_VERSION = "0.6.1";
+export const LIVE_LIFECYCLE_PLUGIN_VERSION = "0.6.2";
 // Exact OpenClaw 2026.6.5 gateway credential surface, taken from the
 // installed runtime schema keys `gateway.auth.*` and `gateway.tailscale.*`
 // and the shipped gateway configuration reference. Unknown members of either
@@ -1906,8 +1910,22 @@ function governabilityEvidence(snapshot, observationId, capturedAt, binding) {
   return result;
 }
 
+// Single serialization choke point for every live-observation artifact. Both
+// the written file and the observation-binding hash derive from this
+// function, so redaction here is what the binding actually commits to.
+//
+// The observer already restricts itself to allowlisted metadata, so on a
+// well-formed artifact redaction is a no-op and the bytes are unchanged from
+// v0.6.1. It is retained as defence in depth: if credential material ever
+// reaches this point it is removed before the bytes exist, and the redacted
+// result is re-scanned so a shape the redactor could not neutralise fails
+// closed instead of being written.
 function artifactBytes(value) {
-  return `${JSON.stringify(value, null, 2)}\n`;
+  const { value: redacted } = redactSecretsWithReport(value);
+  if (scanForSecrets(redacted).length > 0) {
+    fail("live_output_secret_material_detected");
+  }
+  return `${JSON.stringify(redacted, null, 2)}\n`;
 }
 
 function artifactHash(bytes) {

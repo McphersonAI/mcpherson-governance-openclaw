@@ -1,4 +1,4 @@
-# Install and run — McPherson Governance Connector v0.6.1
+# Install and run — McPherson Governance Connector v0.6.2
 
 ## 1. Requirements
 
@@ -82,11 +82,11 @@ changes its gateway port; the V6 binding deliberately refuses that alias.
 
 ```sh
 clawhub package download @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.6.1 \
+  --version 0.6.2 \
   --output ./mcpherson-governance-download
 ```
 
-This writes `mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz`. That single
+This writes `mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz`. That single
 `.tgz` is the artifact you install — do not extract it and do not install a
 subdirectory on its own.
 
@@ -96,12 +96,12 @@ Never install an artifact you have not verified.
 
 ```sh
 clawhub package verify \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz \
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz \
   --package @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.6.1
+  --version 0.6.2
 
 shasum -a 256 \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
 ```
 
 It must report `verified: true`, and the SHA-256 must match the value published
@@ -112,7 +112,7 @@ with the release. Do not proceed on any mismatch.
 ```sh
 env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
   "$OPENCLAW" --profile "$PROFILE" plugins install \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.1.tgz
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
 ```
 
 Expect these warnings on a normal install. All are benign:
@@ -519,10 +519,11 @@ The derived files `discovery.json`, `automap-proposals.json`,
 
 ## 6. Upgrading from an earlier version — receipt-ledger transition
 
-**Read this before starting v0.6.1 against a ledger written by any earlier
-connector version, including v0.5.1 and v0.6.0.** v0.6.1 moves the lifecycle
-version pin from `0.6.0` to `0.6.1`, so a v0.6.0 ledger needs this same
-rotation — upgrading the connector alone is not sufficient.
+**Read this before starting v0.6.2 against a ledger written by any earlier
+connector version, including v0.5.1, v0.6.0, and v0.6.1.** v0.6.2 moves the
+lifecycle version pin from `0.6.1` to `0.6.2`, so a v0.6.1 ledger needs this
+same rotation — upgrading the connector alone is not sufficient. For the
+v0.5.1 path specifically, see [COMPATIBILITY.md](./COMPATIBILITY.md) §2.
 
 The observer pins connector lifecycle records to one exact version, and
 `parseReceiptLedger` validates **every** line of the ledger with no window
@@ -541,8 +542,8 @@ Perform the transition in exactly this order:
    `gateway_stop` record at its own version.
 2. **Confirm the old process has exited.** Do not proceed while it is running.
 3. **Rotate the receipt ledger**, preserving the old file as evidence. Replace
-   `<old-version>` with the version you are leaving, for example `v0.5.1` or
-   `v0.6.0`:
+   `<old-version>` with the version you are leaving, for example `v0.5.1`,
+   `v0.6.0`, or `v0.6.1`:
 
    ```sh
    mv ~/.openclaw/mcpherson-governance-connector/receipts/connector-receipts.jsonl \
@@ -550,7 +551,7 @@ Perform the transition in exactly this order:
    ```
 
    Create the `archive/` directory `0700` first if it does not exist.
-4. **Start v0.6.1.**
+4. **Start v0.6.2.**
 5. **Initialize the new ledger as owner-only `0600`:**
 
    ```sh
@@ -566,10 +567,10 @@ Perform the transition in exactly this order:
    connector version that wrote it.
 8. **Re-initialize and verify the profile binding, then complete one full
    lifecycle.** A binding captured before the upgrade pins the previous plugin
-   version and will not verify against v0.6.1. Run `init-profile-binding`,
+   version and will not verify against v0.6.2. Run `init-profile-binding`,
    record the new binding ID, run `verify-profile-binding`, then run
    `observe-live` and `verify-observation` as in section 4. Confirm the
-   binding reports `plugin_version 0.6.1` and the exact runtime you intend —
+   binding reports `plugin_version 0.6.2` and the exact runtime you intend —
    `2026.6.33 (7af0cfc)` or `2026.6.5 (5181e4f)`.
 
 If you skip the rotation, `observe-live` fails closed with

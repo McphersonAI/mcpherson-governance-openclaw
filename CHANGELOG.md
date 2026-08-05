@@ -5,8 +5,109 @@ All notable changes to the public McPherson Governance OpenClaw connector.
 This project adheres to semantic versioning for its public package identity.
 The plugin ID (`mcpherson-governance-connector`), package name
 (`@mcphersonai/mcpherson-governance-openclaw`), configuration schema, and the
-`mcpherson-connector-ctl` command name are stable across 0.5.x, 0.6.0, and
-0.6.1.
+`mcpherson-connector-ctl` command name are stable across 0.5.x, 0.6.0, 0.6.1,
+and 0.6.2.
+
+---
+
+## [0.6.2] — Release provenance, recursive redaction, and compatibility
+
+A provenance, hardening, and documentation patch. **No runtime governance
+behavior changed.** `AUTHORITY` remains `NONE`, `ENFORCEMENT` remains `OFF`,
+automatic mapping activation remains off, outbound actions and registry
+mutation remain off, and remote decisions remain `SHADOW_ONLY`. No policy
+evaluator and no gate were added. No governance decision, AutoMap semantic,
+governability diagnosis, or enforcement behavior changed.
+
+### Public release provenance — corrected
+
+Through 0.6.1 the public artifact described the private build that produced
+it, in two ways that no downloader could check:
+
+- `RELEASE-PROVENANCE.json` named the **private candidate commit** as the
+  public `source_commit`. That commit does not exist in the public repository.
+- `V6-PACKAGE-MANIFEST.json` recorded **seventeen source files** under private
+  `release/openclaw-public/…` paths that do not resolve inside the package.
+
+Both are corrected. `RELEASE-PROVENANCE.json` moves to schema `…/v2` and binds
+to the public release source:
+
+- `source_commit` / `source_tree` are the **public base commit and tree**,
+  explicitly labelled `PUBLIC_BASE_COMMIT` and `PUBLIC_BASE_TREE` so neither
+  can be misread as a self-reference;
+- the three bindings an artifact cannot make about itself — the release
+  commit, the release tree, and the archive SHA-256 — are declared under
+  `external_bindings`, each with the exact command that resolves it and the
+  reason it cannot be stated inline;
+- `release_ordering` records the order the three manifests must be written in.
+
+No future commit is hardcoded and no self-referential commit claim is made.
+The source inventory now names public package paths only.
+
+`scripts/build-release-manifests.mjs` replaces the manual private step that
+produced the defect, and `--check` re-derives all three manifests and fails on
+any drift. Because the archive is now built by `npm pack` from the tagged
+public tree, **the release is reproducible outside McPherson AI** — see
+[VERIFY.md](./VERIFY.md) §6.
+
+### Recursive secret redaction
+
+New `packages/governance-diagnostics/redaction.mjs` removes credential
+material from every nested object and array before it reaches an output
+boundary. Two independent layers: normalized key matching (case, hyphen, and
+underscore variants of token, access/refresh/device token, authorization,
+bearer, API key, secret, password, credential, cookie, session, private key,
+TOTP seed, recovery code, and state key), and value-shape scrubbing that
+catches a credential pasted under a harmless key.
+
+Wired into the live observer's single artifact-serialization choke point and
+every diagnostics CLI output path, each followed by a final-output scan that
+fails closed. On well-formed artifacts redaction is a no-op, so v0.6.1 output
+bytes are unchanged.
+
+Evidence usability is preserved deliberately: booleans, `null`, and
+`undefined` are never redacted, only whole or trailing credential key names
+match, and value scrubbing replaces just the matched credential rather than
+the surrounding text. `authority`, `credential_id`, `credential_material`,
+`token_shape`, `private_key_shape`, and `session_identifiers` all keep their
+values. Recursion is depth-limited and cycle-safe.
+
+18 regression tests cover nested objects, arrays of objects, mixed casing,
+hyphenated and underscored keys, nested device-token transcript shapes,
+authorization headers, cookies and sessions, null and primitive values,
+harmless similarly named fields, depth limits, and final-output scanning.
+
+### Compatibility and migration
+
+New [COMPATIBILITY.md](./COMPATIBILITY.md) states each target's exact support:
+
+- **`2026.6.33` (`7af0cfc`)** — preferred target; fully lifecycle-proven.
+- **`2026.6.5` (`5181e4f`)** — fully lifecycle-proven.
+- **`2026.7.1-2` (`0790d9f`)** — exact-target binding validated; install and
+  uninstall validated; **live observation unsupported**, because the upstream
+  local CLI does not issue the device-bound `operator.read` token the observer
+  requires.
+
+It also documents the v0.5.1 → v0.6.2 migration end to end: stop v0.5.1 before
+rotating the ledger, archive the historical ledger, create a fresh owner-only
+v0.6.x ledger, verify the profile binding and the device-bound
+`operator.read` token, run the lifecycle and restart proof, and never mix
+historical and fresh version records.
+
+### Other
+
+- The packaged verifier now asserts **all six** fixed safety values against an
+  independently declared expectation, rather than two of them.
+- Version declarations are synchronized to 0.6.2 across `package.json`,
+  `openclaw.plugin.json`, the connector package, `PLUGIN_VERSION`,
+  `LIVE_LIFECYCLE_PLUGIN_VERSION`, both release manifests, and the
+  documentation set. Historical references to 0.6.0 and 0.6.1 are preserved.
+- The packaged test that pinned `plugin_version` to a literal now derives it,
+  so it cannot silently go stale on a future release.
+
+Zero runtime dependencies. The lifecycle version pin moves from `0.6.1` to
+`0.6.2`, so a v0.6.1 receipt ledger requires the documented rotation — see
+[INSTALL.md](./INSTALL.md) §6.
 
 ---
 

@@ -1,4 +1,4 @@
-# Limitations — McPherson Governance Connector v0.6.1
+# Limitations — McPherson Governance Connector v0.6.2
 
 Read this before deciding what this package is for. Everything here is a real
 limitation, stated plainly.

@@ -3,9 +3,9 @@
   "product_boundary": "AUTOMAP_GOVERNABILITY_AND_METADATA_ONLY_OPENCLAW_OBSERVATION",
   "package_name": "@mcphersonai/mcpherson-governance-openclaw",
   "plugin_id": "mcpherson-governance-connector",
-  "plugin_version": "0.6.1",
-  "source_commit": "d479a51b7f7cebd9e1ca09f8f0eaa50b87d27113",
-  "source_tree": "deb3b459df38b92e01792baedc3a0d40cc8e2e25",
+  "plugin_version": "0.6.2",
+  "source_commit": "d80ca75514b17b2d8a7ed8be4f20d7bc32c1c09c",
+  "source_tree": "f879f1e479f263a208e14357bad50e5f1eb9066f",
   "safety": {
     "runtime_authority": "NONE",
     "enforcement_active": false,
@@ -59,7 +59,7 @@
       "runtime_entry_sha256": "ea04d15e53edc9ea4a1e7761b809703ffbc345e41defb8c6d7d69aa8c0969d1c",
       "package_json_sha256": "af4e4f145ce5161eeba53c1408ac06c7df183b52edf5d199ddee5b85c492adb0",
       "build_info_sha256": "6a63416e1a305710d943303019a952100015a6a1b5e515faa2987864878ef6c0",
-      "source_commit": "d479a51b7f7cebd9e1ca09f8f0eaa50b87d27113"
+      "source_commit": "d80ca75514b17b2d8a7ed8be4f20d7bc32c1c09c"
     },
     {
       "schema": "mcpherson-governance-openclaw-canary-target-binding/v2",
@@ -87,7 +87,7 @@
       "runtime_entry_sha256": "f643b005d6db233a0b45204e8d8e943256874ccc6897b8a6e0cf42a9b376a188",
       "package_json_sha256": "695b6ee36df7fc69606dc390cf97bb2ca809114337b18c573707637cd2a4e3db",
       "build_info_sha256": "e45942b82f7e17d0be4ce38483f1da99c2dbfdfabad3c55fbfd3b3bb970b9e33",
-      "source_commit": "d479a51b7f7cebd9e1ca09f8f0eaa50b87d27113"
+      "source_commit": "d80ca75514b17b2d8a7ed8be4f20d7bc32c1c09c"
     },
     {
       "schema": "mcpherson-governance-openclaw-canary-target-binding/v2",
@@ -115,15 +115,75 @@
       "runtime_entry_sha256": "f1f1c6ae5745ba0cb71bfbb72f4ae43f9b3bdb5ca0af84d5fcdf60eb5ab71430",
       "package_json_sha256": "3f959e5b4463e603dbe238b4ee47b33ee2c58b71030a17bdeb69e480086f0774",
       "build_info_sha256": "cfba85b4a9f5997210044a1a6576b50f8839fd974d2951ce027bcd66fcda7925",
-      "source_commit": "d479a51b7f7cebd9e1ca09f8f0eaa50b87d27113"
+      "source_commit": "d80ca75514b17b2d8a7ed8be4f20d7bc32c1c09c"
     }
   ],
   "target_binding_ids": [
-    "9525deaf47a350224dcf8dbdc65a242b3492a9a14276e9c8843972bb94687c6c",
-    "d66738f2af4309338b02e8040a348deae92305cdd3e31c014ca25d75819723e4",
-    "ea71dcfc6be64a14d8f6ca6a14d1d73167ed904bcb9e38f595005498cd6567fb"
+    "65f516d378cad265a59fb087a10bdf659649c8cd3595a412f711ac1964e4cce7",
+    "8dfef36ec9dca34fb6534c1504172ee6debf1a235b8716adf16e94077a1f16e5",
+    "663a83ddd18677f8129e5f687d4d5542477271c7f051de2f195cbe1da291e999"
   ],
   "source_files": [
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 16823,
+      "sha256": "a38688460a43ca61f20a5068aaca31ade35ceaf6c5b00e28b7c7b5394756869e"
+    },
+    {
+      "path": "COMPATIBILITY.md",
+      "bytes": 5982,
+      "sha256": "f8b2b96b98c7926f9bdaa8633b3492d9b4286d5099335f9fd6d0d467a374d108"
+    },
+    {
+      "path": "INSTALL.md",
+      "bytes": 26281,
+      "sha256": "db99fd639097cf5abd6fa0f299380b621ecb5b34537926e3368544495e46b579"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 11346,
+      "sha256": "d835dee4c05033dd8c80bba3ee72cefa699b268addabb3580682ba366caefb0e"
+    },
+    {
+      "path": "LIFECYCLE.md",
+      "bytes": 6028,
+      "sha256": "747e4b44ab93f4f0b326be06a264cb570408f2f3e98d1089ef5f0d88310c7d03"
+    },
+    {
+      "path": "LIMITATIONS.md",
+      "bytes": 8317,
+      "sha256": "74d33b4e5e3b9bd6188f09228133830b442a336d70a60801242a1d23575d18d1"
+    },
+    {
+      "path": "NOTICE",
+      "bytes": 2672,
+      "sha256": "c486391345789f88c269e5a7195f27425dff308a8251dbe866348abc08c8594c"
+    },
+    {
+      "path": "PRIVACY.md",
+      "bytes": 4824,
+      "sha256": "c2a55b5e62142008f33e564a17b6953c03eff7e242b41abb957a37de498a5c0a"
+    },
+    {
+      "path": "README.md",
+      "bytes": 7757,
+      "sha256": "638668e586374ec30af7917f18661bd62f9af3c070da8c755062321d87d448d0"
+    },
+    {
+      "path": "SECURITY.md",
+      "bytes": 7956,
+      "sha256": "f74cd4ffb722edf5541184e259ae19921a6479731ef280ea6ea10943066cca50"
+    },
+    {
+      "path": "SUPPORT.md",
+      "bytes": 4096,
+      "sha256": "203116acc3d6aea04f176cfee9d92463b39e0e1a34d6c2732b07e61143c999bc"
+    },
+    {
+      "path": "VERIFY.md",
+      "bytes": 8615,
+      "sha256": "34c43eeb3217a8a0697f4714f70f208ecdad592054f5673fb0a98bafbf8a29c8"
+    },
     {
       "path": "contracts/diagnostics/mcpherson-governance-advisory-classification-suggestion-v1.schema.json",
       "bytes": 2236,
@@ -270,6 +330,26 @@
       "sha256": "782e45da66a92b6c622c4164caab91533e4673c669dbb24c75a236e45b683cfe"
     },
     {
+      "path": "examples/README.md",
+      "bytes": 2952,
+      "sha256": "812b63e38f73b7b65f8be851d7fcb7f52be2f1468a12673fac695cacdcc7c7ca"
+    },
+    {
+      "path": "examples/connector-config.example.json",
+      "bytes": 1085,
+      "sha256": "d1ed91646225ef0edcd1651ae1ee75719b2645c133f5fed616f7d91651104da1"
+    },
+    {
+      "path": "openclaw.plugin.json",
+      "bytes": 2928,
+      "sha256": "8fdcd44649e3aaf94d756df6fb3682b104a4c4844b1fd5e767079f98bfab1afd"
+    },
+    {
+      "path": "package.json",
+      "bytes": 2218,
+      "sha256": "ccc4b09b37648896cb9bc66d843b5513eafe98a960b770f1e402846ada247969"
+    },
+    {
       "path": "packages/governance-core/canonical.mjs",
       "bytes": 3469,
       "sha256": "b74e52eedd427289316255fd5fa34a5b3364f3688b2ddba9c9e7d455639d9bb2"
@@ -371,8 +451,8 @@
     },
     {
       "path": "packages/governance-diagnostics/index.mjs",
-      "bytes": 1503,
-      "sha256": "0b16b58d2e0a2774a9fc153960355caed7edea466a55b92aea240ce4577c917d"
+      "bytes": 1536,
+      "sha256": "3fe15c84ea310796994ce10a9ea551a681568638b27a293a2b05898ff0cbec12"
     },
     {
       "path": "packages/governance-diagnostics/latency/recorder.mjs",
@@ -383,6 +463,11 @@
       "path": "packages/governance-diagnostics/latency/summary.mjs",
       "bytes": 19475,
       "sha256": "8ac208c2f34e7dbfdf06a14b794ce7a3fd2e473c5434bec726d981563a198ead"
+    },
+    {
+      "path": "packages/governance-diagnostics/redaction.mjs",
+      "bytes": 11580,
+      "sha256": "4af5c8b9b4ed69c695584b4500c88ba13b86aba853203f3f7383ed95485c5d1a"
     },
     {
       "path": "packages/governance-diagnostics/registry.mjs",
@@ -411,8 +496,8 @@
     },
     {
       "path": "packages/openclaw-live-observer/index.mjs",
-      "bytes": 92052,
-      "sha256": "de7d33b3f0df239ee08ec00d6967973129784fe647982d72791014c2e3c6e779"
+      "bytes": 92958,
+      "sha256": "a7734d28f792412554fec3983b029376b3981c7aadd03fb757a50d890de6deaf"
     },
     {
       "path": "packages/openclaw-live-observer/target-binding.mjs",
@@ -452,7 +537,7 @@
     {
       "path": "plugins/openclaw-connector/constants.mjs",
       "bytes": 3461,
-      "sha256": "bf87e5108126abe8a9ff30b7a26ef51189dc174a20d7d4362fb460dd2eab587a"
+      "sha256": "9f82ac2f3ef231b68d31ec63c8f4760a4c9f0456b11f7bd9ad1e88c12b5ec110"
     },
     {
       "path": "plugins/openclaw-connector/controls.mjs",
@@ -492,7 +577,7 @@
     {
       "path": "plugins/openclaw-connector/package.json",
       "bytes": 605,
-      "sha256": "53cabd0dd1d6e9faf7796642519e3c33dd5c76374baed027f60b906362834240"
+      "sha256": "da3c6a677c1d9b1b4d098a3f28dc6c4038b21dec96752a235b980ccf89f5c472"
     },
     {
       "path": "plugins/openclaw-connector/pipeline.mjs",
@@ -565,94 +650,34 @@
       "sha256": "6c85b205d7c6ad293b8fd46e7b5364fb55d6524f731570ca4988ff6599c647cf"
     },
     {
-      "path": "release/openclaw-public/CHANGELOG.md",
-      "bytes": 11627,
-      "sha256": "1bdcf1db8d7353cab29c143483a8ba7939de83799a1beb0732526d44151c024e"
-    },
-    {
-      "path": "release/openclaw-public/INSTALL.md",
-      "bytes": 26179,
-      "sha256": "ac6fb0e4e52bfbd07b5a9eb753f795b828ca965365f229afb3f49bcb6d994adc"
-    },
-    {
-      "path": "release/openclaw-public/LICENSE",
-      "bytes": 11346,
-      "sha256": "d835dee4c05033dd8c80bba3ee72cefa699b268addabb3580682ba366caefb0e"
-    },
-    {
-      "path": "release/openclaw-public/LIFECYCLE.md",
-      "bytes": 6028,
-      "sha256": "57c0a97d13567ad4aa4e9d6f79a29c4853771e9990dbf05b696cb4976da88ed4"
-    },
-    {
-      "path": "release/openclaw-public/LIMITATIONS.md",
-      "bytes": 8317,
-      "sha256": "c46cb3a33e993c9c708441b58ec7a88756ce25c88704ef68739952d9ae9bdfdf"
-    },
-    {
-      "path": "release/openclaw-public/NOTICE",
-      "bytes": 2672,
-      "sha256": "c486391345789f88c269e5a7195f27425dff308a8251dbe866348abc08c8594c"
-    },
-    {
-      "path": "release/openclaw-public/PRIVACY.md",
-      "bytes": 4824,
-      "sha256": "b7d8d25cfdd6745e2d5a4529fe9b75edac2b164099f8156bf5c10654ca405d57"
-    },
-    {
-      "path": "release/openclaw-public/README.md",
-      "bytes": 7757,
-      "sha256": "91fc20a0ddc23209b2ae6b77586190efe4d6aedd9f3d16644621b6afe3b3351b"
-    },
-    {
-      "path": "release/openclaw-public/SECURITY.md",
-      "bytes": 7956,
-      "sha256": "f74cd4ffb722edf5541184e259ae19921a6479731ef280ea6ea10943066cca50"
-    },
-    {
-      "path": "release/openclaw-public/SUPPORT.md",
-      "bytes": 4096,
-      "sha256": "203116acc3d6aea04f176cfee9d92463b39e0e1a34d6c2732b07e61143c999bc"
-    },
-    {
-      "path": "release/openclaw-public/VERIFY.md",
-      "bytes": 7319,
-      "sha256": "af134ebd6cfbcc63a0210c666f33e37e8087d3e7f9400676db23947ac94d81f2"
-    },
-    {
-      "path": "release/openclaw-public/examples/README.md",
-      "bytes": 2952,
-      "sha256": "812b63e38f73b7b65f8be851d7fcb7f52be2f1468a12673fac695cacdcc7c7ca"
-    },
-    {
-      "path": "release/openclaw-public/examples/connector-config.example.json",
-      "bytes": 1085,
-      "sha256": "d1ed91646225ef0edcd1651ae1ee75719b2645c133f5fed616f7d91651104da1"
-    },
-    {
-      "path": "release/openclaw-public/openclaw.plugin.json",
-      "bytes": 2928,
-      "sha256": "bf846b5df0257c2bc5a9a57e81c80627496546850a802cf14993515bbb49c211"
-    },
-    {
-      "path": "release/openclaw-public/package.json",
-      "bytes": 1903,
-      "sha256": "7cf3088c2939d8b991bfc7d01b4ac2c8f84d018fe728ab688078c0cbec44c1cf"
-    },
-    {
-      "path": "release/openclaw-public/scripts/verify-package.mjs",
-      "bytes": 20810,
-      "sha256": "4efb7bdb687cd10b758163eb42729cc198a2b983a97b43b01fa2af8f1ccdf14b"
-    },
-    {
-      "path": "release/openclaw-public/tests/public-package.test.mjs",
-      "bytes": 7536,
-      "sha256": "97387d09f4111e01d042aa812ad277395e09c8b8d64a3c074842e3a02d81e93e"
+      "path": "scripts/build-release-manifests.mjs",
+      "bytes": 12038,
+      "sha256": "585b0a5c0266ae81ee936da3059dfb5c873fcf6a780d67ea37e5c2cc16530166"
     },
     {
       "path": "scripts/governance-diagnostics.mjs",
-      "bytes": 30395,
-      "sha256": "10461d08628816e4c8fd597446656a4334654c0a5ebb93780d0626e71b105266"
+      "bytes": 31362,
+      "sha256": "1e03986edb69acecca8dc2a7aae3e33c7a5dfc575db184a7b9973cb6917067f5"
+    },
+    {
+      "path": "scripts/verify-package.mjs",
+      "bytes": 21611,
+      "sha256": "2fcc8ab932fa301b36f1141b5c8f1eea5b369e933ace31115ecf6423caac23ed"
+    },
+    {
+      "path": "tests/public-package.test.mjs",
+      "bytes": 7744,
+      "sha256": "632c37944e86f3c8576db9477fbe30ad62d6e87940c234ecf0507bcb8a6fcc6d"
+    },
+    {
+      "path": "tests/redaction.test.mjs",
+      "bytes": 12617,
+      "sha256": "98b6defeb2c0c2c2954bdc79c07cc53c1c3cf24c722df5708583cd637377c340"
+    },
+    {
+      "path": "tests/release-manifests.test.mjs",
+      "bytes": 10305,
+      "sha256": "1a5cb8eb37a16add3284aa8229034c6ee42e1edf860abf96042a6e0dfd2a083f"
     }
   ]
 }

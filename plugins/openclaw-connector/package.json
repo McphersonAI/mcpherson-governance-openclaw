@@ -1,6 +1,6 @@
 {
   "name": "mcpherson-governance-connector",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Private shadow-only OpenClaw connector for McPherson Governance",
   "type": "module",
   "main": "plugin.mjs",

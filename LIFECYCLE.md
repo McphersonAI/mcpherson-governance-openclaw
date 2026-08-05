@@ -1,4 +1,4 @@
-# Lifecycle — McPherson Governance Connector v0.6.1
+# Lifecycle — McPherson Governance Connector v0.6.2
 
 How to enable, disable, stop, rotate, upgrade, and remove the connector, and
 what each action does and does not touch.
@@ -73,7 +73,7 @@ observation behavior and is a deliberate operator decision.
 ## Version transitions — the ledger rotation contract
 
 **This is required when upgrading between connector versions, including
-v0.5.1 → v0.6.0.**
+v0.5.1 → v0.6.2.**
 
 Because every line is validated against one exact version, a ledger holding
 records from two connector versions fails closed with

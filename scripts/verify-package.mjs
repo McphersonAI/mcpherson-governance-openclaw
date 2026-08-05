@@ -23,6 +23,16 @@ const PACKAGE_MANIFEST_NAME = "V6-PACKAGE-MANIFEST.json";
 const EXPECTED_PACKAGE = "@mcphersonai/mcpherson-governance-openclaw";
 const EXPECTED_PLUGIN_ID = "mcpherson-governance-connector";
 const EXPECTED_COMPAT = ">=2026.6.5";
+// The fixed safety ceiling, declared here so verification never trusts the
+// package's own copy of it.
+const EXPECTED_SAFETY_VALUES = Object.freeze({
+  AUTHORITY: "NONE",
+  ENFORCEMENT: "OFF",
+  AUTOMATIC_MAPPING_ACTIVATION: "OFF",
+  OUTBOUND_ACTIONS: "OFF",
+  REGISTRY_MUTATION: "OFF",
+  REMOTE_DECISIONS: "SHADOW_ONLY",
+});
 const EXPECTED_OPENCLAW_TARGET_SHAPE = Object.freeze({
   profile_binding_required: true,
   supported_profile_modes: Object.freeze(["DEFAULT", "NAMED"]),
@@ -431,10 +441,18 @@ export function verifyPackage() {
     );
   }
 
+  // All six fixed safety values, asserted together against an independently
+  // declared expectation rather than against the package's own copy.
+  const declaredAuthority = provenance.authority ?? {};
+  const authorityDrift = Object.entries(EXPECTED_SAFETY_VALUES)
+    .filter(([key, value]) => declaredAuthority[key] !== value)
+    .map(([key, value]) => `${key}=${declaredAuthority[key]} (expected ${value})`);
   check(
-    "provenance records AUTHORITY NONE and ENFORCEMENT OFF",
-    provenance.authority?.AUTHORITY === "NONE"
-      && provenance.authority?.ENFORCEMENT === "OFF",
+    "provenance records the six fixed safety values",
+    authorityDrift.length === 0
+      && Object.keys(declaredAuthority).length
+        === Object.keys(EXPECTED_SAFETY_VALUES).length,
+    authorityDrift.join(", "),
   );
 
   // ---- no policy evaluator, gate, or second policy engine ----------------

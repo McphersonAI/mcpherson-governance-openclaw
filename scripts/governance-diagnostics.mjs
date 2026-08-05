@@ -52,6 +52,8 @@ import {
   validateRegistryPatch,
   previewRegistryPatch,
   shadowLookup,
+  redactSecretsWithReport,
+  scanForSecrets,
 } from "../packages/governance-diagnostics/index.mjs";
 import {
   LIVE_OUTPUT_FILES,
@@ -182,8 +184,19 @@ function nowArgument(values) {
   return supplied;
 }
 
+// Final-output gate for every CLI artifact, whether written to `--out` or
+// printed to stdout. Diagnostic artifacts are built from allowlisted metadata
+// and so are already clean; redaction here is defence in depth against a
+// credential reaching an operator's terminal or evidence directory, and the
+// re-scan makes an unneutralisable shape fail closed rather than be emitted.
+function redactedOutputText(result) {
+  const { value: redacted } = redactSecretsWithReport(result);
+  if (scanForSecrets(redacted).length > 0) fail("SECRET_MATERIAL_DETECTED");
+  return `${JSON.stringify(redacted, null, 2)}\n`;
+}
+
 function emit(result, values) {
-  const text = `${JSON.stringify(result, null, 2)}\n`;
+  const text = redactedOutputText(result);
   if (typeof values.out === "string" && values.out.length > 0) {
     try {
       // wx: refuse to overwrite anything that already exists.
@@ -203,8 +216,11 @@ function emitArtifact(result, artifact, values) {
 }
 
 function emitText(text, values) {
+  // Rendered Markdown is an output boundary too: scrub credential shapes out
+  // of the prose while leaving the surrounding report readable.
+  const { value: redacted } = redactSecretsWithReport(text);
   try {
-    writeFileSync(values.out, `${text}\n`, { flag: "wx", mode: 0o600 });
+    writeFileSync(values.out, `${redacted}\n`, { flag: "wx", mode: 0o600 });
   } catch (error) {
     fail(error?.code === "EEXIST" ? "OUT_FILE_EXISTS" : "OUT_UNWRITABLE");
   }
@@ -832,7 +848,9 @@ export async function runGovernanceDiagnostics(argv) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const result = await runGovernanceDiagnostics(process.argv.slice(2));
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    // stdout is an output boundary exactly like `--out`; it goes through the
+    // same redaction and final-output scan.
+    process.stdout.write(redactedOutputText(result));
     if (result && result.ok === false) process.exitCode = 1;
   } catch (error) {
     process.stderr.write(`${JSON.stringify(publicError(error))}\n`);

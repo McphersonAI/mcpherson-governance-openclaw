@@ -1,6 +1,6 @@
 {
   "name": "@mcphersonai/mcpherson-governance-openclaw",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Account-free OpenClaw plugin for local agent and tool discovery, non-authoritative AutoMap proposals, and a local Governability Diagnosis. Shadow-only: it does not block or alter tool execution.",
   "type": "module",
   "license": "Apache-2.0",
@@ -47,6 +47,7 @@
     "PACKAGE-FILES.sha256",
     "RELEASE-PROVENANCE.json",
     "CHANGELOG.md",
+    "COMPATIBILITY.md",
     "INSTALL.md",
     "LIFECYCLE.md",
     "LIMITATIONS.md",
@@ -57,7 +58,10 @@
   ],
   "scripts": {
     "test": "node --test tests/public-package.test.mjs",
-    "verify": "node scripts/verify-package.mjs"
+    "test:regression": "node --test tests/redaction.test.mjs tests/release-manifests.test.mjs",
+    "test:all": "node --test tests/public-package.test.mjs tests/redaction.test.mjs tests/release-manifests.test.mjs",
+    "verify": "node scripts/verify-package.mjs",
+    "verify:manifests": "node scripts/build-release-manifests.mjs --check"
   },
   "openclaw": {
     "extensions": [

@@ -1,4 +1,4 @@
-# Privacy — McPherson Governance Connector v0.6.1
+# Privacy — McPherson Governance Connector v0.6.2
 
 ## Summary
 

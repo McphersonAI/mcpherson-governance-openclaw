@@ -124,7 +124,10 @@ test("package target requires an exact explicit local profile binding", () => {
     "@mcphersonai/mcpherson-governance-openclaw",
   );
   assert.equal(packageManifest.plugin_id, "mcpherson-governance-connector");
-  assert.equal(packageManifest.plugin_version, "0.6.1");
+  // Derived, not pinned: a hard-coded literal here silently goes stale on
+  // every release. Cross-declaration synchronization is asserted in
+  // tests/release-manifests.test.mjs.
+  assert.equal(packageManifest.plugin_version, readJson("package.json").version);
   assert.equal(packageManifest.target_bindings[0].profile_binding_required, true);
   assert.deepEqual(
     packageManifest.target_bindings[0].supported_profile_modes,
