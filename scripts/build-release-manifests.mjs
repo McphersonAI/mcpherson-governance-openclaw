@@ -92,6 +92,11 @@ function sha256(bytes) {
 function walk(directory, found = []) {
   for (const name of readdirSync(directory).sort()) {
     if (name === ".git" || name === "node_modules") continue;
+    // `npm pack` writes its archive into the package root. It is a build
+    // output, never a packaged file, so it must not count towards the
+    // inventory — otherwise verifying a release you just built reports
+    // drift against itself.
+    if (directory === PACKAGE_ROOT && name.endsWith(".tgz")) continue;
     const absolute = join(directory, name);
     const stat = lstatSync(absolute);
     if (stat.isSymbolicLink()) continue;

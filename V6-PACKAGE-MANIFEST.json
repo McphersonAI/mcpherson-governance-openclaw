@@ -651,8 +651,8 @@
     },
     {
       "path": "scripts/build-release-manifests.mjs",
-      "bytes": 12038,
-      "sha256": "585b0a5c0266ae81ee936da3059dfb5c873fcf6a780d67ea37e5c2cc16530166"
+      "bytes": 12357,
+      "sha256": "9abc2300179387409f57c1a12a0d4c4ba7245014e8a834d9b29fd11321e7c33a"
     },
     {
       "path": "scripts/governance-diagnostics.mjs",
