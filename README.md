@@ -25,8 +25,20 @@ No McPherson account. No email verification. No MFA. No organization, no
 workspace, no installation pairing. No McPherson API key. No billing, no
 credits. No dashboard login. No hosted SaaS availability.
 
-The connected dashboard beta is a **separate** product path and is not required
-for, and does not gate, local V6 use.
+The connected dashboard and the broader Observa private beta are **separate**
+product paths and are not required for, and do not gate, local V6 use.
+
+## Observa private beta
+
+The Observa private beta is now open for selected n8n and OpenClaw operators
+and builders. It is the broader McPherson AI product around this plugin:
+founder-assisted onboarding, capability and workflow mapping, reviewable
+governance evidence, and independent verification of supported workflow
+outcomes. The beta is SHADOW_ONLY with authority NONE; enforcement is not
+active in the beta, and nothing in the beta takes production control. This
+plugin remains the public OpenClaw governance product and is not the
+distribution path for the beta. Details and access requests:
+<https://mcphersonai.com/private-beta>.
 
 ## Fixed safety boundary
 

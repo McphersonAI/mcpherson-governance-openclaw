@@ -1,4 +1,4 @@
-# Support — McPherson Governance Connector v0.6.1
+# Support — McPherson Governance Connector v0.6.2
 
 ## Where to go
 
@@ -17,7 +17,7 @@ Please include:
 
 - the output of `openclaw --version`;
 - `node --version`;
-- the package version (`0.6.1`) and the archive SHA-256 if you have it;
+- the package version (`0.6.2`) and the archive SHA-256 if you have it;
 - what you ran and what happened;
 - any error code (they are stable identifiers, e.g. `live_receipt_contract_invalid`).
 
