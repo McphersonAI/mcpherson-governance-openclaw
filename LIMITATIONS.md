@@ -102,8 +102,11 @@ certifications.
   and never issues the device-bound operator token this observer requires. The
   observer deliberately refuses to accept the shared Gateway token in its
   place. Use `2026.6.33` or `2026.6.5` until this is resolved upstream.
-- **No public dashboard.** The connected dashboard is a separate beta and is not
-  publicly available as part of this package.
+- **No public dashboard.** The connected dashboard and the broader Observa
+  private beta are separate product paths and are not distributed as part of
+  this package. The Observa private beta is now open for selected n8n and
+  OpenClaw operators, remains SHADOW_ONLY, and adds no enforcement to this
+  package. See <https://mcphersonai.com/private-beta>.
 - **No billing or paid-plan activation.** There is no billing, credits, or
   paid-plan path in this package.
 - **No v0.7 enforcement.** It is not included and not available here.
