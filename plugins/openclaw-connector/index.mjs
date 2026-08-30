@@ -18,7 +18,13 @@ import { HardenedReceiptWriter, makeLifecycleReceipt } from "./receipts.mjs";
 import { GovernanceApiClient } from "./client.mjs";
 import { ObservationPipeline } from "./pipeline.mjs";
 import { ConnectorHookController } from "./hook.mjs";
-import { makeCanaryTool, makeConnectionTool } from "./tools.mjs";
+import { RuntimeShadowObserver } from "./runtime-observer.mjs";
+import {
+  makeCanaryTool,
+  makeConnectionTool,
+  makeConnectionToolRegistration,
+} from "./tools.mjs";
+import { buildCodeOwnedToolCatalog } from "./hook-adapter.mjs";
 import { connectorStatus, unpairConnector, uninstallConnector } from "./operator.mjs";
 import { setControl } from "./controls.mjs";
 
@@ -96,7 +102,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
     id: PLUGIN_ID,
     name: PLUGIN_NAME,
     version: PLUGIN_VERSION,
-    description: "Shadow-only metadata-minimized OpenClaw governance connector. It observes configured tool activity and records local attempt and completion receipts; it does not block or alter ordinary tool execution, and remote decisions carry no execution authority.",
+    description: "Shadow-only metadata-minimized OpenClaw governance connector. It observes configured semantic activity and eligible actual runtime tool activity, records local attempt and completion receipts, and keeps runtime-only identities unmapped; it does not block or alter ordinary tool execution, and remote decisions carry no execution authority.",
     register(api) {
       // Runtime compatibility is decided before anything else, from the host's
       // own reported version. Package-manager compatibility metadata is not
@@ -112,6 +118,8 @@ function buildGovernanceConnector(options, capabilityProfile) {
         openclawStateDir: resolveOpenClawStateDir({ runtime: api?.runtime }),
         ...(options.pathOverrides || {}),
       });
+      const connectionRegistration = makeConnectionToolRegistration();
+      const codeOwnedTools = buildCodeOwnedToolCatalog([connectionRegistration]);
       ensureSecureDir(config.stateDir);
       ensureSecureDir(config.receiptDir);
       const receiptWriter = options.receiptWriter || new HardenedReceiptWriter(config.receiptDir, api.logger);
@@ -132,6 +140,13 @@ function buildGovernanceConnector(options, capabilityProfile) {
         requestBuilder: options.requestBuilder,
         requestSerializer: options.requestSerializer,
       });
+      const runtimeObserver = options.runtimeObserver || new RuntimeShadowObserver({
+        config,
+        client,
+        receiptWriter,
+        credentialProvider: options.credentialProvider,
+        controlInspector: options.controlInspector,
+      });
       const controller = new ConnectorHookController({
         config,
         pipeline,
@@ -140,6 +155,11 @@ function buildGovernanceConnector(options, capabilityProfile) {
         controlInspector: options.controlInspector,
         summaryBuilder: options.summaryBuilder,
         canaryEvaluator: options.canaryEvaluator,
+        normalizer: options.normalizer,
+        attributionResolver: options.attributionResolver,
+        runtimeEligibilityResolver: options.runtimeEligibilityResolver,
+        runtimeObserver,
+        codeOwnedTools: options.codeOwnedTools || codeOwnedTools,
       });
       const cleanup = [];
       let terminalPromise = null;
@@ -178,7 +198,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
         return terminalPromise;
       };
 
-      api.registerTool(makeConnectionTool(), { name: "mcpherson_connection_test" });
+      api.registerTool(connectionRegistration.tool, { name: "mcpherson_connection_test" });
       api.registerTool(makeCanaryTool(), { name: "mcpherson_governance_canary" });
 
       const hookRegistrations = [
@@ -209,6 +229,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
         config,
         controller,
         pipeline,
+        runtimeObserver,
         client,
         receiptWriter,
         compatibility,
@@ -289,4 +310,6 @@ export * from "./hook.mjs";
 export * from "./operator.mjs";
 export * from "./pipeline.mjs";
 export * from "./receipts.mjs";
+export * from "./runtime-observation-contract.mjs";
+export * from "./runtime-observer.mjs";
 export * from "./verify.mjs";

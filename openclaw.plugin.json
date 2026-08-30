@@ -2,7 +2,7 @@
   "id": "mcpherson-governance-connector",
   "name": "McPherson Governance Connector",
   "description": "Account-free OpenClaw plugin for local agent and tool discovery, non-authoritative AutoMap proposals, and a local Governability Diagnosis. Shadow-only metadata connector with local authority retained and truthful post-hook receipts. It does not block or alter ordinary tool execution; remote decisions have no execution authority.",
-  "version": "0.6.2",
+  "version": "0.6.3-beta.6",
   "activation": {
     "onStartup": true
   },
@@ -106,6 +106,47 @@
             "reversibilityLabel": {
               "type": "string"
             }
+          }
+        }
+      },
+      "runtimeObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "mode",
+          "discoverySource",
+          "profileBinding",
+          "mappingStatus",
+          "authority",
+          "enforcement",
+          "automaticMappingActivation"
+        ],
+        "properties": {
+          "schema": {
+            "const": "observa-runtime-observation-bootstrap/v1"
+          },
+          "mode": {
+            "const": "SHADOW_METADATA_ONLY"
+          },
+          "discoverySource": {
+            "const": "ACTUAL_SUPPORTED_OPENCLAW_TOOL_HOOK"
+          },
+          "profileBinding": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "mappingStatus": {
+            "const": "UNMAPPED"
+          },
+          "authority": {
+            "const": "NONE"
+          },
+          "enforcement": {
+            "const": "OFF"
+          },
+          "automaticMappingActivation": {
+            "const": false
           }
         }
       }

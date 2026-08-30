@@ -2,33 +2,33 @@
   "schema": "mcpherson-governance-openclaw-public-release-provenance/v2",
   "package_name": "@mcphersonai/mcpherson-governance-openclaw",
   "plugin_id": "mcpherson-governance-connector",
-  "version": "0.6.2",
+  "version": "0.6.3-beta.6",
   "public_repository": "https://github.com/McphersonAI/mcpherson-governance-openclaw",
-  "release_tag": "v0.6.2",
+  "release_tag": "v0.6.3-beta.6",
   "binding_method": "PUBLIC_BASE_COMMIT_PLUS_EXTERNAL_TAG_TARGET",
   "binding_statement": "This record binds the published artifact to the PUBLIC release source. Bindings that a file cannot make about the object containing it are declared under external_bindings with the command that resolves them. No field states a commit that did not exist when this file was written.",
-  "source_commit": "d80ca75514b17b2d8a7ed8be4f20d7bc32c1c09c",
+  "source_commit": "167595b76ca48322712336b95caa96ba824ce175",
   "source_commit_role": "PUBLIC_BASE_COMMIT",
-  "source_tree": "f879f1e479f263a208e14357bad50e5f1eb9066f",
+  "source_tree": "2bfdb50b4dce70514a9d88e11d370f8ddbf43f2f",
   "source_tree_role": "PUBLIC_BASE_TREE",
   "external_bindings": [
     {
       "binding": "release_commit",
       "resolution": "EXTERNAL",
       "reason": "a commit identifier covers the content that would state it",
-      "verify": "git rev-parse refs/tags/v0.6.2^{commit}"
+      "verify": "git rev-parse refs/tags/v0.6.3-beta.6^{commit}"
     },
     {
       "binding": "release_tree",
       "resolution": "EXTERNAL",
       "reason": "writing the tree SHA into a tracked file changes that tree",
-      "verify": "git rev-parse refs/tags/v0.6.2^{tree}"
+      "verify": "git rev-parse refs/tags/v0.6.3-beta.6^{tree}"
     },
     {
       "binding": "artifact_sha256",
       "resolution": "EXTERNAL",
       "reason": "the archive contains this file, so it cannot state its digest",
-      "verify": "shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz"
+      "verify": "shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz"
     }
   ],
   "internal_bindings": {
@@ -43,14 +43,14 @@
     "3. write V6-PACKAGE-MANIFEST.json (hashes every source file)",
     "4. write PACKAGE-FILES.sha256 (hashes every packaged file except itself)",
     "5. commit the release on the public repository",
-    "6. create and push the annotated tag v0.6.2",
+    "6. create and push the annotated tag v0.6.3-beta.6",
     "7. build the archive with npm pack from the tagged content",
     "8. publish the archive and record its SHA-256 externally",
     "9. resolve every external_bindings entry against the published release"
   ],
-  "archive_name": "mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz",
+  "archive_name": "mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz",
   "archive_root": "package/",
-  "file_count": 114,
+  "file_count": 123,
   "checksum_manifest": "PACKAGE-FILES.sha256",
   "package_manifest": "V6-PACKAGE-MANIFEST.json",
   "build": {

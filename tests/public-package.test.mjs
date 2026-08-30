@@ -87,16 +87,18 @@ test("no evaluator or gate filename is packaged and diagnosis is singular", () =
   );
 });
 
-test("an unconfigured tool is kept local and never reaches the network", () => {
+test("unattributed or conflicting tool metadata is kept local and never reaches the network", () => {
   const hook = read("plugins/openclaw-connector/hook.mjs");
-  // The unconfigured branch records locally and returns before the pipeline
-  // submit call, so no HTTPS request can occur for that tool.
-  assert.match(hook, /if \(!Object\.hasOwn\(this\.#config\.toolMetadata, summary\.toolId\)\)/);
-  const branch = hook.slice(hook.indexOf("!Object.hasOwn(this.#config.toolMetadata"));
+  // The attribution adapter accepts only connector-owned registration or
+  // operator-validated configuration. Its refusal branch records locally and
+  // returns before the submit call, so no HTTPS request can occur.
+  assert.match(hook, /const attribution = this\.#attribution\(normalized\)/);
+  assert.match(hook, /if \(attribution === null\)/);
+  const branch = hook.slice(hook.indexOf("if (attribution === null)"));
   const recordLocal = branch.indexOf('recordLocal(summary, "NOT_ATTEMPTED", "SKIPPED")');
   const submit = branch.indexOf("this.#pipeline.submit(");
-  assert.ok(recordLocal !== -1, "unconfigured branch must record NOT_ATTEMPTED/SKIPPED");
-  assert.ok(recordLocal < submit, "unconfigured branch must return before submit");
+  assert.ok(recordLocal !== -1, "unattributed branch must record NOT_ATTEMPTED/SKIPPED");
+  assert.ok(recordLocal < submit, "unattributed branch must return before submit");
 });
 
 test("the documented V6 command surface is present", () => {

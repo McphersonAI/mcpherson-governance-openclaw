@@ -1,6 +1,6 @@
 {
   "name": "@mcphersonai/mcpherson-governance-openclaw",
-  "version": "0.6.2",
+  "version": "0.6.3-beta.6",
   "description": "Account-free OpenClaw plugin for local agent and tool discovery, non-authoritative AutoMap proposals, and a local Governability Diagnosis. Shadow-only: it does not block or alter tool execution.",
   "type": "module",
   "license": "Apache-2.0",
@@ -32,7 +32,8 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "mcpherson-connector-ctl": "plugins/openclaw-connector/connector-ctl.mjs"
+    "mcpherson-connector-ctl": "plugins/openclaw-connector/connector-ctl.mjs",
+    "observa-pair": "observa-pair.mjs"
   },
   "files": [
     "openclaw.plugin.json",
@@ -54,12 +55,15 @@
     "PRIVACY.md",
     "SECURITY.md",
     "SUPPORT.md",
-    "VERIFY.md"
+    "VERIFY.md",
+    "observa-pair.mjs",
+    "CANDIDATE-PROVENANCE.json"
   ],
   "scripts": {
-    "test": "node --test tests/public-package.test.mjs",
+    "test": "node --test tests/public-package.test.mjs tests/hook-adapter.test.mjs tests/redaction.test.mjs tests/release-manifests.test.mjs tests/fresh-pair-observation.test.mjs",
+    "test:connector": "node --test tests/hook-adapter.test.mjs",
     "test:regression": "node --test tests/redaction.test.mjs tests/release-manifests.test.mjs",
-    "test:all": "node --test tests/public-package.test.mjs tests/redaction.test.mjs tests/release-manifests.test.mjs",
+    "test:all": "node --test tests/public-package.test.mjs tests/hook-adapter.test.mjs tests/redaction.test.mjs tests/release-manifests.test.mjs tests/fresh-pair-observation.test.mjs",
     "verify": "node scripts/verify-package.mjs",
     "verify:manifests": "node scripts/build-release-manifests.mjs --check"
   },

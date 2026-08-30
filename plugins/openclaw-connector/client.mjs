@@ -8,6 +8,7 @@ import {
   MAX_OBSERVATIONS_IN_FLIGHT,
   MAX_RESPONSE_BYTES,
 } from "./constants.mjs";
+import { validateShadowObservationAck } from "./runtime-observation-contract.mjs";
 
 const TLS_CODES = new Set([
   "CERT_HAS_EXPIRED", "CERT_NOT_YET_VALID", "DEPTH_ZERO_SELF_SIGNED_CERT",
@@ -502,6 +503,17 @@ export class GovernanceApiClient {
     return this.#logicalRequest("/v1/decisions", {
       body, credential, retryNetwork: true, beforeAttempt: options.beforeAttempt,
     });
+  }
+
+  async observeShadow(body, credential, options = {}) {
+    const value = await this.#logicalRequest("/v1/observations", {
+      body, credential, retryNetwork: true, beforeAttempt: options.beforeAttempt,
+    });
+    if (!validateShadowObservationAck(value, options.expectedRequestHash)) {
+      this.recordFailure();
+      throw new ConnectorClientError("INVALID_RESPONSE");
+    }
+    return Object.freeze(value);
   }
 
   async health(credential, options = {}) {

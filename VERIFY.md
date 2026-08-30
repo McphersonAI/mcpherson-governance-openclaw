@@ -1,11 +1,11 @@
-# Verify this package — v0.6.2
+# Verify this package — v0.6.3-beta.6
 
 Do not take the documentation's word for the safety posture. Check it.
 
 ## 1. Verify the archive you downloaded
 
 ```sh
-shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
+shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz
 ```
 
 Compare against the published release checksum. The archive is a standard npm
@@ -14,7 +14,7 @@ tarball with a single `package/` root.
 List its contents without installing:
 
 ```sh
-tar -tzf mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz | sort
+tar -tzf mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz | sort
 ```
 
 ## 2. Run the packaged verifier
@@ -29,7 +29,7 @@ This checks, and fails closed on any mismatch:
 
 - every packaged file against `PACKAGE-FILES.sha256`;
 - no unexpected and no missing files;
-- package name `@mcphersonai/mcpherson-governance-openclaw` and version `0.6.2`;
+- package name `@mcphersonai/mcpherson-governance-openclaw` and version `0.6.3-beta.6`;
 - plugin ID `mcpherson-governance-connector`;
 - `package.json` and `openclaw.plugin.json` versions agree;
 - `openclaw.compat.pluginApi` is `>=2026.6.5`;
@@ -49,7 +49,7 @@ This checks, and fails closed on any mismatch:
 
 ## 3. Check provenance
 
-`RELEASE-PROVENANCE.json` (schema `…/v2`, corrected in 0.6.2) binds this
+`RELEASE-PROVENANCE.json` (schema `…/v2`, corrected in 0.6.3-beta.6) binds this
 archive to the **public** release source. `V6-PACKAGE-MANIFEST.json`
 additionally binds every source file by content hash and carries the immutable
 audited OpenClaw target. The target deliberately contains only portable,
@@ -61,7 +61,7 @@ paths.
 cat RELEASE-PROVENANCE.json
 ```
 
-**What changed in 0.6.2, and why.** Through 0.6.1 this record named the
+**What changed in 0.6.3-beta.6, and why.** Through 0.6.1 this record named the
 private build commit as `source_commit`, and the package manifest listed
 seventeen source files under private `release/openclaw-public/…` paths. Both
 described a repository you cannot fetch, so neither claim could be checked by
@@ -75,9 +75,9 @@ guess a future commit or stay silent, each is declared under
 `external_bindings` with the exact command that resolves it:
 
 ```sh
-git rev-parse refs/tags/v0.6.2^{commit}
-git rev-parse refs/tags/v0.6.2^{tree}
-shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
+git rev-parse refs/tags/v0.6.3-beta.6^{commit}
+git rev-parse refs/tags/v0.6.3-beta.6^{tree}
+shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz
 ```
 
 Everything that *can* be stated truthfully at write time is stated as a value:
@@ -155,7 +155,7 @@ VERIFY_HOME=/absolute/path/to/disposable-home
 VERIFY_PROFILE=verify-mcpherson-v062
 env HOME="$VERIFY_HOME" OPENCLAW_HOME="$VERIFY_HOME" \
   "$VERIFY_HOME/.local/bin/openclaw" --profile "$VERIFY_PROFILE" plugins install \
-  /absolute/path/to/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
+  /absolute/path/to/mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz
 env HOME="$VERIFY_HOME" OPENCLAW_HOME="$VERIFY_HOME" \
   "$VERIFY_HOME/.local/bin/openclaw" --profile "$VERIFY_PROFILE" plugins inspect \
   mcpherson-governance-connector
@@ -179,7 +179,7 @@ closed.
 ## 6. Check the contents against the published source
 
 The archive is built only from a clean, committed source tree, with normalized
-entry ordering, zeroed timestamps, fixed uid/gid, and fixed modes. From 0.6.2
+entry ordering, zeroed timestamps, fixed uid/gid, and fixed modes. From 0.6.3-beta.6
 you can check both the **contents** and the **archive envelope** yourself:
 
 1. `scripts/verify-package.mjs` recomputes the SHA-256 of every packaged file
@@ -187,17 +187,17 @@ you can check both the **contents** and the **archive envelope** yourself:
    package except itself. Any single changed byte fails.
 2. The identical file tree is published at
    `https://github.com/McphersonAI/mcpherson-governance-openclaw` under tag
-   `v0.6.2`. Diff your extracted package against that tag; it should be empty.
+   `v0.6.3-beta.6`. Diff your extracted package against that tag; it should be empty.
 
-**You can now rebuild the archive yourself.** From 0.6.2 the release is built
+**You can now rebuild the archive yourself.** From 0.6.3-beta.6 the release is built
 by `npm pack` from the tagged public tree — no private tooling is involved, so
 the byte-identical archive is reproducible outside McPherson AI:
 
 ```sh
 git clone https://github.com/McphersonAI/mcpherson-governance-openclaw
-cd mcpherson-governance-openclaw && git checkout v0.6.2
+cd mcpherson-governance-openclaw && git checkout v0.6.3-beta.6
 npm pack
-shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
+shasum -a 256 mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz
 ```
 
 That digest must equal the one published on the GitHub release and on
@@ -210,7 +210,7 @@ node scripts/build-release-manifests.mjs --check
 
 Through 0.6.1 neither check was possible: the build ran in a private
 repository with private tooling, and the recorded provenance pointed there.
-That is the defect 0.6.2 removes.
+That is the defect 0.6.3-beta.6 removes.
 
 ## What verification cannot tell you
 

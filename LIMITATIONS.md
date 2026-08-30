@@ -1,4 +1,4 @@
-# Limitations — McPherson Governance Connector v0.6.2
+# Limitations — McPherson Governance Connector v0.6.3-beta.6
 
 Read this before deciding what this package is for. Everything here is a real
 limitation, stated plainly.
@@ -150,3 +150,7 @@ certifications.
 The connector runs inside your OpenClaw process with your permissions. It is not
 a sandbox and does not isolate tools from each other or from your system. It
 observes; it does not contain.
+
+## Fresh-pair coverage
+
+A tool is eligible only after matching before/after events from the supported OpenClaw tool-hook contract establish a bounded host tool identity, agent identity, and correlation identity. Malformed, conflicting, duplicate/alias-colliding, code-owned, or otherwise ambiguous identities stay local and are not remotely observed. Dynamic OpenClaw tools are the release-critical path. Codex-native tools are covered only when OpenClaw relays them with `toolKind: code_mode_exec`; this package does not create a separate native-tool interception path. Observation is not semantic mapping, approval, activation, authority, or enforcement.

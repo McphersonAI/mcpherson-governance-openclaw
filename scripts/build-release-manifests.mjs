@@ -45,8 +45,8 @@
 // what the packaged regression test runs.
 //
 // Usage:
-//   node scripts/build-release-manifests.mjs --version 0.6.2 \
-//     --base-commit <sha40> --base-tree <sha40> --tag v0.6.2
+//   node scripts/build-release-manifests.mjs --version 0.6.3-beta.6 \
+//     --base-commit <sha40> --base-tree <sha40> --tag v0.6.3-beta.6
 //   node scripts/build-release-manifests.mjs --check
 
 import { createHash } from "node:crypto";

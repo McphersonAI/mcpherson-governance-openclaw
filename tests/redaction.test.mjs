@@ -1,4 +1,4 @@
-// Regression coverage for recursive secret redaction (v0.6.2).
+// Regression coverage for recursive secret redaction (v0.6.3-beta.6).
 //
 // Two obligations are tested with equal weight: credential material must not
 // survive anywhere in a nested document, AND evidence must remain usable —

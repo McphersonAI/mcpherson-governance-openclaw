@@ -1,4 +1,4 @@
-# Install and run — McPherson Governance Connector v0.6.2
+# Install and run — McPherson Governance Connector v0.6.3-beta.6
 
 ## 1. Requirements
 
@@ -82,11 +82,11 @@ changes its gateway port; the V6 binding deliberately refuses that alias.
 
 ```sh
 clawhub package download @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.6.2 \
+  --version 0.6.3-beta.6 \
   --output ./mcpherson-governance-download
 ```
 
-This writes `mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz`. That single
+This writes `mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz`. That single
 `.tgz` is the artifact you install — do not extract it and do not install a
 subdirectory on its own.
 
@@ -96,12 +96,12 @@ Never install an artifact you have not verified.
 
 ```sh
 clawhub package verify \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz \
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz \
   --package @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.6.2
+  --version 0.6.3-beta.6
 
 shasum -a 256 \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz
 ```
 
 It must report `verified: true`, and the SHA-256 must match the value published
@@ -112,7 +112,7 @@ with the release. Do not proceed on any mismatch.
 ```sh
 env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
   "$OPENCLAW" --profile "$PROFILE" plugins install \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
+  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.3-beta.6.tgz
 ```
 
 Expect these warnings on a normal install. All are benign:
@@ -519,9 +519,9 @@ The derived files `discovery.json`, `automap-proposals.json`,
 
 ## 6. Upgrading from an earlier version — receipt-ledger transition
 
-**Read this before starting v0.6.2 against a ledger written by any earlier
-connector version, including v0.5.1, v0.6.0, and v0.6.1.** v0.6.2 moves the
-lifecycle version pin from `0.6.1` to `0.6.2`, so a v0.6.1 ledger needs this
+**Read this before starting v0.6.3-beta.6 against a ledger written by any earlier
+connector version, including v0.5.1, v0.6.0, and v0.6.1.** v0.6.3-beta.6 moves the
+lifecycle version pin from `0.6.1` to `0.6.3-beta.6`, so a v0.6.1 ledger needs this
 same rotation — upgrading the connector alone is not sufficient. For the
 v0.5.1 path specifically, see [COMPATIBILITY.md](./COMPATIBILITY.md) §2.
 
@@ -551,7 +551,7 @@ Perform the transition in exactly this order:
    ```
 
    Create the `archive/` directory `0700` first if it does not exist.
-4. **Start v0.6.2.**
+4. **Start v0.6.3-beta.6.**
 5. **Initialize the new ledger as owner-only `0600`:**
 
    ```sh
@@ -567,10 +567,10 @@ Perform the transition in exactly this order:
    connector version that wrote it.
 8. **Re-initialize and verify the profile binding, then complete one full
    lifecycle.** A binding captured before the upgrade pins the previous plugin
-   version and will not verify against v0.6.2. Run `init-profile-binding`,
+   version and will not verify against v0.6.3-beta.6. Run `init-profile-binding`,
    record the new binding ID, run `verify-profile-binding`, then run
    `observe-live` and `verify-observation` as in section 4. Confirm the
-   binding reports `plugin_version 0.6.2` and the exact runtime you intend —
+   binding reports `plugin_version 0.6.3-beta.6` and the exact runtime you intend —
    `2026.6.33 (7af0cfc)` or `2026.6.5 (5181e4f)`.
 
 If you skip the rotation, `observe-live` fails closed with
@@ -585,3 +585,7 @@ on `2026.6.5` and `2026.6.33`.
 
 See [LIFECYCLE.md](./LIFECYCLE.md) for disable, kill switch, rotation, and
 uninstall, including what is and is not removed.
+
+## Fresh-pair shadow observation bootstrap
+
+The supported `observa-pair` command writes a profile-bound, non-authoritative runtime-observation bootstrap in the same atomic OpenClaw configuration transaction as the endpoint binding. No manual `toolMetadata` edit is required before a supported dynamic OpenClaw tool can appear as OBSERVED / UNMAPPED. The bootstrap is restored with the rest of `openclaw.json` by the printed rollback command.

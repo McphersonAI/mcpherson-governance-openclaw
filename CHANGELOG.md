@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.3-beta.6
+
+- Fixes partial live-capture suppression caused by benign duplicate/alias OpenClaw lifecycle dispatch: a supported exact openclaw<tool> + <tool> alias pair canonicalizes to ONE logical observation, and an exact duplicate lifecycle dispatch is treated idempotently.
+- Preserves fail-closed behavior for genuine runtime identity ambiguity and adds durable BLOCKED_LOCAL refusal receipts plus AMBIGUOUS_FAIL_CLOSED diagnostics so refusals are never silent.
+- Preserves the completion classifier fix for real OpenClaw success events.
+- Beta candidate only: adds a profile-bound, metadata-only fresh-pair observation bootstrap for actual supported OpenClaw tool hooks.
+- Keeps discovered tools OBSERVED / UNMAPPED; it does not infer semantic toolMetadata, approve or activate mappings, or create execution authority.
+- Synchronizes package, plugin, runtime receipt, observer, manifest, and archive identity.
+- Preserves SHADOW_ONLY, authority NONE, enforcement OFF, and proposal-only AutoMap.
+
 All notable changes to the public McPherson Governance OpenClaw connector.
 
 This project adheres to semantic versioning for its public package identity.

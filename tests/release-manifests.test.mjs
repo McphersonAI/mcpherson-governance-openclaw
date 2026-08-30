@@ -1,5 +1,5 @@
 // Regression coverage for public release provenance and version
-// synchronization (v0.6.2).
+// synchronization (v0.6.3-beta.6).
 //
 // These tests exist because of two concrete v0.6.1 defects, both of the same
 // kind — a public artifact describing a private build:
@@ -59,7 +59,7 @@ const pluginManifest = readJson("openclaw.plugin.json");
 
 test("every current-release version declaration is synchronized", () => {
   const version = pkg.version;
-  assert.match(version, /^\d+\.\d+\.\d+$/);
+  assert.match(version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
   assert.equal(pluginManifest.version, version, "openclaw.plugin.json");
   assert.equal(provenance.version, version, "RELEASE-PROVENANCE.json");
   assert.equal(packageManifest.plugin_version, version, "V6-PACKAGE-MANIFEST.json");
@@ -237,7 +237,7 @@ test("compatibility documentation states each target's exact support", () => {
   }
 });
 
-test("migration documentation covers the full v0.5.1 to v0.6.2 sequence", () => {
+test("migration documentation covers the full v0.5.1 to v0.6.3-beta.6 sequence", () => {
   const compatibility = readText("COMPATIBILITY.md");
   for (const marker of [
     "Stop v0.5.1 before rotating the ledger",

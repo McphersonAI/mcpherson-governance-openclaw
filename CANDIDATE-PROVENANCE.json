@@ -1,0 +1,72 @@
+{
+  "schema": "observa-v06-fresh-pair-repair-candidate/v1",
+  "version": "0.6.3-beta.6",
+  "builder": {
+    "commit": "d5922cab3f41d0c32df17d5ff8d200454fabcd81",
+    "tree": "7c396f6e7fc230c82c058679353a764d622e2302",
+    "branch": "fix/observa-openclaw-alias-capture-beta6",
+    "dirty": false
+  },
+  "inputs": {
+    "historical_public_v062": {
+      "version": "0.6.2",
+      "sha256": "de760e0469819fad58982d5573db63e868759676fa8bdd461606f35ff6fe3d87",
+      "release_commit": "caf5d1e001c57363906afe814ea864840605150e"
+    },
+    "proven_live_capture_repair": {
+      "version_as_tested": "0.6.2",
+      "sha256": "732b2a0b63e0afff8ba98d4ac370a25f2a02116a65c5229f86b03a34fdc6f028",
+      "public_repair_commit": "167595b76ca48322712336b95caa96ba824ce175",
+      "public_repair_tree": "2bfdb50b4dce70514a9d88e11d370f8ddbf43f2f",
+      "monorepo_code_commit": "e9551c46122031f4dbc6d4453fd797edf48a44ea",
+      "monorepo_inventory_commit": "24559062d29e11dc60dbc888af664416a88485ad"
+    }
+  },
+  "behavioral_delta": {
+    "summary": "fresh pairing writes a profile-bound non-authoritative bootstrap; matching supported OpenClaw before/after hooks can submit a separate closed metadata-only OBSERVED/UNMAPPED envelope without semantic toolMetadata or execution authority; benign duplicate/alias lifecycle dispatch (exact openclaw<tool> + <tool> pair or exact duplicate claim on one host correlation) collapses to one logical observation while genuine identity conflicts stay fail-closed with durable refusal evidence",
+    "base_files_verified_before_overlay": {
+      "plugins/openclaw-connector/allowlist.mjs": "22eb718d2bcd944522d5166dc99ef1a928f7f042f3855dea6b02d997a15f1afc",
+      "plugins/openclaw-connector/hook-adapter.mjs": "87f2707a4d33f37fb58d4c3a67ee3ba70a9d699d5eb8e579710a7e04a1fd3571",
+      "plugins/openclaw-connector/hook.mjs": "9439438116847acf85efefafa91359c3fb9d4ab0db67de9ba03ac5d330dc09b7",
+      "plugins/openclaw-connector/index.mjs": "1542ad5406ba4b3d3d64ebc963c121419305447c26dc9741816243479e0f206c",
+      "plugins/openclaw-connector/tools.mjs": "e4229919131316032d4313f54e630b54e22583d4ac6aa6dbb203a127c4554c28",
+      "tests/hook-adapter.test.mjs": "4d85e9e835e12cb62976ae154ebac440c5e0f4f9c8a1b1b1ce9d0eb141f41115"
+    },
+    "additive_files": [
+      "plugins/openclaw-connector/runtime-observation-contract.mjs",
+      "plugins/openclaw-connector/runtime-observer.mjs",
+      "tests/fresh-pair-observation.test.mjs"
+    ],
+    "overlay_modified_files": [
+      "openclaw.plugin.json",
+      "plugins/openclaw-connector/client.mjs",
+      "plugins/openclaw-connector/config.mjs",
+      "plugins/openclaw-connector/hook-adapter.mjs",
+      "plugins/openclaw-connector/hook.mjs",
+      "plugins/openclaw-connector/index.mjs"
+    ]
+  },
+  "identity_normalization": [
+    "package.json",
+    "openclaw.plugin.json",
+    "plugins/openclaw-connector/package.json",
+    "plugins/openclaw-connector/constants.mjs",
+    "packages/openclaw-live-observer/index.mjs",
+    "RELEASE-PROVENANCE.json",
+    "V6-PACKAGE-MANIFEST.json",
+    "observa-pair.mjs",
+    "scripts/openclaw-profile-pairing.mjs",
+    "scripts/shadow-observation-contract.mjs",
+    "plugins/openclaw-connector/runtime-observation-contract.mjs",
+    "plugins/openclaw-connector/runtime-observer.mjs",
+    "tests/fresh-pair-observation.test.mjs"
+  ],
+  "posture": {
+    "remote_decisions": "SHADOW_ONLY",
+    "authority": "NONE",
+    "enforcement": "OFF",
+    "automatic_mapping_activation": "OFF",
+    "outbound_actions": "OFF",
+    "registry_mutation": "OFF"
+  }
+}

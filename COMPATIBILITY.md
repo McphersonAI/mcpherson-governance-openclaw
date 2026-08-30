@@ -1,4 +1,4 @@
-# Compatibility and migration — v0.6.2
+# Compatibility and migration — v0.6.3-beta.6
 
 Support in this package is **exact-target based, never label-based**. A build
 is approved only when its semantic version, full commit, runtime-entry
@@ -44,7 +44,7 @@ Every other OpenClaw version is permitted by the connector's declared
 `>=2026.6.5` plugin-API range but is not covered by this evidence, and live
 observation refuses it.
 
-## 2. Migrating from v0.5.1 to v0.6.2
+## 2. Migrating from v0.5.1 to v0.6.3-beta.6
 
 v0.6.x writes a different receipt-record shape than v0.5.1. A ledger holding
 records from more than one connector version **fails closed** — this is

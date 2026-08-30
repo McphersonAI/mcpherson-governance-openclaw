@@ -212,7 +212,7 @@ const LIFECYCLE_KEYS = Object.freeze([
 // `plugins/openclaw-connector/constants.mjs`. It is duplicated rather than
 // imported so the observer keeps no runtime edge into the connector tree; the
 // two are held equal by tests/release/version-synchronization.test.mjs.
-export const LIVE_LIFECYCLE_PLUGIN_VERSION = "0.6.2";
+export const LIVE_LIFECYCLE_PLUGIN_VERSION = "0.6.3-beta.6";
 // Exact OpenClaw 2026.6.5 gateway credential surface, taken from the
 // installed runtime schema keys `gateway.auth.*` and `gateway.tailscale.*`
 // and the shipped gateway configuration reference. Unknown members of either

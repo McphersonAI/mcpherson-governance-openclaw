@@ -1,4 +1,4 @@
-# Privacy — McPherson Governance Connector v0.6.2
+# Privacy — McPherson Governance Connector v0.6.3-beta.6
 
 ## Summary
 
@@ -117,3 +117,7 @@ which is not part of this package.
 ## Contact
 
 See [SUPPORT.md](./SUPPORT.md) and [SECURITY.md](./SECURITY.md).
+
+## Metadata-only runtime observation
+
+Fresh-pair runtime observation sends only a closed bounded envelope: agent id, tool id, OpenClaw dynamic versus relayed Codex-native kind, fixed hook provenance/basis/mode, closed completion outcome, a one-way correlation reference, request freshness/replay fields, and the fixed values UNMAPPED, authority NONE, and enforcement OFF. Prompt or message text, raw arguments, raw results, exception text, workspace contents, credentials, semantic action/resource/sensitivity/reversibility fields, and arbitrary metadata are not accepted by the builder or wire contract.
