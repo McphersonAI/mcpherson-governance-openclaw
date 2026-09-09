@@ -1,26 +1,27 @@
 {
   "name": "mcpherson-governance-connector",
-  "version": "0.6.2",
-  "description": "Private shadow-only OpenClaw connector for McPherson Governance",
+  "version": "0.7.0",
+  "description": "Internal Observa SHADOW plugin entrypoint for OpenClaw",
   "type": "module",
   "main": "plugin.mjs",
   "private": true,
-  "bin": {
-    "connector-ctl": "./connector-ctl.mjs"
+  "engines": {
+    "node": ">=22"
   },
-  "scripts": {
-    "test": "node --test ../../tests/connector/*.test.mjs"
-  },
+  "scripts": {},
   "openclaw": {
     "extensions": [
       "./plugin.mjs"
     ],
     "compat": {
-      "pluginApi": ">=2026.6.5"
+      "pluginApi": ">=2026.8.2"
     },
     "build": {
-      "openclawVersion": "2026.6.33",
-      "openclawCommit": "7af0cfc",
+      "openclawVersion": "2026.8.2",
+      "shadowMode": "SHADOW",
+      "authority": "NONE",
+      "enforcement": "OFF",
+      "active": false,
       "receiptMode": "POST_HOOK"
     }
   }

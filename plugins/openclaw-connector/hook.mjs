@@ -4,9 +4,14 @@ import {
   RECEIPT_MODE,
 } from "./constants.mjs";
 import { deriveSafeToolSummary } from "./allowlist.mjs";
-import { evaluateLocalCanary } from "./canary.mjs";
 import { inspectObservationControls } from "./controls.mjs";
 import { makeCompletionReceipt } from "./receipts.mjs";
+import {
+  buildCodeOwnedToolCatalog,
+  normalizeOpenClawToolHook,
+  resolveHookAttribution,
+  resolveRuntimeObservationEligibility,
+} from "./hook-adapter.mjs";
 
 function observedOutcome(event) {
   if (event && Object.prototype.hasOwnProperty.call(event, "error") && typeof event.error !== "string") {
@@ -35,7 +40,11 @@ export class ConnectorHookController {
   #shutdownDeadlineExceeded = false;
   #controlInspector;
   #summaryBuilder;
-  #canaryEvaluator;
+  #normalizer;
+  #attributionResolver;
+  #runtimeEligibilityResolver;
+  #runtimeObserver;
+  #codeOwnedTools;
 
   constructor({
     config,
@@ -44,7 +53,11 @@ export class ConnectorHookController {
     receiptMode = RECEIPT_MODE,
     controlInspector = null,
     summaryBuilder = deriveSafeToolSummary,
-    canaryEvaluator = evaluateLocalCanary,
+    normalizer = normalizeOpenClawToolHook,
+    attributionResolver = resolveHookAttribution,
+    runtimeEligibilityResolver = resolveRuntimeObservationEligibility,
+    runtimeObserver = null,
+    codeOwnedTools = buildCodeOwnedToolCatalog([]),
   }) {
     if (!["POST_HOOK", "ATTEMPT_ONLY"].includes(receiptMode)) {
       throw new TypeError("invalid_receipt_mode");
@@ -55,15 +68,43 @@ export class ConnectorHookController {
     this.#receiptMode = receiptMode;
     this.#controlInspector = controlInspector || (() => inspectObservationControls(config));
     this.#summaryBuilder = summaryBuilder;
-    this.#canaryEvaluator = canaryEvaluator;
+    this.#normalizer = normalizer;
+    this.#attributionResolver = attributionResolver;
+    this.#runtimeEligibilityResolver = runtimeEligibilityResolver;
+    this.#runtimeObserver = runtimeObserver;
+    this.#codeOwnedTools = codeOwnedTools;
   }
 
-  #summary(event, ctx) {
-    const toolName = ctx?.toolName || event?.toolName || "unknown";
-    const agentId = ctx?.agentId || this.#config.agentId;
-    const toolCallId = ctx?.toolCallId || event?.toolCallId || null;
-    const runId = ctx?.runId || event?.runId || null;
-    return this.#summaryBuilder({ toolName, agentId, toolCallId, runId }, this.#config);
+  #summary(normalized, metadata = null) {
+    return this.#summaryBuilder({
+      toolName: normalized?.toolName || "unknown",
+      agentId: normalized?.agentId || this.#config.agentId,
+      toolCallId: normalized?.toolCallId || null,
+      runId: normalized?.runId || null,
+    }, this.#config, metadata);
+  }
+
+  #normalize(event, ctx, phase) {
+    const normalized = this.#normalizer(event, ctx, phase);
+    return normalized?.accepted === true ? normalized : null;
+  }
+
+  #attribution(normalized) {
+    const attribution = this.#attributionResolver(
+      normalized,
+      this.#config,
+      this.#codeOwnedTools,
+    );
+    return attribution?.accepted === true ? attribution : null;
+  }
+
+  #runtimeEligibility(normalized) {
+    const eligibility = this.#runtimeEligibilityResolver(
+      normalized,
+      this.#config,
+      this.#codeOwnedTools,
+    );
+    return eligibility?.accepted === true ? eligibility : null;
   }
 
   #remember(handle) {
@@ -94,7 +135,7 @@ export class ConnectorHookController {
 
     // The ordinary observation gate is structurally first. Only the permitted
     // local receipt metadata summary is derived after a blocked result; no
-    // canary, outbound builder, credential, queue, client, or transport exists
+      // outbound builder, credential, queue, client, or transport exists
     // on this path.
     const controls = this.#controlInspector();
     if (controls.blocked) {
@@ -104,25 +145,31 @@ export class ConnectorHookController {
       // documented behaviour of stopping remote contact while still recording
       // a local receipt.
       if (controls.priority === "DISABLED") return undefined;
-      const summary = this.#summary(event, ctx);
+      const normalized = this.#normalize(event, ctx, "before_tool_call");
+      const summary = this.#summary(normalized);
       const handle = this.#pipeline.recordLocal(summary, controls.remoteStatus || "NOT_ATTEMPTED", "SKIPPED");
       this.#remember(handle);
       return undefined;
     }
 
-    const summary = this.#summary(event, ctx);
-    const canary = this.#canaryEvaluator(event, ctx, this.#config);
-    if (canary.blocked) {
-      this.#pipeline.recordLocal(summary, "NOT_ATTEMPTED", "BLOCKED_LOCAL");
-      return canary.hookResult;
+    const normalized = this.#normalize(event, ctx, "before_tool_call");
+    if (normalized === null) {
+      const handle = this.#pipeline.recordLocal(this.#summary(null), "NOT_ATTEMPTED", "SKIPPED");
+      this.#remember(handle);
+      return undefined;
     }
-
-    // The Governance API deliberately returns 404 for tools outside the
-    // deployment registry. An unconfigured OpenClaw tool has no authoritative
-    // schema or action-class binding, so keep that observation local instead of
-    // manufacturing fallback metadata and sending a request that cannot be
-    // accepted. This is observational only and never changes tool execution.
-    if (!Object.hasOwn(this.#config.toolMetadata, summary.toolId)) {
+    // A real hook supplies identity and arguments, never governance metadata.
+    // Metadata must resolve from the connector's own registered tool contract
+    // or from operator-validated configuration. Missing, conflicting, or
+    // schema-invalid attribution stays local and cannot reach the network.
+    const attribution = this.#attribution(normalized);
+    const summary = this.#summary(normalized, attribution?.metadata ?? null);
+    if (attribution === null) {
+      const eligibility = this.#runtimeEligibility(normalized);
+      if (eligibility !== null
+          && this.#runtimeObserver?.before(normalized, eligibility) === true) {
+        return undefined;
+      }
       const handle = this.#pipeline.recordLocal(summary, "NOT_ATTEMPTED", "SKIPPED");
       this.#remember(handle);
       return undefined;
@@ -143,13 +190,21 @@ export class ConnectorHookController {
     // ran while the connector was still enabled. No completion receipt is
     // written while operationally disabled.
     if (this.#controlInspector().priority === "DISABLED") return undefined;
-    const summary = this.#summary(event, ctx);
+    const normalized = this.#normalize(event, ctx, "after_tool_call");
+    if (normalized === null) return undefined;
+    const attribution = this.#attribution(normalized);
+    if (attribution === null) {
+      const eligibility = this.#runtimeEligibility(normalized);
+      this.#runtimeObserver?.after(normalized, eligibility);
+      return undefined;
+    }
+    const summary = this.#summary(normalized, attribution.metadata);
     const ref = correlationRef(summary.rawCorrelation || "");
     const queue = ref ? this.#pending.get(ref) : null;
     const pending = queue?.shift();
     if (queue && queue.length === 0) this.#pending.delete(ref);
     if (!pending) return undefined;
-    const observed = observedOutcome(event);
+    const observed = observedOutcome(normalized.event);
     const task = pending.attemptPromise.then((attempt) => {
       const receipt = makeCompletionReceipt({
         decisionId: attempt.decision_id ?? pending.decisionId,
@@ -174,7 +229,11 @@ export class ConnectorHookController {
   #refreshShutdownState() {
     if (this.#shutdownState === "OPEN") return;
     const pipeline = this.#pipeline.status();
+    const runtime = this.#runtimeObserver?.status?.() ?? null;
+    const runtimeClean = runtime === null
+      || runtime.active === 0 && runtime.queued === 0 && runtime.pendingHooks === 0;
     const clean = pipeline.shutdown?.clean === true
+      && runtimeClean
       && this.#pending.size === 0
       && this.#completionTasks.size === 0;
     if (clean) {
@@ -192,6 +251,7 @@ export class ConnectorHookController {
       completionTasks: this.#completionTasks.size,
       pendingCompletions: [...this.#pending.values()].reduce((sum, queue) => sum + queue.length, 0) + this.#completionTasks.size,
       hookCount: [...this.#pending.values()].reduce((sum, queue) => sum + queue.length, 0) + this.#completionTasks.size,
+      runtimeObservation: this.#runtimeObserver?.status?.() ?? null,
       shutdown: Object.freeze({
         state: this.#shutdownState,
         clean: this.#shutdownState === "CLEAN"
@@ -209,7 +269,10 @@ export class ConnectorHookController {
     this.#stopped = true;
     this.#shutdownState = "DRAINING";
     this.#shutdownPromise = (async () => {
-      await this.#pipeline.shutdown(deadline);
+      await Promise.allSettled([
+        this.#runtimeObserver?.shutdown?.(deadline),
+        this.#pipeline.shutdown(deadline),
+      ]);
       const pendingAttempts = [...this.#pending.values()]
         .flat()
         .map((entry) => entry.attemptPromise);

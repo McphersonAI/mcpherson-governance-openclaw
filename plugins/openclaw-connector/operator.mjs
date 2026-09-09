@@ -613,13 +613,15 @@ export function connectorStatus(config, pipelineStatus = null, receiptStatus = n
   return Object.freeze({
     pluginId: PLUGIN_ID,
     enabled: config.enabled && !inspectControl(config.stateDir, "disabled").active,
-    mode: "remote_shadow",
+    mode: "SHADOW",
+    authority: "NONE",
+    enforcement: "OFF",
+    active: false,
     remoteAuthority: false,
     receiptMode,
     controls: Object.freeze({
       killswitch: inspectControl(config.stateDir, "killswitch").status,
       lock: inspectControl(config.stateDir, "lock").status,
-      canary: inspectControl(config.stateDir, "canary").status,
       disabled: inspectControl(config.stateDir, "disabled").status,
     }),
     pairing: Object.freeze(pairing),

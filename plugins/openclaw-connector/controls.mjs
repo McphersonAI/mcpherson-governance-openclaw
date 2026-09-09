@@ -1,7 +1,6 @@
 import { closeSync, constants as C, fstatSync } from "node:fs";
 import { join } from "node:path";
 import {
-  CANARY_CONTROL_FILE,
   DISABLED_FILE,
   KILL_SWITCH_FILE,
   SYSTEM_LOCK_FILE,
@@ -20,7 +19,6 @@ const CONTROL_FILES = Object.freeze({
   killswitch: KILL_SWITCH_FILE,
   lock: SYSTEM_LOCK_FILE,
   disabled: DISABLED_FILE,
-  canary: CANARY_CONTROL_FILE,
 });
 
 export function controlPath(stateDir, name) {
@@ -73,8 +71,8 @@ export function inspectNetworkControls(stateDir) {
 
 // This is the single ordinary-observation gate. Source configuration disable
 // is checked before touching control files; the durable priority is then
-// disabled > kill switch > system lock. The local canary is intentionally not
-// part of this gate and is evaluated only after it returns unblocked.
+// disabled > kill switch > system lock. These controls stop observation and
+// never produce an OpenClaw hook result.
 export function inspectObservationControls(config) {
   if (config?.enabled !== true) {
     return Object.freeze({

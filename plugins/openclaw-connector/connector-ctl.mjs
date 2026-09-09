@@ -60,7 +60,7 @@ export async function runConnectorCtl(argv, dependencies = {}) {
   if (command === "status") result = connectorStatus(config);
   else if (command === "disable") result = disableConnector(config);
   else if (command === "enable") result = enableConnector(config);
-  else if (["killswitch", "lock", "canary"].includes(command)) {
+  else if (["killswitch", "lock"].includes(command)) {
     if (values.on === values.off) throw new Error("Specify exactly one of --on or --off");
     result = setControl(config.stateDir, command, values.on === true);
   } else if (command === "rotate" || command === "recover") {
@@ -99,7 +99,7 @@ export async function runConnectorCtl(argv, dependencies = {}) {
     });
   } else if (command === "uninstall") result = uninstallConnector();
   else {
-    throw new Error("Usage: connector-ctl status|enable|disable|rotate|recover|unpair|uninstall|killswitch|lock|canary [options]");
+    throw new Error("Usage: connector-ctl status|enable|disable|rotate|recover|unpair|uninstall|killswitch|lock [options]");
   }
   return result;
 }

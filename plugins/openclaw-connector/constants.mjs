@@ -1,11 +1,11 @@
 export const PLUGIN_ID = "mcpherson-governance-connector";
 export const PLUGIN_NAME = "McPherson Governance Connector";
-export const PLUGIN_VERSION = "0.6.2";
+export const PLUGIN_VERSION = "0.7.0";
 
 // Source-owned runtime compatibility floor. It is enforced by the connector at
 // activation time and is deliberately not delegated to package-manager or
 // host-side compatibility metadata, which is not enforced by every installer.
-export const MIN_SUPPORTED_OPENCLAW_VERSION = "2026.6.5";
+export const MIN_SUPPORTED_OPENCLAW_VERSION = "2026.8.2";
 
 // The connector's state root is always this directory name inside the ACTIVE
 // OpenClaw profile state directory.
@@ -16,6 +16,10 @@ export const CONNECTOR_STATE_DIR_NAME = "mcpherson-governance-connector";
 export const REMOTE_AUTHORITY = false;
 export const ENFORCEABLE_REMOTE_DECISIONS = Object.freeze([]);
 export const DEFAULT_MODES = Object.freeze({
+  mode: "SHADOW",
+  authority: "NONE",
+  enforcement: "OFF",
+  active: false,
   remote_shadow: true,
   remote_authority: false,
   deny_enforcement: false,
@@ -39,9 +43,6 @@ export const CIRCUIT_OPEN_MS = 60_000;
 
 export const CONNECTION_TOOL_NAME = "mcpherson_connection_test";
 export const CONNECTION_MARKER = "MCPHERSON_GOVERNANCE_CONNECTION_OK_V1";
-export const CANARY_TOOL_NAME = "mcpherson_governance_canary";
-export const CANARY_TOKEN = "mcpherson-canary-block-v1";
-export const CANARY_MARKER = "MCPHERSON_GOVERNANCE_CANARY_OK_V1";
 
 export const RECEIPT_SCHEMA = "mcpherson-governance-evidence/v2";
 export const RECEIPT_FILE = "connector-receipts.jsonl";
@@ -49,7 +50,6 @@ export const CREDENTIAL_FILE = "deployment-credential";
 export const KILL_SWITCH_FILE = "governance-killswitch.on";
 export const SYSTEM_LOCK_FILE = "system.lock";
 export const DISABLED_FILE = "connector-disabled.on";
-export const CANARY_CONTROL_FILE = "canary-control.json";
 
 export const DECISIONS = Object.freeze([
   "ALLOW",
@@ -64,6 +64,10 @@ export const ATTEMPT_OUTCOMES = Object.freeze(["UNKNOWN", "NOT_OBSERVED"]);
 export const COMPLETION_OUTCOMES = Object.freeze(["COMPLETED", "FAILED", "TIMED_OUT"]);
 
 export const FORBIDDEN_AUTHORITY_CONFIG_KEYS = Object.freeze([
+  "mode",
+  "authority",
+  "active",
+  "enforcement",
   "REMOTE_AUTHORITY",
   "remoteAuthority",
   "remote_authority",
@@ -74,6 +78,9 @@ export const FORBIDDEN_AUTHORITY_CONFIG_KEYS = Object.freeze([
   "deny_enforcement",
   "approvalEnforcement",
   "approval_enforcement",
+  "approvalAuthority",
+  "operatorToken",
+  "operatorTokenFile",
   "requireApproval",
   "block",
 ]);

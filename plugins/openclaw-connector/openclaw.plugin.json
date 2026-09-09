@@ -1,14 +1,13 @@
 {
   "id": "mcpherson-governance-connector",
   "name": "McPherson Governance Connector",
-  "description": "Shadow-only metadata connector with local authority retained and truthful post-hook receipts. It does not block or alter ordinary tool execution; remote decisions have no execution authority.",
+  "description": "Observa v0.7 SHADOW governance evidence for OpenClaw. AUTHORITY NONE, ENFORCEMENT OFF, ACTIVE OFF; simulated decisions never alter execution.",
   "activation": {
     "onStartup": true
   },
   "contracts": {
     "tools": [
-      "mcpherson_connection_test",
-      "mcpherson_governance_canary"
+      "mcpherson_connection_test"
     ]
   },
   "configSchema": {
@@ -27,6 +26,30 @@
       "stateDir": { "type": "string" },
       "receiptDir": { "type": "string" },
       "caFile": { "type": "string" },
+      "runtimeObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "mode",
+          "discoverySource",
+          "profileBinding",
+          "mappingStatus",
+          "authority",
+          "enforcement",
+          "automaticMappingActivation"
+        ],
+        "properties": {
+          "schema": { "const": "observa-runtime-observation-bootstrap/v1" },
+          "mode": { "const": "SHADOW_METADATA_ONLY" },
+          "discoverySource": { "const": "ACTUAL_SUPPORTED_OPENCLAW_TOOL_HOOK" },
+          "profileBinding": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "mappingStatus": { "const": "UNMAPPED" },
+          "authority": { "const": "NONE" },
+          "enforcement": { "const": "OFF" },
+          "automaticMappingActivation": { "const": false }
+        }
+      },
       "toolMetadata": {
         "type": "object",
         "additionalProperties": {

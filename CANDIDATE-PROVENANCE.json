@@ -1,0 +1,186 @@
+{
+  "schema": "observa-openclaw-package-provenance/v1",
+  "package_name": "@mcphersonai/mcpherson-governance-openclaw",
+  "version": "0.7.0",
+  "source_tree_sha256": "57854b5c210d75458ff5f897288e68c97dc94518830ad73ed1c5e405b90f0469",
+  "posture": {
+    "mode": "SHADOW",
+    "authority": "NONE",
+    "enforcement": "OFF",
+    "active": false
+  },
+  "build": {
+    "command": "npm pack --ignore-scripts",
+    "source_date_epoch": "0"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "b44c0675c19c33d444ce58479f00461613a1d854472156a05f3f658891c26664"
+    },
+    {
+      "path": "observa-pair.mjs",
+      "sha256": "b839583dc4e21266f8f0b6cdd8b53afcc03a83096db5d102ff008ad8b1670573"
+    },
+    {
+      "path": "openclaw.plugin.json",
+      "sha256": "f947b77ab8bb1fd4cfa5ac70143408df5b4ce6ec93a71c4a0a3f1d020151b357"
+    },
+    {
+      "path": "package.json",
+      "sha256": "62d44743b630b3ebb3527e9f225318100947cfbdd8fb760cf4201d38107f28cc"
+    },
+    {
+      "path": "pairing/openclaw-profile-pairing.mjs",
+      "sha256": "0740d527b1e6bd8d69c635c11956ef3238116f3082f3812064ddc514533c56c0"
+    },
+    {
+      "path": "pairing/shadow-observation-contract.mjs",
+      "sha256": "e6a618a4b9bb873daef5701dac4dd3c87571a2b1598eef0635d7c2e5afb4eb53"
+    },
+    {
+      "path": "plugins/openclaw-connector/README.md",
+      "sha256": "b44c0675c19c33d444ce58479f00461613a1d854472156a05f3f658891c26664"
+    },
+    {
+      "path": "plugins/openclaw-connector/allowlist.mjs",
+      "sha256": "5b0e428446232587ad3d8e7e3681a0605815881cc44f9e9d0762d6fa3d526a20"
+    },
+    {
+      "path": "plugins/openclaw-connector/client.mjs",
+      "sha256": "c6b58f5cf7f4c2c0b50c6e15a2e850634fca6e4974eee1a8a14ab9141b11e200"
+    },
+    {
+      "path": "plugins/openclaw-connector/config.mjs",
+      "sha256": "2e8752c86aaab2b55af37cebdaa0a6f76a9d8def4f1dc540454ce964067465b4"
+    },
+    {
+      "path": "plugins/openclaw-connector/connector-ctl.mjs",
+      "sha256": "123615d5e562f2849fcf1e014cb50221cfb6489397b61acd29e3bdd8a592056d"
+    },
+    {
+      "path": "plugins/openclaw-connector/constants.mjs",
+      "sha256": "da46313630f150d6b3c4b36b92e41fa6de72fe478b808c97bfe2b391d003a90e"
+    },
+    {
+      "path": "plugins/openclaw-connector/controls.mjs",
+      "sha256": "ff844c99fc5b80b38e3922eae3ace5039c1e0100d7c0ed733a6c95dfe383e46d"
+    },
+    {
+      "path": "plugins/openclaw-connector/credentials.mjs",
+      "sha256": "000637733172602d3ea5943af5b06f2cd40641ca3b004d82ff4d4b1d4b1e797d"
+    },
+    {
+      "path": "plugins/openclaw-connector/hook-adapter.mjs",
+      "sha256": "0bcf10597a21ece3f85b6f3f1196537cc030047eef529bc08eb366264b0d7c0a"
+    },
+    {
+      "path": "plugins/openclaw-connector/hook.mjs",
+      "sha256": "6bf19531e8c01b82b1ddf6c3fd2ea3c204a3566e0ef5c5016aee925cfda2bf44"
+    },
+    {
+      "path": "plugins/openclaw-connector/host.mjs",
+      "sha256": "f8d35f1f9360a2f70c904589147de4cfab21df5ef645eb4dcfce6b76a518932b"
+    },
+    {
+      "path": "plugins/openclaw-connector/index.mjs",
+      "sha256": "a9965e6a6678dd2f612af581faea9fd07c559934835b17d4aef5137df9cd8efc"
+    },
+    {
+      "path": "plugins/openclaw-connector/openclaw.plugin.json",
+      "sha256": "f947b77ab8bb1fd4cfa5ac70143408df5b4ce6ec93a71c4a0a3f1d020151b357"
+    },
+    {
+      "path": "plugins/openclaw-connector/operator.mjs",
+      "sha256": "6e8a8c8a5d34afd6c9e371ee2080321189b04fdf29d5fed19f5d41e19535c123"
+    },
+    {
+      "path": "plugins/openclaw-connector/package.json",
+      "sha256": "962560ef4db76e3d175695568db5d374efa53676fe602541b9f8531ba7a1ec5a"
+    },
+    {
+      "path": "plugins/openclaw-connector/pipeline.mjs",
+      "sha256": "88a5fee0cc31c86824b5414cab417a9cc6742f196b866d2dcebd5a8becbbcf4b"
+    },
+    {
+      "path": "plugins/openclaw-connector/plugin.mjs",
+      "sha256": "5bdadce39272dc53c7184ff4f22df999f007e3feb1956f9b69f5195b17690747"
+    },
+    {
+      "path": "plugins/openclaw-connector/receipts.mjs",
+      "sha256": "2993d626d171dd2fa89899cbb6ffdc6a9ce774463da680b915e72a42277bd25e"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/canonical.mjs",
+      "sha256": "b74e52eedd427289316255fd5fa34a5b3364f3688b2ddba9c9e7d455639d9bb2"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/classify.mjs",
+      "sha256": "60291f30c0598e1d46467fc5869d255bba558b3aa3591cffb213e313032846be"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/contracts.mjs",
+      "sha256": "a847d378474b362f366ea8f64694ba2a77a503ed5c3b1bb93d2cd7d50011ceb0"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/errors.mjs",
+      "sha256": "b81ea92eec5d5bd4932f74a1acb9cc77c2434b526ee1cab55c210124449861b9"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/index.mjs",
+      "sha256": "6d67e76daf5737b37866e0f6aecf936b2e705d1f040bdd85007904609711214e"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime/governance-core/policy-validate.mjs",
+      "sha256": "a7fd7771b9afdf347e45b09acd2a8b1522df77a18aa59c30de1e55f37c21afb1"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime-observation-contract.mjs",
+      "sha256": "e6a618a4b9bb873daef5701dac4dd3c87571a2b1598eef0635d7c2e5afb4eb53"
+    },
+    {
+      "path": "plugins/openclaw-connector/runtime-observer.mjs",
+      "sha256": "488e56c330e84c57185547f98f6c29a458bac1cd741f1fdce6384553a6d12bee"
+    },
+    {
+      "path": "plugins/openclaw-connector/secure-files.mjs",
+      "sha256": "90f9697899f3016a2508f1b570931cae2382868abe831faa97dbbc52b190175c"
+    },
+    {
+      "path": "plugins/openclaw-connector/shadow-v070/constants.mjs",
+      "sha256": "133ce69a6fac29ab583e65a4ba33ea2b60dbb96f0e506b54ff0758825df12db1"
+    },
+    {
+      "path": "plugins/openclaw-connector/shadow-v070/evidence.mjs",
+      "sha256": "29401c3533495928fa822b409ea15c2e5b03500c6d6382afc0d56424d1698232"
+    },
+    {
+      "path": "plugins/openclaw-connector/shadow-v070/index.mjs",
+      "sha256": "0b32ac9223992aa1192845c407883f0886e4810a3fd1d13fe6db3b86fb71908f"
+    },
+    {
+      "path": "plugins/openclaw-connector/shadow-v070/normalize.mjs",
+      "sha256": "5f6497ef7ed519d8849708f28d0c63e9d696016aad79adbdcafff53b8d395045"
+    },
+    {
+      "path": "plugins/openclaw-connector/shadow-v070/response.mjs",
+      "sha256": "6d65459b7559ce5ef6bb81cd72a6b157565b329dd062d07d266625452d2a8856"
+    },
+    {
+      "path": "plugins/openclaw-connector/shadow-v070/runtime.mjs",
+      "sha256": "1f8dde9336276905482b31257092559d3e0b6d9d841ea5ac6d7c09cfd034c1cc"
+    },
+    {
+      "path": "plugins/openclaw-connector/shadow-v070/transport.mjs",
+      "sha256": "4a1e7b7bfa2d23093cec147869230bbad83ec051dd4f63226e362a47d5b08831"
+    },
+    {
+      "path": "plugins/openclaw-connector/tools.mjs",
+      "sha256": "d506c78511c103156f4a5c81751f1526ec5690e00e58be7070194c4cf0efe24c"
+    },
+    {
+      "path": "plugins/openclaw-connector/verify.mjs",
+      "sha256": "6c85b205d7c6ad293b8fd46e7b5364fb55d6524f731570ca4988ff6599c647cf"
+    }
+  ]
+}

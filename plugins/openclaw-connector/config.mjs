@@ -1,4 +1,5 @@
 import { join, resolve } from "node:path";
+import { validateRuntimeObservationBootstrap } from "./runtime-observation-contract.mjs";
 import { ACTION_CLASSES } from "./runtime/governance-core/index.mjs";
 import { connectorStateRoot, resolveOpenClawStateDir } from "./host.mjs";
 import {
@@ -28,6 +29,7 @@ const ALLOWED_KEYS = new Set([
   "receiptDir",
   "caFile",
   "toolMetadata",
+  "runtimeObservation",
 ]);
 
 function fail(code) {
@@ -88,12 +90,13 @@ export function loadConnectorConfig(input = {}, pathOverrides = {}) {
   // Precedence: explicit override > explicit configuration > the connector
   // state root inside the ACTIVE OpenClaw profile. The default never resolves
   // to another profile's root, and no state is read or migrated from one.
+  const openclawStateDir = resolve(
+    pathOverrides.openclawStateDir || resolveOpenClawStateDir(),
+  );
   const stateDir = resolve(
     pathOverrides.stateDir
     || input.stateDir
-    || connectorStateRoot(
-      pathOverrides.openclawStateDir || resolveOpenClawStateDir(),
-    ),
+    || connectorStateRoot(openclawStateDir),
   );
   const receiptDir = resolve(pathOverrides.receiptDir || input.receiptDir || join(stateDir, "receipts"));
   const apiUrl = input.apiUrl || "https://127.0.0.1:8443";
@@ -115,6 +118,9 @@ export function loadConnectorConfig(input = {}, pathOverrides = {}) {
     receiptDir,
     caFile: input.caFile ? resolve(input.caFile) : null,
     toolMetadata: validateToolMetadata(input.toolMetadata),
+    runtimeObservation: input.runtimeObservation === undefined
+      ? null
+      : validateRuntimeObservationBootstrap(input.runtimeObservation, openclawStateDir),
   };
   return Object.freeze(config);
 }

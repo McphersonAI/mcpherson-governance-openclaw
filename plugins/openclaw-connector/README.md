@@ -1,54 +1,42 @@
-# McPherson Governance Connector v0.6.1
+# Observa OpenClaw plugin v0.7.0
 
-This private OpenClaw connector is structurally shadow-only. Remotely sourced data is observed and receipted but cannot block, pause, approve, modify, or duplicate an ordinary tool call. The only blocking path is the exact-match, operator-enabled local harmless canary; it does not read or depend on remote data.
+`@mcphersonai/mcpherson-governance-openclaw` records what Observa would have decided at OpenClaw's native synchronous `before_tool_call` seam. Its release posture is fixed in source:
 
-## Account-free V6 local use
+- mode: `SHADOW`
+- authority: `NONE`
+- enforcement: `OFF`
+- active: `false`
 
-Installing this plugin does not require a McPherson Governance account. Leave
-its configuration at `{"enabled":false}` and use the package's local
-diagnostics CLI to discover local agents, tools, and capabilities, create
-non-authoritative AutoMap proposals, and render a Governability Diagnosis.
-There is no login redirect or dependency on email verification, MFA,
-workspace creation, installation pairing, McPherson API keys, billing,
-credits, or the dashboard. See `docs/v6-account-free-local.md` in the V6
-package for exact commands and output locations.
+`SHADOW_WOULD_ALLOW`, `SHADOW_WOULD_DENY`, and `SHADOW_WOULD_REQUIRE_APPROVAL` are evidence labels. They do not grant, block, delay, approve, modify, retry, or execute a tool. `REQUIRE_APPROVAL` records `shadow_mode_no_approval`; it creates no approval and holds no invocation. Transport, protocol, identity, evidence, and verifier failures remain observational. Every `before_tool_call` handler result is `undefined`, so OpenClaw remains the execution authority.
 
-Remote shadow is opt-in and independent: only a tool with complete explicit
-remote configuration may use HTTPS. An unconfigured tool stays local, makes
-no HTTPS request, and records `remote_status: NOT_ATTEMPTED` and
-`local_disposition: SKIPPED`. In both cases tool execution is unchanged,
-authority is `NONE`, and enforcement is off.
+The supported host floor is OpenClaw `2026.8.2` with Node.js 22 or newer. OAuth-mode OpenAI models can route through another harness unless the selected model is explicitly bound to `agentRuntime.id = "openclaw"`. The plugin reports the observed compatibility state when the host exposes it and never edits model configuration. A Codex runtime or Codex plugin is neither shipped nor required.
 
-The exact integration target, OpenClaw `2026.6.5 (5181e4f)`, publicly documents and types `before_tool_call`, `after_tool_call`, `gateway_start`, and `gateway_stop`. The connector therefore uses `POST_HOOK` mode. Every pre-call emits an `attempt_receipt` with `UNKNOWN` or `NOT_OBSERVED`; a `completion_receipt` is emitted only after a directly observed `after_tool_call`. HTTP timeouts, queue drops, shutdown, missing events, and elapsed time never become tool outcomes.
+The v0.7 SHADOW bridge authenticates to `POST /v1/openclaw/shadow/evaluate` with the installation credential already used by the 0.6 connector. Requests contain bounded identity and classification metadata, the executable name, a correlation reference, and a digest of tool arguments. They do not contain the command body, prompt, message body, tool result, exception body, credential, or approval token. Responses must echo the exact installation, principal, request, and tool binding and must declare `authority=NONE`, `enforcement=OFF`, and `active=false`.
 
-The connector requires OpenClaw `2026.6.5` or newer and enforces that minimum at runtime from the host's own reported version. A host that declares an older or unresolvable version is `UNSUPPORTED`: activation is refused and the connector stays inert. A harness or embedder that exposes no runtime-version field is `UNKNOWN` and may load for compatibility with the existing test seam; `UNKNOWN` is not verified or officially supported. The internal canary hard-stops rather than using that seam.
+## Upgrade from 0.6.3-beta.6
 
-Connector state-root precedence is:
+Install the exact v0.7 package over the existing package and retain the existing OpenClaw plugin entry, connector state directory, endpoint, deployment ID, agent ID, and `deployment-credential` file. A package upgrade does not require re-pairing or credential rotation. The plugin does not alter org, workspace, installation, model, runtime, allowlist, or Alpha state. If the configured service does not support the v0.7 evaluation route, governed calls record `INDETERMINATE` and still execute according to OpenClaw.
 
-1. an explicit path override or explicit connector `stateDir` configuration, when deliberately supplied;
-2. the host runtime state resolver for the active OpenClaw profile;
-3. `OPENCLAW_STATE_DIR`; and
-4. the true default `~/.openclaw` profile.
+Rollback replaces the package with the previously pinned `0.6.3-beta.6` artifact, preserves the connector state directory and credential, and restarts only the affected OpenClaw service when the operator's change procedure requires it. Do not run the pairing command for a version-only rollback.
 
-An explicit `stateDir` intentionally opts out of the automatic profile-derived connector root. The internal canary forbids a shared or cross-profile override. Without that deliberate override, the active-profile default keeps state, receipts, controls, and the credential isolated below the active OpenClaw profile. No state is automatically copied or migrated between profiles.
+## Pairing
 
-While operationally disabled the connector is inert for ordinary observation: both tool-observation hook handlers return immediately and no governance request, shadow observation, or ordinary observation receipt is produced. Gateway lifecycle records, which note only that the connector was loaded, are unaffected.
+`observa-pair` is the OpenClaw-native pairing client. It reads a single-use pairing code from a hidden terminal prompt or an owner-only `--code-file`, redeems it through `/v1/pairing/redeem`, binds the returned installation to the selected OpenClaw profile, installs the credential through the connector's secure credential writer, and verifies it. It never accepts the code in argv and never prints the credential. Pairing fixes the posture at SHADOW / NONE / OFF / OFF.
 
-Operator controls are available through the `connector-ctl.mjs` control CLI. An archive install does not guarantee a `connector-ctl` executable on `PATH`; invoke it by explicit path as `node <install-dir>/connector-ctl.mjs <command>` with `OPENCLAW_STATE_DIR` naming the intended profile:
+Pair a new profile only:
 
-- `status`
-- `enable` (clear the durable disabled control after OpenClaw config has explicitly set `enabled:true`)
-- `disable`
-- `killswitch --on|--off`
-- `lock --on|--off`
-- `canary --on|--off`
-- `rotate --rotation <32-hex-id> --new-credential-file <0600-file> [--rotation-operator <trusted-path>]`
-- `recover --new-credential-file <expected-path> [--rotation-operator <trusted-path>]`
-- `unpair --api-url https://... --deployment-id ... --agent-id ...`
-- `uninstall`
+```console
+observa-pair --api-url https://dashboard.example --profile default
+```
 
-The credential is read only from `<stateDir>/deployment-credential` (0600 in a 0700 directory). Never pass it in an argument, environment variable, ordinary OpenClaw config, or log. Rotation uses the operator-supplied durable non-secret server rotation ID and a trusted root-owned callback executable whose fixed grammar carries IDs only; it does not add a remote administration endpoint. Rotation first writes and fsyncs a new exclusive 0600 staged file while the old active path remains untouched, preserves the old material in a private retirement file, tests the new credential, and activates with one rename over the existing path followed by directory fsync. It then confirms active connector use, records the server's bounded-overlap activation, obtains exact atomic old-revocation/completion confirmation, and durably removes the retirement file, input delivery file, and secret-free recovery journal. Restart recovery requires the original expected delivery path even when that file is already absent, making explicit delivery retirement idempotent before the journal is removed. It reconciles the journal with complete file IDs and fingerprints; it never restores an old credential after an ambiguous activation or revocation response. If trusted reconciliation instead returns the exact unchanged server `PENDING` state after its deadline, the connector journals that terminal observation, atomically restores and fsyncs the preserved old credential first, and only then invokes exact idempotent server cancellation/output retirement. Each rollback step is restart-safe and a wrong-state or wrong-ID response cannot trigger restoration or report success.
+An existing installation does not need this command for a package upgrade.
 
-`rotate`, `recover`, and `unpair` share one durable lifecycle interlock. An unfinished rotation blocks unpair and reports the supported connector recovery command; an unfinished unpair blocks a new rotation. `unpair` first creates the durable local disabled control and a secret-free recovery record, confirms idempotent server self-revocation with the exact local credential ID, records that confirmation, and only then deletes the local credential. Ambiguous responses and local-delete failures cannot report success. A restart either retries the idempotent server confirmation or finishes the already-confirmed local deletion without issuing another revocation.
+## Configuration
 
-`uninstall` delegates to the supported `openclaw plugins uninstall` command and preserves the state directory and receipts. A gateway reload/restart completes removal of the host-owned hook registry; the public `api.on` contract in the inspected build does not expose an in-process unregister handle. Gateway stop requests abort and bounded drain for every connector-owned operation. `CLEAN` proves zero connector-owned queue, timer, request, response, socket, promise, and correlation residue. A concrete transport that ignores abort remains visibly owned as `NON_CLEAN_DEADLINE`; it is not reported clean or zero until actual close/settlement advances it to `CLEAN_AFTER_DEADLINE`.
+The existing 0.6 keys remain supported: `enabled`, `apiUrl`, `deploymentId`, `agentId`, `policyVersion`, observation budgets, state paths, `toolMetadata`, and the profile-bound `runtimeObservation` bootstrap. Mode, authority, enforcement, ACTIVE, approval authority, and operator-token keys are rejected. The default state root remains inside the active OpenClaw profile.
+
+The operator CLI exposes status, enable/disable, observation kill/lock controls, credential lifecycle recovery, unpair, and uninstall. Kill and lock controls stop remote observation and record an observational state; they never produce a tool hook result. No local blocking canary ships in v0.7.
+
+## Evidence
+
+One accepted governed correlation produces one terminal SHADOW decision record. Trusted OpenClaw diagnostic events add deduplicated execution evidence, and `after_tool_call` adds deduplicated result-presence evidence without copying the result. Legacy 0.6 observational receipts remain available for compatibility. Evidence write failures cannot change execution.

@@ -2,7 +2,6 @@ import { randomBytes, randomUUID } from "node:crypto";
 import {
   API_VERSION,
   CONNECTION_TOOL_NAME,
-  CANARY_TOOL_NAME,
   MAX_OUTBOUND_BYTES,
   OUTBOUND_FIELDS,
 } from "./constants.mjs";
@@ -34,12 +33,12 @@ function includeOptional(request, key, value) {
   if (value !== undefined && value !== null) request[key] = value;
 }
 
-export function deriveSafeToolSummary({ toolName, agentId, toolCallId, runId }, config) {
+export function deriveSafeToolSummary({ toolName, agentId, toolCallId, runId }, config, authoritativeMetadata = null) {
   // This function deliberately has no parameter for tool arguments. Callers
   // cannot accidentally pass event.params into the outbound request builder.
   const safeTool = isSafeConnectorId(toolName) ? toolName : "unknown";
   const safeAgent = isSafeConnectorId(agentId) ? agentId : config.agentId;
-  const metadata = config.toolMetadata[safeTool] || Object.freeze({
+  const metadata = authoritativeMetadata || config.toolMetadata[safeTool] || Object.freeze({
     schemaVersion: "1",
     schemaHash: `sha256:${"0".repeat(64)}`,
     actionClass: safeTool === CONNECTION_TOOL_NAME

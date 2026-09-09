@@ -18,9 +18,19 @@ import { HardenedReceiptWriter, makeLifecycleReceipt } from "./receipts.mjs";
 import { GovernanceApiClient } from "./client.mjs";
 import { ObservationPipeline } from "./pipeline.mjs";
 import { ConnectorHookController } from "./hook.mjs";
-import { makeCanaryTool, makeConnectionTool } from "./tools.mjs";
+import { RuntimeShadowObserver } from "./runtime-observer.mjs";
+import {
+  makeConnectionTool,
+  makeConnectionToolRegistration,
+} from "./tools.mjs";
+import { buildCodeOwnedToolCatalog } from "./hook-adapter.mjs";
 import { connectorStatus, unpairConnector, uninstallConnector } from "./operator.mjs";
 import { setControl } from "./controls.mjs";
+import {
+  createInertShadowRuntime,
+  createShadowRuntime,
+  SHADOW_HOOK_TIMEOUT_MS,
+} from "./shadow-v070/index.mjs";
 
 const CAPABILITY_PROFILES = Object.freeze({
   POST_HOOK: Object.freeze({ receiptMode: "POST_HOOK", postHookName: "after_tool_call" }),
@@ -38,7 +48,6 @@ function registerIncompatibleConnector(api, compatibility, receiptMode) {
   api.logger?.error?.(compatibility.message);
   const inert = () => undefined;
   api.registerTool(makeConnectionTool(), { name: "mcpherson_connection_test" });
-  api.registerTool(makeCanaryTool(), { name: "mcpherson_governance_canary" });
   const cleanup = [];
   for (const hookName of ["before_tool_call", "after_tool_call", "gateway_start", "gateway_stop"]) {
     const unregister = api.on(hookName, inert);
@@ -49,7 +58,10 @@ function registerIncompatibleConnector(api, compatibility, receiptMode) {
     pluginVersion: PLUGIN_VERSION,
     activated: false,
     enabled: false,
-    mode: "remote_shadow",
+    mode: "SHADOW",
+    authority: "NONE",
+    enforcement: "OFF",
+    active: false,
     remoteAuthority: false,
     receiptMode,
     compatibility,
@@ -96,7 +108,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
     id: PLUGIN_ID,
     name: PLUGIN_NAME,
     version: PLUGIN_VERSION,
-    description: "Shadow-only metadata-minimized OpenClaw governance connector. It observes configured tool activity and records local attempt and completion receipts; it does not block or alter ordinary tool execution, and remote decisions carry no execution authority.",
+    description: "Shadow-only metadata-minimized OpenClaw governance connector. It observes configured semantic activity and eligible actual runtime tool activity, records local attempt and completion receipts, and keeps runtime-only identities unmapped; it does not block or alter ordinary tool execution, and remote decisions carry no execution authority.",
     register(api) {
       // Runtime compatibility is decided before anything else, from the host's
       // own reported version. Package-manager compatibility metadata is not
@@ -112,6 +124,8 @@ function buildGovernanceConnector(options, capabilityProfile) {
         openclawStateDir: resolveOpenClawStateDir({ runtime: api?.runtime }),
         ...(options.pathOverrides || {}),
       });
+      const connectionRegistration = makeConnectionToolRegistration();
+      const codeOwnedTools = buildCodeOwnedToolCatalog([connectionRegistration]);
       ensureSecureDir(config.stateDir);
       ensureSecureDir(config.receiptDir);
       const receiptWriter = options.receiptWriter || new HardenedReceiptWriter(config.receiptDir, api.logger);
@@ -132,6 +146,32 @@ function buildGovernanceConnector(options, capabilityProfile) {
         requestBuilder: options.requestBuilder,
         requestSerializer: options.requestSerializer,
       });
+      const runtimeObserver = options.runtimeObserver || new RuntimeShadowObserver({
+        config,
+        client,
+        receiptWriter,
+        credentialProvider: options.credentialProvider,
+        controlInspector: options.controlInspector,
+      });
+      let shadowRuntime = options.shadowRuntime;
+      if (!shadowRuntime) {
+        try {
+          shadowRuntime = createShadowRuntime({
+            config,
+            runtimeVersion: compatibility.hostVersion,
+            agentRuntime: options.agentRuntime ?? api?.runtime?.agentRuntime ?? api?.agentRuntime ?? null,
+            transport: options.shadowTransport,
+            evidenceWriter: options.shadowEvidenceWriter,
+            credentialProvider: options.shadowCredentialProvider,
+            controlInspector: options.shadowControlInspector,
+            nowIso: options.shadowNowIso,
+            makeRequestId: options.shadowMakeRequestId,
+          });
+        } catch (error) {
+          shadowRuntime = createInertShadowRuntime(error);
+          api.logger?.error?.(`[observa-shadow] initialization ${shadowRuntime.status().reason}`);
+        }
+      }
       const controller = new ConnectorHookController({
         config,
         pipeline,
@@ -139,9 +179,19 @@ function buildGovernanceConnector(options, capabilityProfile) {
         receiptMode,
         controlInspector: options.controlInspector,
         summaryBuilder: options.summaryBuilder,
-        canaryEvaluator: options.canaryEvaluator,
+        normalizer: options.normalizer,
+        attributionResolver: options.attributionResolver,
+        runtimeEligibilityResolver: options.runtimeEligibilityResolver,
+        runtimeObserver,
+        codeOwnedTools: options.codeOwnedTools || codeOwnedTools,
       });
       const cleanup = [];
+      if (typeof options.subscribeDiagnostics === "function") {
+        const unsubscribe = options.subscribeDiagnostics((event, metadata) => {
+          shadowRuntime.onDiagnosticEvent(event, metadata);
+        });
+        if (typeof unsubscribe === "function") cleanup.push(unsubscribe);
+      }
       let terminalPromise = null;
       let terminalReason = null;
 
@@ -169,6 +219,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
               receiptWriter.write(makeLifecycleReceipt({ event: lifecycleEvent, receiptMode }));
             }
           } finally {
+            await shadowRuntime.close();
             for (const unregister of cleanup.splice(0)) unregister();
             receiptWriter.close?.();
           }
@@ -178,15 +229,18 @@ function buildGovernanceConnector(options, capabilityProfile) {
         return terminalPromise;
       };
 
-      api.registerTool(makeConnectionTool(), { name: "mcpherson_connection_test" });
-      api.registerTool(makeCanaryTool(), { name: "mcpherson_governance_canary" });
+      api.registerTool(connectionRegistration.tool, { name: "mcpherson_connection_test" });
 
       const hookRegistrations = [
-        ["before_tool_call", (event, ctx) => controller.beforeToolCall(event, ctx)],
+        ["before_tool_call", async (event, ctx) => {
+          await shadowRuntime.beforeToolCall(event, ctx);
+          return controller.beforeToolCall(event, ctx);
+        }, { priority: 100, timeoutMs: SHADOW_HOOK_TIMEOUT_MS }],
         // Gateway lifecycle records that the connector was loaded. They are
         // not ordinary observation receipts and are unaffected by the
         // operational disable, which governs tool observation.
         ["gateway_start", async () => {
+          shadowRuntime.onGatewayStart();
           receiptWriter.write(makeLifecycleReceipt({ event: "gateway_start", receiptMode }));
         }],
         ["gateway_stop", async () => {
@@ -195,11 +249,14 @@ function buildGovernanceConnector(options, capabilityProfile) {
       ];
       if (postHookName !== null) {
         hookRegistrations.splice(1, 0, [
-          postHookName, (event, ctx) => controller.afterToolCall(event, ctx),
+          postHookName, (event, ctx) => {
+            shadowRuntime.afterToolCall(event, ctx);
+            return controller.afterToolCall(event, ctx);
+          },
         ]);
       }
-      for (const [hookName, handler] of hookRegistrations) {
-        const unregister = api.on(hookName, handler);
+      for (const [hookName, handler, hookOptions] of hookRegistrations) {
+        const unregister = api.on(hookName, handler, hookOptions);
         // Current OpenClaw's supported api.on contract returns void. A host test
         // adapter may return an unregister callback; use it when available.
         if (typeof unregister === "function") cleanup.push(unregister);
@@ -209,6 +266,8 @@ function buildGovernanceConnector(options, capabilityProfile) {
         config,
         controller,
         pipeline,
+        runtimeObserver,
+        shadowRuntime,
         client,
         receiptWriter,
         compatibility,
@@ -218,6 +277,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
           pluginVersion: PLUGIN_VERSION,
           activated: true,
           compatibility,
+          shadow: shadowRuntime.status(),
           lifecycle: Object.freeze({
             terminal: terminalPromise !== null,
             reason: terminalReason,
@@ -289,4 +349,7 @@ export * from "./hook.mjs";
 export * from "./operator.mjs";
 export * from "./pipeline.mjs";
 export * from "./receipts.mjs";
+export * from "./runtime-observation-contract.mjs";
+export * from "./runtime-observer.mjs";
+export * from "./shadow-v070/index.mjs";
 export * from "./verify.mjs";

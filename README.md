@@ -1,188 +1,42 @@
-# McPherson Governance Connector for OpenClaw
+# Observa OpenClaw plugin v0.7.0
 
-**Version 0.6.2 — account-free local governance diagnostics.**
+`@mcphersonai/mcpherson-governance-openclaw` records what Observa would have decided at OpenClaw's native synchronous `before_tool_call` seam. Its release posture is fixed in source:
 
-This package is the distributed McPherson Governance OpenClaw plugin. It is not
-the McPherson Governance monorepo: it contains the connector runtime, the V6
-local diagnostics CLI, the runtime modules those two need, the JSON schema
-contracts they read, public documentation, and self-verification tooling.
+- mode: `SHADOW`
+- authority: `NONE`
+- enforcement: `OFF`
+- active: `false`
 
-## What it does
+`SHADOW_WOULD_ALLOW`, `SHADOW_WOULD_DENY`, and `SHADOW_WOULD_REQUIRE_APPROVAL` are evidence labels. They do not grant, block, delay, approve, modify, retry, or execute a tool. `REQUIRE_APPROVAL` records `shadow_mode_no_approval`; it creates no approval and holds no invocation. Transport, protocol, identity, evidence, and verifier failures remain observational. Every `before_tool_call` handler result is `undefined`, so OpenClaw remains the execution authority.
 
-Installed into an OpenClaw profile, it gives you a local, private workflow:
+The supported host floor is OpenClaw `2026.8.2` with Node.js 22 or newer. OAuth-mode OpenAI models can route through another harness unless the selected model is explicitly bound to `agentRuntime.id = "openclaw"`. The plugin reports the observed compatibility state when the host exposes it and never edits model configuration. A Codex runtime or Codex plugin is neither shipped nor required.
 
-- **Account-free local agent and tool discovery** from your own OpenClaw
-  gateway metadata.
-- **Non-authoritative AutoMap proposals** for the capabilities it discovers.
-- **A Governability Diagnosis** of how much of your local surface could be
-  governed.
-- **Private JSON and Markdown reports** written `0600` under a directory you
-  choose.
+The v0.7 SHADOW bridge authenticates to `POST /v1/openclaw/shadow/evaluate` with the installation credential already used by the 0.6 connector. Requests contain bounded identity and classification metadata, the executable name, a correlation reference, and a digest of tool arguments. They do not contain the command body, prompt, message body, tool result, exception body, credential, or approval token. Responses must echo the exact installation, principal, request, and tool binding and must declare `authority=NONE`, `enforcement=OFF`, and `active=false`.
 
-## What it does not require
+## Upgrade from 0.6.3-beta.6
 
-No McPherson account. No email verification. No MFA. No organization, no
-workspace, no installation pairing. No McPherson API key. No billing, no
-credits. No dashboard login. No hosted SaaS availability.
+Install the exact v0.7 package over the existing package and retain the existing OpenClaw plugin entry, connector state directory, endpoint, deployment ID, agent ID, and `deployment-credential` file. A package upgrade does not require re-pairing or credential rotation. The plugin does not alter org, workspace, installation, model, runtime, allowlist, or Alpha state. If the configured service does not support the v0.7 evaluation route, governed calls record `INDETERMINATE` and still execute according to OpenClaw.
 
-The connected dashboard and the broader Observa private beta are **separate**
-product paths and are not required for, and do not gate, local V6 use.
+Rollback replaces the package with the previously pinned `0.6.3-beta.6` artifact, preserves the connector state directory and credential, and restarts only the affected OpenClaw service when the operator's change procedure requires it. Do not run the pairing command for a version-only rollback.
 
-## Observa private beta
+## Pairing
 
-The Observa private beta is now open for selected n8n and OpenClaw operators
-and builders. It is the broader McPherson AI product around this plugin:
-founder-assisted onboarding, capability and workflow mapping, reviewable
-governance evidence, and independent verification of supported workflow
-outcomes. The beta is SHADOW_ONLY with authority NONE; enforcement is not
-active in the beta, and nothing in the beta takes production control. This
-plugin remains the public OpenClaw governance product and is not the
-distribution path for the beta. Details and access requests:
-<https://mcphersonai.com/private-beta>.
+`observa-pair` is the OpenClaw-native pairing client. It reads a single-use pairing code from a hidden terminal prompt or an owner-only `--code-file`, redeems it through `/v1/pairing/redeem`, binds the returned installation to the selected OpenClaw profile, installs the credential through the connector's secure credential writer, and verifies it. It never accepts the code in argv and never prints the credential. Pairing fixes the posture at SHADOW / NONE / OFF / OFF.
 
-## Fixed safety boundary
+Pair a new profile only:
 
-| Property | Value |
-| --- | --- |
-| `AUTHORITY` | `NONE` |
-| `ENFORCEMENT` | `OFF` |
-| Automatic mapping activation | `OFF` |
-| Outbound actions | `OFF` |
-| Registry mutation | `OFF` |
-| Billing / enforcement credits | absent or inactive |
-| Remote decisions | `SHADOW_ONLY` |
-
-- The connector **does not block, approve, deny, delay, or rewrite** any tool
-  call. It has no policy evaluator and no gate.
-- **Remote decisions cannot alter tool execution.** There is no code path from
-  a remote response to a change in what a tool does.
-- **AutoMap proposals cannot activate themselves.** Their status is `PROPOSED`.
-  Promoting a proposal is a separate, human, out-of-band decision.
-- The single exception to "never blocks" is the operator-enabled, exact-match
-  local canary tool, which exists so you can prove the hook is installed. It
-  reads no remote data.
-
-## Unconfigured tools make no network request
-
-If a tool has no complete configured metadata in your connector configuration:
-
-- it **remains local**;
-- **no HTTPS request occurs**;
-- the receipt records `remote_status: NOT_ATTEMPTED`;
-- the receipt records `local_disposition: SKIPPED`;
-- **tool execution is unchanged**;
-- no fallback metadata reaches the wire or the receipt ledger.
-
-Earlier releases described unmapped tools as normally producing remote registry
-`404` observations. That is **not** V6 behavior — see
-[LIMITATIONS.md](./LIMITATIONS.md) §4 for the corrected description and the one
-case where a `404` can still legitimately appear.
-
-## Requirements
-
-- **OpenClaw 2026.6.5 or newer.** This minimum is source-owned and enforced by
-  the connector itself at activation time. See [INSTALL.md](./INSTALL.md) for
-  the exact provenance of that number.
-- **For live observation, one of three exact audited builds.** Support is
-  exact-target based, not range-based: `2026.6.5` (`5181e4f`) and `2026.6.33`
-  (`7af0cfc`, extended-stable) are both live-lifecycle proven, with
-  `2026.6.33` preferred. `2026.7.1-2` (`0790d9f`) is target-bound and
-  installable but **not** live-observation supported. Live observation
-  refuses every other build. See [LIMITATIONS.md](./LIMITATIONS.md).
-- **Node.js 22 or newer** (the V6 diagnostics CLI requires it).
-- No third-party dependencies. Every import resolves to a sibling module in this
-  package or to a Node.js built-in.
-
-## Quick start
-
-```sh
-PROFILE=my-profile
-PROFILE_HOME=/absolute/physical/path/to/the/openclaw-home
-OPENCLAW="$PROFILE_HOME/.local/bin/openclaw"
-PROFILE_STATE="$PROFILE_HOME/.openclaw-$PROFILE"
-PACKAGE_ROOT=/absolute/path/to/the/verified/package
-clawhub package download @mcphersonai/mcpherson-governance-openclaw \
-  --version 0.6.2 --output ./mcpherson-governance-download
-clawhub package verify \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz \
-  --package @mcphersonai/mcpherson-governance-openclaw --version 0.6.2
-env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
-  "$OPENCLAW" --profile "$PROFILE" plugins install \
-  ./mcpherson-governance-download/mcphersonai-mcpherson-governance-openclaw-0.6.2.tgz
-env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
-  "$OPENCLAW" --profile "$PROFILE" config set \
-  plugins.entries.mcpherson-governance-connector.config \
-  '{"enabled":false}' --strict-json
-env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
-  "$OPENCLAW" --profile "$PROFILE" config validate
-env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
-  "$OPENCLAW" --profile "$PROFILE" plugins inspect mcpherson-governance-connector
-env HOME="$PROFILE_HOME" OPENCLAW_HOME="$PROFILE_HOME" \
-  "$OPENCLAW" --profile "$PROFILE" plugins disable mcpherson-governance-connector
+```console
+observa-pair --api-url https://dashboard.example --profile default
 ```
 
-Download, verify, then install the verified `.tgz` — the same install contract
-as v0.5.1. Full steps and expected install warnings are in
-[INSTALL.md](./INSTALL.md).
+An existing installation does not need this command for a package upgrade.
 
-`enabled: false` is the default and keeps remote shadow off. The local V6
-diagnostics workflow runs with the connector disabled.
+## Configuration
 
-Then follow the account-free SecretRef and local loopback-health identity
-bootstrap in [INSTALL.md](./INSTALL.md) §4.1. It uses the exact named profile,
-requires no remote service or account, and must complete before binding. The
-binding pins the exact profile-local ledger under
-`$PROFILE_STATE/mcpherson-governance-connector/receipts/`.
+The existing 0.6 keys remain supported: `enabled`, `apiUrl`, `deploymentId`, `agentId`, `policyVersion`, observation budgets, state paths, `toolMetadata`, and the profile-bound `runtimeObservation` bootstrap. Mode, authority, enforcement, ACTIVE, approval authority, and operator-token keys are rejected. The default state root remains inside the active OpenClaw profile.
 
-Run the local workflow using the full commands in [INSTALL.md](./INSTALL.md):
+The operator CLI exposes status, enable/disable, observation kill/lock controls, credential lifecycle recovery, unpair, and uninstall. Kill and lock controls stop remote observation and record an observational state; they never produce a tool hook result. No local blocking canary ships in v0.7.
 
-```sh
-node "$PACKAGE_ROOT/scripts/governance-diagnostics.mjs" init-profile-binding ...
-node "$PACKAGE_ROOT/scripts/governance-diagnostics.mjs" verify-profile-binding ...
-node "$PACKAGE_ROOT/scripts/governance-diagnostics.mjs" observe-live ...
-node "$PACKAGE_ROOT/scripts/governance-diagnostics.mjs" verify-observation ...
-node "$PACKAGE_ROOT/scripts/governance-diagnostics.mjs" discover ...
-node "$PACKAGE_ROOT/scripts/governance-diagnostics.mjs" propose ...
-node "$PACKAGE_ROOT/scripts/governance-diagnostics.mjs" govern ...
-node "$PACKAGE_ROOT/scripts/governance-diagnostics.mjs" render-diagnosis ...
-```
+## Evidence
 
-## Verify what you installed
-
-```sh
-npm run verify
-```
-
-This checks the packaged file inventory against `PACKAGE-FILES.sha256`, the
-declared identities, and the safety constants. See [VERIFY.md](./VERIFY.md).
-
-## Documents
-
-| File | Contents |
-| --- | --- |
-| [INSTALL.md](./INSTALL.md) | Install, configure, run the V6 workflow, upgrade from v0.5.1 |
-| [VERIFY.md](./VERIFY.md) | Independent verification of this package |
-| [LIMITATIONS.md](./LIMITATIONS.md) | What this does not do, honestly stated |
-| [PRIVACY.md](./PRIVACY.md) | What is read, what is written, what never leaves |
-| [SECURITY.md](./SECURITY.md) | Security posture and reporting |
-| [SUPPORT.md](./SUPPORT.md) | Getting help, troubleshooting |
-| [LIFECYCLE.md](./LIFECYCLE.md) | Enable, disable, rotate, uninstall, version transitions |
-| [CHANGELOG.md](./CHANGELOG.md) | Release history |
-
-## Security
-
-To report a suspected vulnerability, email **admin@mcphersonai.com** privately.
-Please do not open a public issue for suspected security vulnerabilities. See
-[SECURITY.md](./SECURITY.md).
-
-## What this package is not
-
-It does not include, and this license does not grant rights to, the hosted
-McPherson Governance API, the McPherson Governance Dashboard, Observa
-commercial services, the commercial control plane, or v0.7 enforcement. Those
-are separate works and are not distributed here. See [NOTICE](./NOTICE).
-
-## License
-
-Apache License 2.0. Copyright 2026 McPherson AI LLC. See [LICENSE](./LICENSE)
-and [NOTICE](./NOTICE).
+One accepted governed correlation produces one terminal SHADOW decision record. Trusted OpenClaw diagnostic events add deduplicated execution evidence, and `after_tool_call` adds deduplicated result-presence evidence without copying the result. Legacy 0.6 observational receipts remain available for compatibility. Evidence write failures cannot change execution.

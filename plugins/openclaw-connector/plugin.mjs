@@ -1,4 +1,5 @@
 import { createGovernanceConnector } from "./index.mjs";
+import { onInternalDiagnosticEvent } from "openclaw/plugin-sdk/diagnostic-runtime";
 
 // Only filesystem locations may be overridden by environment. Identity,
 // transport authority, decisions, enforcement, and credentials cannot be.
@@ -7,5 +8,7 @@ const pathOverrides = Object.freeze({
   ...(process.env.MCP_GOVERNANCE_RECEIPT_DIR ? { receiptDir: process.env.MCP_GOVERNANCE_RECEIPT_DIR } : {}),
 });
 
-export default createGovernanceConnector({ pathOverrides });
-
+export default createGovernanceConnector({
+  pathOverrides,
+  subscribeDiagnostics: onInternalDiagnosticEvent,
+});

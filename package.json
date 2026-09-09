@@ -1,78 +1,45 @@
 {
   "name": "@mcphersonai/mcpherson-governance-openclaw",
-  "version": "0.6.2",
-  "description": "Account-free OpenClaw plugin for local agent and tool discovery, non-authoritative AutoMap proposals, and a local Governability Diagnosis. Shadow-only: it does not block or alter tool execution.",
+  "version": "0.7.0",
+  "description": "Observa SHADOW governance evidence plugin for OpenClaw",
   "type": "module",
-  "license": "Apache-2.0",
-  "author": "McPherson AI LLC",
-  "homepage": "https://mcphersonai.com",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/McphersonAI/mcpherson-governance-openclaw.git"
+  "bin": {
+    "observa-pair": "./observa-pair.mjs",
+    "observa-openclaw-ctl": "./plugins/openclaw-connector/connector-ctl.mjs"
   },
-  "bugs": {
-    "url": "https://github.com/McphersonAI/mcpherson-governance-openclaw/issues"
-  },
-  "keywords": [
-    "openclaw",
-    "openclaw-plugin",
-    "governance",
-    "observability",
-    "shadow-mode",
-    "audit",
-    "receipts",
-    "diagnostics"
+  "files": [
+    "plugins/",
+    "pairing/",
+    "observa-pair.mjs",
+    "README.md",
+    "CANDIDATE-PROVENANCE.json",
+    "openclaw.plugin.json"
   ],
   "engines": {
     "node": ">=22"
   },
-  "main": "./plugins/openclaw-connector/plugin.mjs",
-  "exports": {
-    ".": "./plugins/openclaw-connector/plugin.mjs",
-    "./package.json": "./package.json"
+  "peerDependencies": {
+    "openclaw": ">=2026.8.2"
   },
-  "bin": {
-    "mcpherson-connector-ctl": "plugins/openclaw-connector/connector-ctl.mjs"
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
   },
-  "files": [
-    "openclaw.plugin.json",
-    "plugins/",
-    "packages/",
-    "contracts/",
-    "scripts/",
-    "examples/",
-    "tests/",
-    "NOTICE",
-    "V6-PACKAGE-MANIFEST.json",
-    "PACKAGE-FILES.sha256",
-    "RELEASE-PROVENANCE.json",
-    "CHANGELOG.md",
-    "COMPATIBILITY.md",
-    "INSTALL.md",
-    "LIFECYCLE.md",
-    "LIMITATIONS.md",
-    "PRIVACY.md",
-    "SECURITY.md",
-    "SUPPORT.md",
-    "VERIFY.md"
-  ],
-  "scripts": {
-    "test": "node --test tests/public-package.test.mjs",
-    "test:regression": "node --test tests/redaction.test.mjs tests/release-manifests.test.mjs",
-    "test:all": "node --test tests/public-package.test.mjs tests/redaction.test.mjs tests/release-manifests.test.mjs",
-    "verify": "node scripts/verify-package.mjs",
-    "verify:manifests": "node scripts/build-release-manifests.mjs --check"
-  },
+  "scripts": {},
   "openclaw": {
     "extensions": [
       "./plugins/openclaw-connector/plugin.mjs"
     ],
     "compat": {
-      "pluginApi": ">=2026.6.5"
+      "pluginApi": ">=2026.8.2"
     },
     "build": {
-      "openclawVersion": "2026.6.33",
-      "openclawCommit": "7af0cfc",
+      "openclawVersion": "2026.8.2",
+      "shadowMode": "SHADOW",
+      "authority": "NONE",
+      "enforcement": "OFF",
+      "active": false,
       "receiptMode": "POST_HOOK"
     }
   }
