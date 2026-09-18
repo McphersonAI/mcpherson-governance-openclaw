@@ -2,11 +2,14 @@ import { randomUUID } from "node:crypto";
 
 import { correlationRef, requestHash } from "./runtime/governance-core/index.mjs";
 import { ConnectorClientError } from "./client.mjs";
+import { canonicalObservationToolId } from "./hook-adapter.mjs";
 import { inspectObservationControls } from "./controls.mjs";
 import { withCredential } from "./credentials.mjs";
 import { makeAttemptReceipt, makeCompletionReceipt } from "./receipts.mjs";
 import {
+  buildLinkedShadowObservationRequest,
   buildShadowObservationRequest,
+  executionCorrelationReference,
   serializeShadowObservationRequest,
 } from "./runtime-observation-contract.mjs";
 
@@ -50,14 +53,23 @@ function observedOutcome(event) {
   return exact === "TIMEOUT" || exact === "TIMED_OUT" ? "TIMED_OUT" : "FAILED";
 }
 
-function rawCorrelation(normalized) {
-  if (typeof normalized?.toolCallId === "string" && normalized.toolCallId.length > 0) {
-    return normalized.toolCallId;
+// Exact execution identity needs BOTH host ids; only then can a result carry
+// a decision proof (V2). With exactly one id the 0.7.0 behaviour is kept: the
+// result is still observed, over the legacy V1 contract, and can never link.
+function hostCorrelation(normalized, runtimeInstanceId) {
+  const present = (value) => (typeof value === "string" && value.length > 0 ? value : null);
+  const runId = present(normalized?.runId);
+  const toolCallId = present(normalized?.toolCallId);
+  if (runId !== null && toolCallId !== null) {
+    return Object.freeze({
+      raw: `${runId}\n${toolCallId}`, exact: true,
+      ref: executionCorrelationReference({ runtimeInstanceId, runId, toolCallId }),
+    });
   }
-  if (typeof normalized?.runId === "string" && normalized.runId.length > 0) {
-    return normalized.runId;
-  }
-  return null;
+  const raw = toolCallId ?? runId;
+  if (raw === null) return null;
+  const ref = correlationRef(raw);
+  return typeof ref === "string" ? Object.freeze({ raw, exact: false, ref }) : null;
 }
 
 function localRequestHash(entry) {
@@ -85,6 +97,7 @@ export class RuntimeShadowObserver {
   #writer;
   #credentialProvider;
   #controlInspector;
+  #runtimeInstanceId;
   #pending = new Map();
   // One record per host correlation this process has accepted a claim for:
   // { agentId, runtimeToolKind, names:Set, poisoned }. Used to keep completed
@@ -111,12 +124,14 @@ export class RuntimeShadowObserver {
     config,
     client,
     receiptWriter,
+    runtimeInstanceId,
     credentialProvider = null,
     controlInspector = null,
   }) {
     this.#config = config;
     this.#client = client;
     this.#writer = receiptWriter;
+    this.#runtimeInstanceId = runtimeInstanceId;
     this.#credentialProvider = credentialProvider
       || ((callback) => withCredential(config.stateDir, callback));
     this.#controlInspector = controlInspector || (() => inspectObservationControls(config));
@@ -174,14 +189,17 @@ export class RuntimeShadowObserver {
     this.#totals.completions += 1;
   }
 
-  #entryFor(normalized, eligibility, raw, ref) {
+  #entryFor(normalized, eligibility, corr) {
     const entry = {
       id: randomUUID(),
       agentId: normalized.agentId,
-      toolId: normalized.toolName,
+      toolId: eligibility.toolId,
       runtimeToolKind: eligibility.runtimeToolKind,
-      rawCorrelation: raw,
-      correlationRef: ref,
+      runId: normalized.runId,
+      toolCallId: normalized.toolCallId,
+      exact: corr.exact,
+      rawCorrelation: corr.raw,
+      correlationRef: corr.ref,
       requestHash: null,
       ambiguous: false,
       claimedNames: new Set([normalized.toolName]),
@@ -193,12 +211,11 @@ export class RuntimeShadowObserver {
 
   before(normalized, eligibility) {
     if (!this.#accepting || !eligibility?.accepted || !this.#controlsAllowRemote()) return false;
-    const raw = rawCorrelation(normalized);
     // Without a host call/run identity there is no safe before/after binding
     // and no way to distinguish two same-name executions. Keep that local-only.
-    if (raw === null) return false;
-    const ref = correlationRef(raw);
-    if (typeof ref !== "string") return false;
+    const corr = hostCorrelation(normalized, this.#runtimeInstanceId);
+    if (corr === null) return false;
+    const { raw, ref } = corr;
     const group = this.#pending.get(ref) || [];
     if (group.length === 0) {
       const record = this.#seen.get(ref);
@@ -223,7 +240,7 @@ export class RuntimeShadowObserver {
         }
         record.poisoned = true;
         this.#totals.ambiguous += 1;
-        this.#refuse(this.#entryFor(normalized, eligibility, raw, ref));
+        this.#refuse(this.#entryFor(normalized, eligibility, corr));
         return false;
       }
       this.#seen.set(ref, {
@@ -236,7 +253,7 @@ export class RuntimeShadowObserver {
       while (this.#seenOrder.length > 4096) {
         this.#seen.delete(this.#seenOrder.shift());
       }
-      const entry = this.#entryFor(normalized, eligibility, raw, ref);
+      const entry = this.#entryFor(normalized, eligibility, corr);
       this.#pending.set(ref, [entry]);
       this.#writeAttempt(entry, "NONE");
       this.#totals.attempts += 1;
@@ -257,7 +274,11 @@ export class RuntimeShadowObserver {
         return true;
       }
       if (sameIdentity && entry.claimedNames.size === 1) {
-        const canonical = canonicalAliasOf(entry.toolId, normalized.toolName);
+        // Compare HOST names: entry.toolId is already the canonical governed
+        // identity (exec -> openclaw:exec) and is not itself a host name.
+        const [firstName] = entry.claimedNames;
+        const alias = canonicalAliasOf(firstName, normalized.toolName);
+        const canonical = alias === null ? null : canonicalObservationToolId(alias);
         if (canonical !== null) {
           // Supported exact alias pair — exactly two claims, literal
           // "openclaw" + canonical relationship, all protected identity
@@ -282,7 +303,7 @@ export class RuntimeShadowObserver {
     // remote lane, and each refused claim leaves a durable BLOCKED_LOCAL
     // attempt receipt so the refusal is never silent.
     this.#poisonGroup(group, record);
-    const entry = this.#entryFor(normalized, eligibility, raw, ref);
+    const entry = this.#entryFor(normalized, eligibility, corr);
     this.#refuse(entry);
     group.push(entry);
     this.#pending.set(ref, group);
@@ -292,11 +313,11 @@ export class RuntimeShadowObserver {
     return true;
   }
 
-  after(normalized, eligibility) {
+  after(normalized, eligibility, decisionLinkage = null) {
     if (!eligibility?.accepted) return false;
-    const raw = rawCorrelation(normalized);
-    if (raw === null) return false;
-    const ref = correlationRef(raw);
+    const corr = hostCorrelation(normalized, this.#runtimeInstanceId);
+    if (corr === null) return false;
+    const { ref } = corr;
     const pending = this.#pending.get(ref);
     if (!pending || pending.length === 0) return false;
     const index = pending.findIndex((entry) => (
@@ -332,7 +353,15 @@ export class RuntimeShadowObserver {
       this.#writeCompletion(entry, outcome);
       return true;
     }
-    const job = { entry, outcome, body: null, promise: null };
+    const exactLink = entry.exact && decisionLinkage
+      && decisionLinkage.runtimeInstanceId === this.#runtimeInstanceId
+      && decisionLinkage.runId === entry.runId
+      && decisionLinkage.toolCallId === entry.toolCallId
+      && decisionLinkage.agentId === entry.agentId
+      && decisionLinkage.toolId === entry.toolId
+      && decisionLinkage.correlationRef === entry.correlationRef
+      ? decisionLinkage : null;
+    const job = { entry, outcome, decisionLinkage: exactLink, body: null, promise: null };
     this.#totals.submitted += 1;
     if (this.#active.size < this.#config.maxInFlight) this.#start(job);
     else if (this.#queue.length < this.#config.maxQueue) this.#queue.push(job);
@@ -362,13 +391,25 @@ export class RuntimeShadowObserver {
   async #run(job) {
     let request;
     try {
-      request = buildShadowObservationRequest({
-        agentId: job.entry.agentId,
-        toolId: job.entry.toolId,
-        runtimeToolKind: job.entry.runtimeToolKind,
-        rawCorrelation: job.entry.rawCorrelation,
-        toolOutcome: job.outcome,
-      });
+      request = job.entry.exact
+        ? buildLinkedShadowObservationRequest({
+          agentId: job.entry.agentId,
+          toolId: job.entry.toolId,
+          runtimeToolKind: job.entry.runtimeToolKind,
+          runtimeInstanceId: this.#runtimeInstanceId,
+          runId: job.entry.runId,
+          toolCallId: job.entry.toolCallId,
+          decisionId: job.decisionLinkage?.decisionId ?? null,
+          decisionRequestHash: job.decisionLinkage?.decisionRequestHash ?? null,
+          toolOutcome: job.outcome,
+        })
+        : buildShadowObservationRequest({
+          agentId: job.entry.agentId,
+          toolId: job.entry.toolId,
+          runtimeToolKind: job.entry.runtimeToolKind,
+          rawCorrelation: job.entry.rawCorrelation,
+          toolOutcome: job.outcome,
+        });
       job.body = serializeShadowObservationRequest(request);
     } catch {
       return Object.freeze({ remoteStatus: "PRIVACY_GUARD_TRIPPED" });

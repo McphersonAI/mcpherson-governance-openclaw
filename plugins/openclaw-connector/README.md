@@ -1,4 +1,4 @@
-# Observa OpenClaw plugin v0.7.0
+# Observa OpenClaw plugin v0.7.2
 
 `@mcphersonai/mcpherson-governance-openclaw` records what Observa would have decided at OpenClaw's native synchronous `before_tool_call` seam. Its release posture is fixed in source:
 

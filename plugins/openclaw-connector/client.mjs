@@ -9,6 +9,7 @@ import {
   MAX_RESPONSE_BYTES,
 } from "./constants.mjs";
 import { validateShadowObservationAck } from "./runtime-observation-contract.mjs";
+import { validateRuntimePublicationAck } from "./runtime-publication-contract.mjs";
 
 const TLS_CODES = new Set([
   "CERT_HAS_EXPIRED", "CERT_NOT_YET_VALID", "DEPTH_ZERO_SELF_SIGNED_CERT",
@@ -514,6 +515,25 @@ export class GovernanceApiClient {
       throw new ConnectorClientError("INVALID_RESPONSE");
     }
     return Object.freeze(value);
+  }
+
+  async #publishRuntime(path, kind, body, credential, options) {
+    const value = await this.#logicalRequest(path, {
+      body, credential, retryNetwork: true, beforeAttempt: options.beforeAttempt,
+    });
+    if (!validateRuntimePublicationAck(value, kind, options.expectedRequestHash)) {
+      this.recordFailure();
+      throw new ConnectorClientError("INVALID_RESPONSE");
+    }
+    return Object.freeze(value);
+  }
+
+  publishInventory(body, credential, options = {}) {
+    return this.#publishRuntime("/v1/runtime/inventory", "INVENTORY", body, credential, options);
+  }
+
+  publishHeartbeat(body, credential, options = {}) {
+    return this.#publishRuntime("/v1/runtime/heartbeat", "HEARTBEAT", body, credential, options);
   }
 
   async health(credential, options = {}) {

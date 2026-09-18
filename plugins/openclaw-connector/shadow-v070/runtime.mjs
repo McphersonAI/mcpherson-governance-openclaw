@@ -199,6 +199,16 @@ export function createShadowRuntime({
         return;
       }
       const accepted = validateShadowResponse(response, normalized.request, decisionIds);
+      entry.linkage = Object.freeze({
+        decisionId: accepted.value.decision_id,
+        decisionRequestHash: normalized.request.request_hash,
+        correlationRef: normalized.request.correlation_ref,
+        runtimeInstanceId,
+        runId: normalized.correlation.run_id,
+        toolCallId: normalized.correlation.tool_call_id,
+        agentId: normalized.request.agent_id,
+        toolId: normalized.request.tool_id,
+      });
       terminal(entry, accepted.action, {
         abstract_decision: accepted.value.abstract_decision,
         reason_code: accepted.value.reason_code,
@@ -349,6 +359,19 @@ export function createShadowRuntime({
     });
   }
 
+  function linkageFor(event, ctx) {
+    const ids = correlationIdentity(event, ctx);
+    if (ids.conflict || ids.key === null) return null;
+    const entry = correlations.get(ids.key);
+    const link = entry?.linkage ?? null;
+    const toolName = typeof event?.toolName === "string" ? event.toolName : null;
+    const agentId = typeof ctx?.agentId === "string" ? ctx.agentId : null;
+    if (link === null || !["exec", "openclawexec"].includes(toolName)
+        || link.agentId !== agentId || link.runId !== ids.run_id
+        || link.toolCallId !== ids.tool_call_id) return null;
+    return link;
+  }
+
   function onGatewayStart() {
     if (startupRecorded) return;
     startupRecorded = true;
@@ -381,6 +404,7 @@ export function createShadowRuntime({
     beforeToolCall,
     onDiagnosticEvent,
     afterToolCall,
+    linkageFor,
     onGatewayStart,
     close,
     status: () => Object.freeze({
@@ -407,6 +431,7 @@ export function createInertShadowRuntime(reason = "SHADOW_RUNTIME_INIT_FAILED") 
     beforeToolCall: async () => undefined,
     onDiagnosticEvent: () => undefined,
     afterToolCall: () => undefined,
+    linkageFor: () => null,
     onGatewayStart: () => undefined,
     close: async () => undefined,
     status: () => status,

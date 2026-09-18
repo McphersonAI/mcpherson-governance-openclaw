@@ -32,18 +32,33 @@ function resourceRef(argv0) {
     : `exec:argv0-sha256:${sha256(argv0).slice(7, 31)}`;
 }
 
-function firstString(...values) {
-  return values.find((value) => typeof value === "string" && value.length > 0) ?? null;
-}
-
 export function correlationIdentity(event, ctx) {
-  const toolCallId = firstString(event?.toolCallId, ctx?.toolCallId);
-  const runId = firstString(event?.runId, ctx?.runId);
+  const choose = (left, right) => {
+    const a = typeof left === "string" && left.length > 0 ? left : null;
+    const b = typeof right === "string" && right.length > 0 ? right : null;
+    if (a !== null && b !== null && a !== b) return { value: null, conflict: true };
+    return { value: a ?? b, conflict: false };
+  };
+  const tool = choose(event?.toolCallId, ctx?.toolCallId);
+  const run = choose(event?.runId, ctx?.runId);
+  const toolCallId = tool.value;
+  const runId = run.value;
   return {
     tool_call_id: toolCallId,
     run_id: runId,
-    key: toolCallId && runId ? `${toolCallId}\n${runId}` : null,
+    conflict: tool.conflict || run.conflict,
+    key: !tool.conflict && !run.conflict && toolCallId && runId
+      ? `${toolCallId}\n${runId}` : null,
   };
+}
+
+export function executionCorrelationRef({ runtimeInstanceId, runId, toolCallId }) {
+  return sha256(stableStringify({
+    schema: "openclaw-execution-link/v1",
+    runtime_instance_id: runtimeInstanceId,
+    run_id: runId,
+    tool_call_id: toolCallId,
+  }));
 }
 
 export function classifyShadowScope({ event, ctx, agentId }) {
@@ -92,6 +107,7 @@ export function normalizeShadowRequest({
   if (!argv0) missing.push("event.params.command");
   if (!correlation.tool_call_id) missing.push("toolCallId");
   if (!correlation.run_id) missing.push("runId");
+  if (correlation.conflict) missing.push("correlation_identity_conflict");
   for (const [name, value] of Object.entries({ deploymentId, agentId, runtimeVersion, runtimeInstanceId, requestId })) {
     if (typeof value !== "string" || !SAFE_ID.test(value)) missing.push(name);
   }
@@ -115,7 +131,10 @@ export function normalizeShadowRequest({
     resource_ref: resourceRef(argv0),
     argv0,
     argument_digest: sha256(stableStringify(event.params)),
-    correlation_ref: sha256(correlation.key).slice(0, 31),
+    correlation_ref: executionCorrelationRef({
+      runtimeInstanceId, runId: correlation.run_id,
+      toolCallId: correlation.tool_call_id,
+    }),
     tool_call_id: correlation.tool_call_id,
     run_id: correlation.run_id,
     runtime_name: "openclaw",

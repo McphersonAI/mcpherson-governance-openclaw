@@ -184,7 +184,7 @@ export class ConnectorHookController {
     return undefined;
   }
 
-  async afterToolCall(event, ctx) {
+  async afterToolCall(event, ctx, decisionLinkage = null) {
     if (this.#stopped || this.#receiptMode !== "POST_HOOK") return undefined;
     // Disabling takes effect immediately, including for a call whose pre-hook
     // ran while the connector was still enabled. No completion receipt is
@@ -195,7 +195,7 @@ export class ConnectorHookController {
     const attribution = this.#attribution(normalized);
     if (attribution === null) {
       const eligibility = this.#runtimeEligibility(normalized);
-      this.#runtimeObserver?.after(normalized, eligibility);
+      this.#runtimeObserver?.after(normalized, eligibility, decisionLinkage);
       return undefined;
     }
     const summary = this.#summary(normalized, attribution.metadata);

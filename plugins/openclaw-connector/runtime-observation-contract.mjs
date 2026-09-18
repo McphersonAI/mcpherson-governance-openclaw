@@ -12,6 +12,8 @@ import { resolve } from "node:path";
 export const RUNTIME_OBSERVATION_BOOTSTRAP_SCHEMA =
   "observa-runtime-observation-bootstrap/v1";
 export const SHADOW_OBSERVATION_SCHEMA = "observa-shadow-observation/v1";
+export const LINKED_SHADOW_OBSERVATION_SCHEMA = "observa-shadow-observation/v2";
+export const EXECUTION_LINKAGE_VERSION = "openclaw-execution-link/v1";
 export const SHADOW_OBSERVATION_ACK_SCHEMA = "observa-shadow-observation-ack/v1";
 export const SHADOW_OBSERVATION_MODE = "SHADOW_METADATA_ONLY";
 export const SHADOW_OBSERVATION_DISCOVERY = "ACTUAL_SUPPORTED_OPENCLAW_TOOL_HOOK";
@@ -47,6 +49,14 @@ const REQUEST_FIELDS = Object.freeze([
   "correlation_ref",
   "request_hash",
 ]);
+const LINKED_REQUEST_FIELDS = Object.freeze([
+  "schema", "request_id", "nonce", "timestamp", "agent_id", "tool_id",
+  "runtime_tool_kind", "runtime_provenance", "observation_basis",
+  "observation_mode", "tool_outcome", "mapping_status", "authority",
+  "enforcement", "runtime_instance_id", "run_id", "tool_call_id",
+  "linkage_version", "decision_id", "decision_request_hash",
+  "correlation_ref", "request_hash",
+]);
 const ACK_FIELDS = Object.freeze([
   "schema",
   "accepted",
@@ -70,6 +80,8 @@ const BOOTSTRAP_FIELDS = Object.freeze([
 ]);
 
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,96}$/;
+const RUNTIME_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+const OPAQUE_HOST_ID = /^[^\u0000-\u001F\u007F]{1,256}$/u;
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NONCE = /^[a-f0-9]{32}$/;
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
@@ -191,12 +203,27 @@ export function correlationReference(raw, fallback) {
   return `sha256:${createHash("sha256").update(candidate).digest("hex")}`;
 }
 
+export function executionCorrelationReference({ runtimeInstanceId, runId, toolCallId }) {
+  for (const value of [runtimeInstanceId, runId, toolCallId]) {
+    if (typeof value !== "string" || !OPAQUE_HOST_ID.test(value)) {
+      fail("SHADOW_OBSERVATION_CORRELATION_INVALID");
+    }
+  }
+  return `sha256:${createHash("sha256").update(canonicalFlatObject({
+    schema: EXECUTION_LINKAGE_VERSION,
+    runtime_instance_id: runtimeInstanceId,
+    run_id: runId,
+    tool_call_id: toolCallId,
+  })).digest("hex")}`;
+}
+
 export function validateShadowObservationRequest(value) {
-  const descriptors = exactFields(value, REQUEST_FIELDS);
+  const linked = value?.schema === LINKED_SHADOW_OBSERVATION_SCHEMA;
+  const descriptors = exactFields(value, linked ? LINKED_REQUEST_FIELDS : REQUEST_FIELDS);
   if (descriptors === null) return Object.freeze({ ok: false, code: "MALFORMED" });
   const field = (name) => descriptors[name].value;
   const checks = [
-    [field("schema") === SHADOW_OBSERVATION_SCHEMA, "schema"],
+    [field("schema") === (linked ? LINKED_SHADOW_OBSERVATION_SCHEMA : SHADOW_OBSERVATION_SCHEMA), "schema"],
     [safeString(field("request_id"), UUID_V4), "request_id"],
     [safeString(field("nonce"), NONCE), "nonce"],
     [validTimestamp(field("timestamp")), "timestamp"],
@@ -214,6 +241,24 @@ export function validateShadowObservationRequest(value) {
     [safeString(field("correlation_ref"), SHA256), "correlation_ref"],
     [safeString(field("request_hash"), SHA256), "request_hash"],
   ];
+  if (linked) {
+    const hasDecision = field("decision_id") !== null || field("decision_request_hash") !== null;
+    checks.push(
+      [safeString(field("runtime_instance_id"), RUNTIME_ID), "runtime_instance_id"],
+      [safeString(field("run_id"), OPAQUE_HOST_ID), "run_id"],
+      [safeString(field("tool_call_id"), OPAQUE_HOST_ID), "tool_call_id"],
+      [field("linkage_version") === EXECUTION_LINKAGE_VERSION, "linkage_version"],
+      [hasDecision
+        ? safeString(field("decision_id"), SAFE_ID)
+          && safeString(field("decision_request_hash"), SHA256)
+        : field("decision_id") === null && field("decision_request_hash") === null,
+      "decision_proof"],
+      [field("correlation_ref") === executionCorrelationReference({
+        runtimeInstanceId: field("runtime_instance_id"), runId: field("run_id"),
+        toolCallId: field("tool_call_id"),
+      }), "correlation_ref"],
+    );
+  }
   const failed = checks.find(([ok]) => !ok);
   if (failed) return Object.freeze({ ok: false, code: "MALFORMED", field: failed[1] });
   let expected;
@@ -256,6 +301,43 @@ export function buildShadowObservationRequest(identity, providers = {}) {
     authority: SHADOW_OBSERVATION_AUTHORITY,
     enforcement: SHADOW_OBSERVATION_ENFORCEMENT,
     correlation_ref: correlationReference(identity.rawCorrelation, requestId),
+  };
+  request.request_hash = shadowObservationRequestHash(request);
+  serializeShadowObservationRequest(request);
+  return Object.freeze(request);
+}
+
+export function buildLinkedShadowObservationRequest(identity, providers = {}) {
+  // The linkage proof is closed and optional as a pair.  Missing a validated
+  // pre-execution decision produces an explicitly UNLINKED runtime result;
+  // partial proof is never serialized.
+  const decisionId = identity.decisionId ?? null;
+  const decisionRequestHash = identity.decisionRequestHash ?? null;
+  if ((decisionId === null) !== (decisionRequestHash === null)) {
+    fail("SHADOW_OBSERVATION_DECISION_PROOF_INVALID");
+  }
+  const request = {
+    schema: LINKED_SHADOW_OBSERVATION_SCHEMA,
+    request_id: (providers.randomUUID || randomUUID)(),
+    nonce: (providers.randomBytes || randomBytes)(16).toString("hex"),
+    timestamp: (providers.now || (() => new Date()))().toISOString(),
+    agent_id: identity.agentId,
+    tool_id: identity.toolId,
+    runtime_tool_kind: identity.runtimeToolKind,
+    runtime_provenance: SHADOW_OBSERVATION_PROVENANCE,
+    observation_basis: SHADOW_OBSERVATION_BASIS,
+    observation_mode: SHADOW_OBSERVATION_MODE,
+    tool_outcome: identity.toolOutcome,
+    mapping_status: SHADOW_OBSERVATION_MAPPING_STATUS,
+    authority: SHADOW_OBSERVATION_AUTHORITY,
+    enforcement: SHADOW_OBSERVATION_ENFORCEMENT,
+    runtime_instance_id: identity.runtimeInstanceId,
+    run_id: identity.runId,
+    tool_call_id: identity.toolCallId,
+    linkage_version: EXECUTION_LINKAGE_VERSION,
+    decision_id: decisionId,
+    decision_request_hash: decisionRequestHash,
+    correlation_ref: executionCorrelationReference(identity),
   };
   request.request_hash = shadowObservationRequestHash(request);
   serializeShadowObservationRequest(request);

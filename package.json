@@ -1,11 +1,12 @@
 {
   "name": "@mcphersonai/mcpherson-governance-openclaw",
-  "version": "0.7.0",
+  "version": "0.7.2",
   "description": "Observa SHADOW governance evidence plugin for OpenClaw",
   "type": "module",
   "bin": {
     "observa-pair": "./observa-pair.mjs",
-    "observa-openclaw-ctl": "./plugins/openclaw-connector/connector-ctl.mjs"
+    "observa-openclaw-ctl": "./plugins/openclaw-connector/connector-ctl.mjs",
+    "observa": "./observa.mjs"
   },
   "files": [
     "plugins/",
@@ -13,7 +14,10 @@
     "observa-pair.mjs",
     "README.md",
     "CANDIDATE-PROVENANCE.json",
-    "openclaw.plugin.json"
+    "openclaw.plugin.json",
+    "cli/",
+    "observa.mjs",
+    "observa-pair-legacy.mjs"
   ],
   "engines": {
     "node": ">=22"

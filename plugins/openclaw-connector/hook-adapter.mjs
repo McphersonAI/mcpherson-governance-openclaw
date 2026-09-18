@@ -251,6 +251,15 @@ export function buildCodeOwnedToolCatalog(registrations) {
  * configuration. Hook arguments are used solely for code-owned schema
  * validation and can never supply or override identity metadata.
  */
+// Closed tool-identity normalization shared by the pre-execution v0.7
+// evaluator and the post-execution observer: the host's exec tool and its
+// flattened "openclaw" alias are the one governed identity "openclaw:exec";
+// every other name passes through unchanged. No fuzzy, timestamp, ordering,
+// or semantic guess is permitted.
+export function canonicalObservationToolId(toolName) {
+  return toolName === "exec" || toolName === "openclawexec" ? "openclaw:exec" : toolName;
+}
+
 export function resolveRuntimeObservationEligibility(normalized, config, codeOwnedTools) {
   if (!normalized?.accepted) return refused("HOOK_NORMALIZATION_REQUIRED");
   if (config.runtimeObservation === null) return refused("RUNTIME_OBSERVATION_NOT_BOOTSTRAPPED");
@@ -265,6 +274,7 @@ export function resolveRuntimeObservationEligibility(normalized, config, codeOwn
   }
   return Object.freeze({
     accepted: true,
+    toolId: canonicalObservationToolId(normalized.toolName),
     runtimeToolKind: normalized.runtimeToolKind,
     provenance: OPENCLAW_HOOK_PROVENANCE,
     mappingStatus: "UNMAPPED",

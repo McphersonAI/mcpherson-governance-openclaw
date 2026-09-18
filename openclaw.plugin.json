@@ -14,18 +14,55 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
-      "enabled": { "type": "boolean", "default": false },
-      "apiUrl": { "type": "string", "pattern": "^https://" },
-      "deploymentId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
-      "agentId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
-      "policyVersion": { "type": "integer", "minimum": 1 },
-      "observationBudgetMs": { "type": "integer", "minimum": 0, "maximum": 500 },
-      "connectTimeoutMs": { "type": "integer", "minimum": 1, "maximum": 5000 },
-      "maxInFlight": { "type": "integer", "minimum": 1, "maximum": 4 },
-      "maxQueue": { "type": "integer", "minimum": 0, "maximum": 16 },
-      "stateDir": { "type": "string" },
-      "receiptDir": { "type": "string" },
-      "caFile": { "type": "string" },
+      "enabled": {
+        "type": "boolean",
+        "default": false
+      },
+      "apiUrl": {
+        "type": "string",
+        "pattern": "^https://"
+      },
+      "deploymentId": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+      },
+      "agentId": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._:-]{1,96}$"
+      },
+      "policyVersion": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "observationBudgetMs": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 500
+      },
+      "connectTimeoutMs": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5000
+      },
+      "maxInFlight": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 4
+      },
+      "maxQueue": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 16
+      },
+      "stateDir": {
+        "type": "string"
+      },
+      "receiptDir": {
+        "type": "string"
+      },
+      "caFile": {
+        "type": "string"
+      },
       "runtimeObservation": {
         "type": "object",
         "additionalProperties": false,
@@ -40,14 +77,31 @@
           "automaticMappingActivation"
         ],
         "properties": {
-          "schema": { "const": "observa-runtime-observation-bootstrap/v1" },
-          "mode": { "const": "SHADOW_METADATA_ONLY" },
-          "discoverySource": { "const": "ACTUAL_SUPPORTED_OPENCLAW_TOOL_HOOK" },
-          "profileBinding": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-          "mappingStatus": { "const": "UNMAPPED" },
-          "authority": { "const": "NONE" },
-          "enforcement": { "const": "OFF" },
-          "automaticMappingActivation": { "const": false }
+          "schema": {
+            "const": "observa-runtime-observation-bootstrap/v1"
+          },
+          "mode": {
+            "const": "SHADOW_METADATA_ONLY"
+          },
+          "discoverySource": {
+            "const": "ACTUAL_SUPPORTED_OPENCLAW_TOOL_HOOK"
+          },
+          "profileBinding": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "mappingStatus": {
+            "const": "UNMAPPED"
+          },
+          "authority": {
+            "const": "NONE"
+          },
+          "enforcement": {
+            "const": "OFF"
+          },
+          "automaticMappingActivation": {
+            "const": false
+          }
         }
       },
       "toolMetadata": {
@@ -55,20 +109,46 @@
         "additionalProperties": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["schemaVersion", "schemaHash", "actionClass"],
+          "required": [
+            "schemaVersion",
+            "schemaHash",
+            "actionClass"
+          ],
           "properties": {
-            "schemaVersion": { "type": "string" },
-            "schemaHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-            "actionClass": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
-            "resourceClass": { "type": "string" },
-            "recipientType": { "type": "string" },
-            "recipientCount": { "type": "integer", "minimum": 0 },
-            "attachmentIndicator": { "type": "boolean" },
-            "dataSensitivityLabel": { "type": "string" },
-            "reversibilityLabel": { "type": "string" }
+            "schemaVersion": {
+              "type": "string"
+            },
+            "schemaHash": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "actionClass": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            "resourceClass": {
+              "type": "string"
+            },
+            "recipientType": {
+              "type": "string"
+            },
+            "recipientCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "attachmentIndicator": {
+              "type": "boolean"
+            },
+            "dataSensitivityLabel": {
+              "type": "string"
+            },
+            "reversibilityLabel": {
+              "type": "string"
+            }
           }
         }
       }
     }
-  }
+  },
+  "version": "0.7.2"
 }

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   DEFAULT_MODES,
   ENFORCEABLE_REMOTE_DECISIONS,
@@ -19,6 +20,7 @@ import { GovernanceApiClient } from "./client.mjs";
 import { ObservationPipeline } from "./pipeline.mjs";
 import { ConnectorHookController } from "./hook.mjs";
 import { RuntimeShadowObserver } from "./runtime-observer.mjs";
+import { RuntimePublisher } from "./runtime-publisher.mjs";
 import {
   makeConnectionTool,
   makeConnectionToolRegistration,
@@ -137,6 +139,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
         absoluteTimeoutMs: options.absoluteTimeoutMs,
         random: options.random,
       });
+      const runtimeInstanceId = options.runtimeInstanceId || randomUUID();
       const pipeline = options.pipeline || new ObservationPipeline({
         config,
         client,
@@ -150,15 +153,34 @@ function buildGovernanceConnector(options, capabilityProfile) {
         config,
         client,
         receiptWriter,
+        runtimeInstanceId,
         credentialProvider: options.credentialProvider,
         controlInspector: options.controlInspector,
       });
+      let runtimePublisher = options.runtimePublisher;
+      if (!runtimePublisher) {
+        try {
+          runtimePublisher = new RuntimePublisher({
+            client, hostConfig: api.config, runtimeInstanceId,
+            credentialProvider: options.credentialProvider,
+          });
+        } catch (error) {
+          const reason = String(error?.message ?? "RUNTIME_ROSTER_INVALID");
+          runtimePublisher = Object.freeze({
+            start: () => false, stop: async () => undefined,
+            status: () => Object.freeze({ started: false, stopped: true,
+              reason, authority: "NONE", enforcement: "OFF", active: false }),
+          });
+          api.logger?.error?.(`[observa-runtime] inventory publication refused: ${reason}`);
+        }
+      }
       let shadowRuntime = options.shadowRuntime;
       if (!shadowRuntime) {
         try {
           shadowRuntime = createShadowRuntime({
             config,
             runtimeVersion: compatibility.hostVersion,
+            runtimeInstanceId,
             agentRuntime: options.agentRuntime ?? api?.runtime?.agentRuntime ?? api?.agentRuntime ?? null,
             transport: options.shadowTransport,
             evidenceWriter: options.shadowEvidenceWriter,
@@ -214,6 +236,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
         pipeline.stopAdmission();
         terminalPromise = (async () => {
           try {
+            await runtimePublisher.stop();
             await controller.shutdown(5_000);
             if (lifecycleEvent !== null) {
               receiptWriter.write(makeLifecycleReceipt({ event: lifecycleEvent, receiptMode }));
@@ -241,6 +264,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
         // operational disable, which governs tool observation.
         ["gateway_start", async () => {
           shadowRuntime.onGatewayStart();
+          runtimePublisher.start(config);
           receiptWriter.write(makeLifecycleReceipt({ event: "gateway_start", receiptMode }));
         }],
         ["gateway_stop", async () => {
@@ -251,7 +275,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
         hookRegistrations.splice(1, 0, [
           postHookName, (event, ctx) => {
             shadowRuntime.afterToolCall(event, ctx);
-            return controller.afterToolCall(event, ctx);
+            return controller.afterToolCall(event, ctx, shadowRuntime.linkageFor(event, ctx));
           },
         ]);
       }
@@ -267,6 +291,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
         controller,
         pipeline,
         runtimeObserver,
+        runtimePublisher,
         shadowRuntime,
         client,
         receiptWriter,
@@ -278,6 +303,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
           activated: true,
           compatibility,
           shadow: shadowRuntime.status(),
+          runtimePublication: runtimePublisher.status(),
           lifecycle: Object.freeze({
             terminal: terminalPromise !== null,
             reason: terminalReason,
@@ -351,5 +377,8 @@ export * from "./pipeline.mjs";
 export * from "./receipts.mjs";
 export * from "./runtime-observation-contract.mjs";
 export * from "./runtime-observer.mjs";
+export * from "./runtime-generation.mjs";
+export * from "./runtime-publication-contract.mjs";
+export * from "./runtime-publisher.mjs";
 export * from "./shadow-v070/index.mjs";
 export * from "./verify.mjs";
