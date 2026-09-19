@@ -1,15 +1,15 @@
 {
   "schema": "observa-unified-local-cli-candidate/v1",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "authorized_base": {
-    "head": "d86d4fc2df14aa822fb12ca21f65972aee47ef97",
-    "tree": "288fd727e66aa0be8d7295871abf4ca1a96870f7"
+    "head": "d0fe213c6b0c50896645a9a7ad7cc162bd758d81",
+    "tree": "da91a6cdb7156a69abd0ac98bb99f0a40ebdcfe4"
   },
   "immutable_runtime_input": {
     "version": "0.7.1-beta.1",
     "sha256": "bca0b9715a0e537bc39b0939610c047799f7450a5ac767b41a09a2bd2c8c6fb2"
   },
-  "scope": "Unified local CLI with verified-email access requests; existing lifecycle and pairing dispatch",
+  "scope": "Hosted outbound control repair: runtime roster and heartbeat publication now obey the same durable disable/killswitch/lock controls as observation, and the OpenClaw plugin entry declines prompt-injection and conversation-access grants it does not use",
   "posture": {
     "mode": "SHADOW",
     "authority": "NONE",

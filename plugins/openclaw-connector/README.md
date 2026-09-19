@@ -1,4 +1,4 @@
-# Observa OpenClaw plugin v0.7.2
+# Observa OpenClaw plugin v0.7.3
 
 `@mcphersonai/mcpherson-governance-openclaw` records what Observa would have decided at OpenClaw's native synchronous `before_tool_call` seam. Its release posture is fixed in source:
 
@@ -12,6 +12,49 @@
 The supported host floor is OpenClaw `2026.8.2` with Node.js 22 or newer. OAuth-mode OpenAI models can route through another harness unless the selected model is explicitly bound to `agentRuntime.id = "openclaw"`. The plugin reports the observed compatibility state when the host exposes it and never edits model configuration. A Codex runtime or Codex plugin is neither shipped nor required.
 
 The v0.7 SHADOW bridge authenticates to `POST /v1/openclaw/shadow/evaluate` with the installation credential already used by the 0.6 connector. Requests contain bounded identity and classification metadata, the executable name, a correlation reference, and a digest of tool arguments. They do not contain the command body, prompt, message body, tool result, exception body, credential, or approval token. Responses must echo the exact installation, principal, request, and tool binding and must declare `authority=NONE`, `enforcement=OFF`, and `active=false`.
+
+## What v0.7.3 changes
+
+v0.7.3 is a security patch on v0.7.2. It changes two things and nothing else.
+
+**Runtime roster and heartbeat now obey the outbound controls.** Up to and
+including v0.7.2, `gateway_start` published the runtime roster and then a 60s
+liveness heartbeat using the paired credential without consulting `disable`, the
+kill switch or the lock — the only Hosted paths in the package that did not. A
+paired installation therefore kept talking to its configured endpoint after an
+operator had stopped it. Those two publications now pass through the same
+outbound-authority seam as observation, checked at four points per cycle: at the
+top of every run, before the runtime generation is allocated, before the
+credential is read, and before every transport attempt and retry. A refused
+install performs zero Hosted requests, reads no credential and leaves no
+generation claim. An unreadable or malformed control file fails closed. Clearing
+the control resumes publication without a gateway restart.
+
+**The plugin entry now declines capabilities it does not use.** OpenClaw grants
+`allowPromptInjection` to every non-bundled plugin whose entry does not set it,
+and the manifest has no field to decline it, so v0.7.2's managed install showed
+`Prompt injection: allowed`. This connector builds no prompt: it registers only
+`before_tool_call`, `after_tool_call`, `gateway_start` and `gateway_stop`, and
+never calls `api.enqueueNextTurnInjection` or any session/context API. `pair` and
+`enable` now write `hooks.allowPromptInjection: false` and
+`hooks.allowConversationAccess: false` into this plugin's `openclaw.json` entry,
+so the capability review reports both denied. An explicit operator value is
+preserved. A brand-new install has no entry yet and shows the host default until
+`pair` or `enable` writes the policy.
+
+Observation semantics, evidence, decision and execution linking, receipt
+vocabulary, pairing, rollback, credential storage and the SHADOW posture are
+unchanged.
+
+## Upgrade from 0.7.2
+
+Install the exact v0.7.3 package over v0.7.2 and keep the existing plugin entry,
+connector state directory, endpoint, deployment ID, agent ID and
+`deployment-credential` file. No re-pairing, credential rotation or config
+migration is required, and no receipt or evidence file is rewritten. Run
+`observa enable` (or re-pair) once after upgrading if you want the least-privilege
+hook policy written into an entry that predates it; publication control applies
+immediately either way, because it lives in the plugin code and not in config.
 
 ## Upgrade from 0.6.3-beta.6
 
@@ -35,7 +78,11 @@ An existing installation does not need this command for a package upgrade.
 
 The existing 0.6 keys remain supported: `enabled`, `apiUrl`, `deploymentId`, `agentId`, `policyVersion`, observation budgets, state paths, `toolMetadata`, and the profile-bound `runtimeObservation` bootstrap. Mode, authority, enforcement, ACTIVE, approval authority, and operator-token keys are rejected. The default state root remains inside the active OpenClaw profile.
 
-The operator CLI exposes status, enable/disable, observation kill/lock controls, credential lifecycle recovery, unpair, and uninstall. Kill and lock controls stop remote observation and record an observational state; they never produce a tool hook result. No local blocking canary ships in v0.7.
+The operator CLI exposes status, enable/disable, kill/lock controls, credential lifecycle recovery, unpair, and uninstall. As of v0.7.3, disable, kill and lock stop **every** Hosted path the plugin runtime owns — observation, SHADOW evaluation, runtime roster and liveness heartbeat — with precedence disable > kill switch > system lock. A refused path reads no credential and opens no socket. These controls record an observational state and never produce a tool hook result, so ordinary OpenClaw tool execution is unaffected whether they are set or clear. No local blocking canary ships in v0.7.
+
+## Runtime roster and heartbeat
+
+On `gateway_start` an enabled installation publishes `POST /v1/runtime/inventory` once (runtime instance id, runtime generation, the agent ids OpenClaw's own configured roster reports, and a roster revision hash) and then `POST /v1/runtime/heartbeat` every 60 seconds (runtime instance id, generation, sequence, cadence). Neither carries tool identities, capabilities, activity, prompts, results or any business claim: they say this runtime process is alive and which agent ids the host configures. Both are credential-bearing, so both obey the controls above. `mcpherson_connection_test` is a local marker-only probe: it accepts no arguments, makes no network call, uses no credential and returns a fixed string.
 
 ## Evidence
 

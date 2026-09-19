@@ -163,6 +163,9 @@ function buildGovernanceConnector(options, capabilityProfile) {
           runtimePublisher = new RuntimePublisher({
             client, hostConfig: api.config, runtimeInstanceId,
             credentialProvider: options.credentialProvider,
+            // Roster and heartbeat are credential-bearing Hosted traffic, so
+            // they take the same durable outbound controls as observation.
+            controlInspector: options.controlInspector,
           });
         } catch (error) {
           const reason = String(error?.message ?? "RUNTIME_ROSTER_INVALID");
@@ -259,9 +262,12 @@ function buildGovernanceConnector(options, capabilityProfile) {
           await shadowRuntime.beforeToolCall(event, ctx);
           return controller.beforeToolCall(event, ctx);
         }, { priority: 100, timeoutMs: SHADOW_HOOK_TIMEOUT_MS }],
-        // Gateway lifecycle records that the connector was loaded. They are
-        // not ordinary observation receipts and are unaffected by the
-        // operational disable, which governs tool observation.
+        // Gateway lifecycle records that the connector was loaded. The LOCAL
+        // receipt is not an observation receipt and is unaffected by the
+        // operational disable. Roster/heartbeat publication is not local: it
+        // is credential-bearing Hosted traffic, so `start` only arms the
+        // cadence loop and the publisher's own outbound gate decides, per run,
+        // whether anything may leave this host.
         ["gateway_start", async () => {
           shadowRuntime.onGatewayStart();
           runtimePublisher.start(config);

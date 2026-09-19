@@ -1,6 +1,6 @@
 {
   "name": "mcpherson-governance-connector",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Internal Observa SHADOW plugin entrypoint for OpenClaw",
   "type": "module",
   "main": "plugin.mjs",

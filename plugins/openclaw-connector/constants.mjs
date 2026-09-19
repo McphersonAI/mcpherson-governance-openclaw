@@ -1,6 +1,6 @@
 export const PLUGIN_ID = "mcpherson-governance-connector";
 export const PLUGIN_NAME = "McPherson Governance Connector";
-export const PLUGIN_VERSION = "0.7.2";
+export const PLUGIN_VERSION = "0.7.3";
 
 // Source-owned runtime compatibility floor. It is enforced by the connector at
 // activation time and is deliberately not delegated to package-manager or

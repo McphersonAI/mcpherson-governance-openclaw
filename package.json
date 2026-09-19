@@ -1,6 +1,6 @@
 {
   "name": "@mcphersonai/mcpherson-governance-openclaw",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Observa SHADOW governance evidence plugin for OpenClaw",
   "type": "module",
   "bin": {
@@ -30,7 +30,9 @@
       "optional": true
     }
   },
-  "scripts": {},
+  "scripts": {
+    "test": "node --test 'test/**/*.test.mjs'"
+  },
   "openclaw": {
     "extensions": [
       "./plugins/openclaw-connector/plugin.mjs"

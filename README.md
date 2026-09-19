@@ -1,4 +1,4 @@
-# Observa local CLI — 0.7.2
+# Observa local CLI — 0.7.3
 
 Observa provides governance visibility for AI agents. This OpenClaw
 package adds one primary executable, `observa`. It adds no execution authority.
@@ -65,6 +65,10 @@ installation credential is issued by an access request. Public local use remains
 available without approval. Access requests need a Hosted service with
 admission routing, durable storage and email delivery configured.
 This package includes the root `openclaw.plugin.json` required for managed installation.
+Its plugin manifest id is `mcpherson-governance-connector` and the npm package is
+`@mcphersonai/mcpherson-governance-openclaw`. OpenClaw notes the difference and uses
+the manifest id as the config key; that is intentional and stable. Installed profiles
+key `plugins.entries.mcpherson-governance-connector` on it, so the id is not renamed.
 Signed component manifests are consumed by the Local Node installer. This
 OpenClaw package uses managed plugin installation and credential pairing.
 
@@ -117,8 +121,24 @@ bounded local CLI, not a second OpenClaw configuration engine.
 `enable` enables this plugin's entry and connector configuration when necessary,
 preserves other config, and clears its durable disable flag. A gateway reload may
 be required after a configuration change; the command says so. It never opens
-global plugin gates or enables other plugins. `disable`, killswitch and lock stop
-observation/network delivery only. Ordinary tools continue unchanged.
+global plugin gates or enables other plugins.
+
+`disable`, `killswitch on` and `lock on` each stop **all** Observa Hosted outbound
+traffic from the plugin runtime: observations, SHADOW evaluations, the startup
+runtime roster, and the periodic liveness heartbeat. While any of them is active
+the plugin makes zero Hosted requests and never reads the paired credential, on a
+fresh gateway start as well as mid-session, and a retry armed before the control
+was set still refuses when it fires. Precedence is disable, then kill switch, then
+lock; an unreadable or malformed control file fails closed. Clearing the control
+resumes ordinary publication without a gateway restart. Ordinary OpenClaw tools
+continue unchanged throughout — these controls stop Observa, never your agents.
+
+Two Hosted paths are deliberately outside that stop, because each is an explicit
+operator command rather than background traffic: `pair` (which redeems a pairing
+code and has no credential to obey a control with yet) and `unpair` (which sets
+the durable disable flag first, then confirms server-side revocation before
+deleting the local credential). `request-access`/`request-status` use their own
+per-request owner key and never touch the installation credential.
 
 Pair, authenticated rotation/recovery and unpair reuse the inherited lifecycle
 implementation. Rotation still requires the existing trusted server operator;
@@ -149,5 +169,40 @@ command bodies, tool result bodies, environment values, pairing codes, approval
 tokens or credential contents are emitted by the inspection views. Unsafe file
 ownership/permissions, symlinks, hardlinks and foreign paths fail safely. The
 owner-controlled local evidence files are not a remotely authenticated ledger.
+
+## What leaves this machine
+
+A paired, enabled installation sends exactly four kinds of request, all to the
+endpoint bound at pairing, all over verified TLS, all bearing the installation
+credential:
+
+| Request | When | Contents |
+| --- | --- | --- |
+| `POST /v1/runtime/inventory` | once per gateway start | runtime instance id, generation, the configured agent id list, roster revision |
+| `POST /v1/runtime/heartbeat` | every 60s | runtime instance id, generation, sequence, cadence |
+| `POST /v1/observations`, `POST /v1/decisions` | per observed tool call | bounded identity and classification metadata |
+| `POST /v1/openclaw/shadow/evaluate` | per governed tool call | bounded metadata, executable name, correlation reference, digest of tool arguments |
+
+Roster and heartbeat carry no tool identities, no capabilities, no activity and
+no business claim; they say this runtime is alive and which agent ids the host
+configures. No request ever carries a prompt, message body, command body, tool
+result, exception body, environment value, pairing code, approval token or
+credential content. All five paths obey `disable`, the kill switch and the lock.
+
+## Capabilities this plugin asks for
+
+The plugin registers four OpenClaw hooks — `before_tool_call`, `after_tool_call`,
+`gateway_start`, `gateway_stop` — and one tool, `mcpherson_connection_test`, which
+takes no arguments, makes no network call and returns a fixed marker.
+
+It builds no prompt and mutates no conversation, so `pair` and `enable` write
+`hooks.allowPromptInjection: false` and `hooks.allowConversationAccess: false`
+into this plugin's own `openclaw.json` entry, and OpenClaw's capability review
+then reports both as denied. An explicit value you have already set is preserved.
+Because OpenClaw grants prompt injection by default to any plugin whose entry is
+silent, and because a first-time install has no entry yet, the approval screen on
+the very first `openclaw plugins install` shows the host default until `pair` or
+`enable` writes the policy; to see it denied at first install, add the entry with
+those two keys before installing.
 
 SHADOW ONLY / AUTHORITY NONE / ENFORCEMENT OFF / ACTIVE OFF

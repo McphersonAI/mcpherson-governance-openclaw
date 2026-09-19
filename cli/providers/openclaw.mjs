@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { agentId, assertPath, inside, readBounded, readJson, refuse, timestamp, toolId } from '../safe-local.mjs';
+import { withLeastPrivilegeHookPolicy } from '../../pairing/openclaw-profile-pairing.mjs';
 
 const PLUGIN = 'mcpherson-governance-connector';
 const ACTIONS = Object.freeze({ SHADOW_WOULD_ALLOW: 'WOULD_ALLOW', SHADOW_WOULD_DENY: 'WOULD_DENY', SHADOW_WOULD_REQUIRE_APPROVAL: 'WOULD_REQUIRE_APPROVAL', ABSTAIN: 'ABSTAIN', INDETERMINATE: 'INDETERMINATE', ERROR: 'ERROR' });
@@ -174,8 +175,16 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
         assertPath(root, configPath);
         const current = readJson(root, configPath, { privateFile: false });
         if (JSON.stringify(current) !== JSON.stringify(host)) refuse('LOCAL_FILE_CHANGED');
+        // Enabling re-asserts this plugin's least-privilege hook policy so the
+        // capability review keeps reporting prompt injection and conversation
+        // access as denied. An explicit operator value is never overwritten.
         const next = { ...host, plugins: { ...host.plugins, entries: { ...host.plugins.entries,
-          [PLUGIN]: { ...entry, enabled: true, config: { ...source, enabled: true } } } } };
+          [PLUGIN]: {
+            ...entry,
+            enabled: true,
+            hooks: withLeastPrivilegeHookPolicy(entry),
+            config: { ...source, enabled: true },
+          } } } };
         const { atomicWriteSecureFile } = await load('secure-files');
         atomicWriteSecureFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
         configUpdated = true;
