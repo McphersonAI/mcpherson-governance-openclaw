@@ -5,6 +5,7 @@ import {
   buildRuntimeHeartbeatRequest, buildRuntimeInventoryRequest,
   canonicalRuntimePublicationJson, rosterRevision, serializeRuntimePublication,
 } from "./runtime-publication-contract.mjs";
+import { publicationFailureCode } from "./runtime-publication-status.mjs";
 
 export const RUNTIME_HEARTBEAT_CADENCE_SECONDS = 60;
 const AGENT_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
@@ -97,6 +98,7 @@ export class RuntimePublisher {
   #setTimeout;
   #clearTimeout;
   #timer = null;
+  #now;
   #active = null;
   // Re-entrancy is tracked by this synchronous flag rather than by `#active`.
   // A refused run returns without ever awaiting, so its `finally` executes
@@ -113,6 +115,13 @@ export class RuntimePublisher {
   #sequence = 0;
   #lastRefusal = null;
   #totals = { inventoryAccepted: 0, heartbeatsAccepted: 0, failures: 0, refusals: 0 };
+  // Local journal of accepted publications (see runtime-publication-status.mjs).
+  // Written only after a run the controls allowed, so a refused install stays
+  // free of new local state exactly as before.
+  #statusJournal;
+  #journalConfig = null;
+  #inventoryAcceptedAt = null;
+  #heartbeatAcceptedAt = null;
 
   constructor({
     client, hostConfig, runtimeInstanceId,
@@ -122,8 +131,11 @@ export class RuntimePublisher {
     cadenceSeconds = RUNTIME_HEARTBEAT_CADENCE_SECONDS,
     setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout,
     generationAllocator = (config) => allocateRuntimeGeneration(config?.stateDir),
+    statusJournal = null, now = () => new Date(),
   }) {
     this.#generationAllocator = generationAllocator;
+    this.#statusJournal = typeof statusJournal === "function" ? statusJournal : null;
+    this.#now = now;
     if (!Number.isSafeInteger(cadenceSeconds) || cadenceSeconds < 10 || cadenceSeconds > 300) {
       throw new TypeError("RUNTIME_HEARTBEAT_CADENCE_INVALID");
     }
@@ -183,6 +195,8 @@ export class RuntimePublisher {
       );
       this.#inventoryAccepted = true;
       this.#totals.inventoryAccepted += 1;
+      this.#inventoryAcceptedAt = this.#now().toISOString();
+      this.#journal("INVENTORY_ACCEPTED");
     } finally { body.fill(0); }
   }
 
@@ -202,7 +216,30 @@ export class RuntimePublisher {
         ),
       );
       this.#totals.heartbeatsAccepted += 1;
+      this.#heartbeatAcceptedAt = this.#now().toISOString();
+      this.#journal("HEARTBEAT_ACCEPTED");
     } finally { body.fill(0); }
+  }
+
+  // Best effort and never able to affect publication: a journal failure only
+  // means hosted-health reports the heartbeat as unavailable.
+  #journal(outcome, failure = null) {
+    if (this.#statusJournal === null || this.#journalConfig === null || this.#runtimeGeneration === null) return;
+    try {
+      this.#statusJournal(this.#journalConfig.stateDir, {
+        runtime_instance_id: this.#runtimeInstanceId,
+        runtime_generation: this.#runtimeGeneration,
+        roster_revision: this.#rosterRevision,
+        agents: this.#agents.map((agent) => agent.agent_id),
+        cadence_seconds: this.#cadenceSeconds,
+        inventory_accepted_at: this.#inventoryAcceptedAt,
+        heartbeat_accepted_at: this.#heartbeatAcceptedAt,
+        heartbeats_accepted: this.#totals.heartbeatsAccepted,
+        last_outcome: outcome,
+        last_outcome_at: this.#now().toISOString(),
+        last_failure: failure,
+      });
+    } catch { /* journal is advisory */ }
   }
 
   #schedule(config) {
@@ -252,6 +289,7 @@ export class RuntimePublisher {
       try {
         if (this.#refusedThisRun(config)) return;
         if (!this.#ensureGeneration(config)) return;
+        this.#journalConfig = config;
         if (!this.#inventoryAccepted) await this.#publishInventory(config);
         if (this.#inventoryAccepted && !this.#stopped) await this.#publishHeartbeat(config);
       } catch (error) {
@@ -272,6 +310,7 @@ export class RuntimePublisher {
           this.#superseded = true;
           this.#stopped = true;
         }
+        this.#journal(this.#superseded ? "SUPERSEDED" : "FAILED", publicationFailureCode(error));
       } finally {
         this.#running = false;
         this.#schedule(config);
@@ -300,6 +339,7 @@ export class RuntimePublisher {
       this.#timer = null;
     }
     if (this.#active !== null) await Promise.allSettled([this.#active]);
+    this.#journal("STOPPED");
     return this.status();
   }
 

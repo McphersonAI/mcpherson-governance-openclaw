@@ -6,13 +6,13 @@ import { parseArgs } from 'node:util';
 import { createOpenClawProvider } from './providers/openclaw.mjs';
 import { agentId, readBounded, refuse } from './safe-local.mjs';
 
-export const CLI_VERSION = '0.7.3';
+export const CLI_VERSION = '0.7.4';
 export const POSTURE = Object.freeze({ mode: 'SHADOW', authority: 'NONE', enforcement: 'OFF', active: false });
 // A provider supplies a projected metadata snapshot and bounded control/pair
 // dispatch. No runtime registry, dynamic plugin loading or tool execution API.
 export const RUNTIME_PROVIDERS = Object.freeze({ openclaw: createOpenClawProvider });
 const HELP = {
-  status: 'status\nShow selected-profile configuration, pairing, controls and local evidence health.\nEnabled is configuration intent; live gateway/Hosted connection are not probed.',
+  status: 'status\nShow selected-profile configuration, pairing, controls and local evidence health.\nEnabled is configuration intent; live gateway/Hosted connection are not probed.\nHeartbeat is the gateway\'s last locally recorded Hosted acceptance, when present.\nTo actively check Hosted, run observa hosted-health.',
   agents: 'agents\nList configured agents and agents evidenced locally. ACTIVE means a completion\nin the last 5 minutes, not ACTIVE governance. Capabilities require completion receipts.',
   agent: 'agent <id>\nShow configuration, observed capabilities and recent local activity/decisions.',
   activity: 'activity [--limit <1-100>]\nRecent completion receipts only. Heartbeat, prompts, commands and tool bodies are excluded.',
@@ -24,37 +24,46 @@ const HELP = {
   lock: 'lock <on|off>\nToggle the observation/network lock. Tools continue normally.',
   credential: 'credential <rotate|recover> --new-credential-file <owner-only-file>\nrotate also requires --rotation <id>. Optional: --rotation-operator <trusted-path>.\nUses existing authenticated lifecycle and recovery; requires the existing trusted\nserver operator. Credential values are never accepted or printed.',
   unpair: 'unpair\nDisable observation, revoke the paired Hosted credential and remove it only\nafter server confirmation. On failure the existing recovery journal is retained.',
-  uninstall: 'uninstall\nRun the existing OpenClaw plugin uninstaller in the selected profile.\nReceipts are preserved; this does not revoke Hosted credentials (use unpair first).',
+  uninstall: 'uninstall [--yes]\nRun the existing OpenClaw plugin uninstaller in the selected profile, then remove\nthe observa command this plugin created (never any other observa command).\nIn a terminal, OpenClaw asks you to confirm; --yes confirms without asking.\nReceipts are preserved; this does not revoke Hosted credentials (use unpair first).',
   'request-access': ACCESS_HELP['request-access'],
   'request-status': ACCESS_HELP['request-status'],
+  'hosted-health': 'hosted-health\nActively check the paired Hosted connection: reachability, credential acceptance\nand installation binding (GET /v1/health, GET /v1/credentials/identity), plus the\ngateway\'s recorded heartbeat and roster freshness. Unlike status, this contacts\nHosted. It obeys disable, killswitch and lock, never prints credentials, and writes\nno activity, decision or heartbeat. Unpaired: reports NOT_PAIRED and the next steps.\nExit status: 0 HEALTHY, 2 checked but not healthy, 1 could not run.',
+  identify: 'identify\nIdentify the agents this OpenClaw profile configures. When paired, confirm that\nroster on Hosted through the existing runtime roster contract, under the running\ngateway\'s own runtime identity so its heartbeat is never superseded. A changed\nroster is published by the gateway on restart. Obeys disable, killswitch and lock.\nIdentity is not activity: no receipt, activity, decision or heartbeat is written,\nand no agent becomes ACTIVE. Exit status: 0 identified (and confirmed when paired),\n2 Hosted confirmation not completed, 1 could not run.',
 };
 const ROOT_HELP = `Observa — governance visibility for AI agents
 
 Usage:
-  observa <command>
+  observa <command> [options]
+  observa <command> --help
 
-Inspect:
-  status
-  agents
-  agent <id>
-  activity
-  decisions
+Local (offline; reads this machine only, never contacts Hosted):
+  status                  Configuration, pairing, controls and local evidence health
+  agents                  Configured and locally evidenced agents
+  agent <id>              One agent: configuration, activity and decisions
+  activity                Recent completed tool activity (receipts)
+  decisions               Local SHADOW counterfactual decisions (WOULD_*)
 
-Hosted:
-  pair
-  request-access
-  request-status
+Hosted access (Hosted dashboard; start here):
+  request-access          1. Request Hosted beta access (verified email)
+  request-status          2. Check your access request
+  pair                    3. Pair this OpenClaw profile with Hosted Observa
+
+Hosted health / refresh (after pairing; contacts Hosted):
+  hosted-health           Check Hosted connectivity, binding and heartbeat
+  identify                Identify agents locally; confirm the Hosted roster when paired
 
 Controls:
-  enable
-  disable
-  killswitch <on|off>
-  lock <on|off>
+  enable                  Enable this plugin's observation
+  disable                 Stop observation and all Hosted traffic
+  killswitch <on|off>     Observation/network kill switch
+  lock <on|off>           Observation/network lock
 
 Lifecycle:
   credential <rotate|recover>
   unpair
   uninstall
+
+Hosted path: request-access -> request-status -> pair -> hosted-health -> identify
 
 Options:
   --help, -h                  Command help
@@ -66,9 +75,12 @@ Options:
   --limit <1-100>            Activity/decisions limit (default 20)
 
 Environment: OPENCLAW_STATE_DIR selects the runtime state root. Conflicting
-profile/config selectors are refused. Reads never contact Hosted or start a gateway.
+profile/config selectors are refused. Local commands never contact Hosted or
+start a gateway; only request-*, pair, hosted-health, identify, credential and
+unpair contact Hosted, and only when you run them.
 SHADOW ONLY / AUTHORITY NONE / ENFORCEMENT OFF / ACTIVE OFF`;
 const UPGRADE = 'Local Observa view. Hosted adds persistent history, AutoMap, Governance Analysis and reports.\nRequest Hosted beta access with observa request-access.';
+const NO_ACTIVITY = 'Identity and health are not activity: no receipt, activity, decision or heartbeat was written.';
 const COMMON = ['help', 'json', 'runtime', 'profile', 'profile-home', 'state-dir'];
 const FLAGS = {
   help: { type: 'boolean', short: 'h' }, version: { type: 'boolean' }, json: { type: 'boolean' },
@@ -113,6 +125,7 @@ const ERRORS = {
   UNSAFE_STATE_PATH: 'Unsafe local path (ownership, permissions, link or profile boundary).',
   UNSAFE_LOCAL_FILE: 'Local file is not a regular owner-controlled file with safe permissions.',
   PAIR_JSON_UNSUPPORTED: 'Interactive pairing does not support --json. Use observa pair --help.',
+  UNINSTALL_CONFIRMATION_REQUIRED: 'OpenClaw asks to confirm plugin removal. Run observa uninstall in a terminal, or pass --yes to confirm.',
 };
 function age(at, now) {
   if (!at) return 'never';
@@ -129,7 +142,7 @@ function renderAgents(agents, now) {
 }
 function renderActivity(rows) { return rows.length ? table(rows, [['at', 'TIME'], ['agent_id', 'AGENT'], ['capability', 'CAPABILITY'], ['outcome', 'OUTCOME']]) : 'No meaningful local activity evidence.'; }
 function renderDecisions(rows) { return rows.length ? table(rows, [['at', 'TIME'], ['agent_id', 'AGENT'], ['capability', 'CAPABILITY'], ['decision', 'COUNTERFACTUAL DECISION']]) : 'No local decision evidence. Activity is not a governance decision.'; }
-function renderStatus(s) {
+function renderStatus(s, now) {
   const yes = v => v ? 'YES' : 'NO';
   return `Observa ${CLI_VERSION}
 Runtime                 ${s.runtime.type} ${s.runtime.version ?? '(version unknown)'}${s.runtime.version ? ' (last local evidence)' : ''}
@@ -143,9 +156,52 @@ Killswitch              ${s.controls.killswitch === 'absent' ? 'OFF' : 'ON'}
 Lock                    ${s.controls.lock === 'absent' ? 'OFF' : 'ON'}
 Credential fingerprint  ${s.pairing.fingerprint ?? 'unavailable'}
 Configured agents       ${s.configured_agent_count ?? 'unknown'}
-Heartbeat               NOT_AVAILABLE (no local heartbeat journal)
+Heartbeat               ${s.heartbeat === 'NOT_AVAILABLE' ? 'NOT_AVAILABLE (no gateway publication journal)' : `${s.heartbeat} (last accepted ${age(s.heartbeat_accepted_at, now)}; gateway journal, not probed)`}
 Evidence health         ${s.evidence.health}${s.evidence.truncated ? ' (bounded tail)' : ''}
-Hosted connection       ${s.hosted_connection}`;
+Hosted connection       ${s.hosted_connection}${s.pairing.paired ? ' (observa hosted-health probes it)' : ''}
+CLI entrypoint          ${renderEntrypoint(s.cli_entrypoint)}`;
+}
+function renderEntrypoint(e) {
+  if (!e) return 'unknown';
+  const onPath = e.path_resolution === 'THIS_PLUGIN' ? `observa -> this plugin (${e.path})`
+    : e.path_resolution === 'ABSENT' ? 'observa not on PATH' : `observa on PATH is ${e.path_resolution} (${e.path})`;
+  return `${onPath}; gateway record ${e.recorded_state}${e.recorded_path && e.recorded_path !== e.path ? ` (${e.recorded_path})` : ''}${e.remediation && e.path_resolution !== 'THIS_PLUGIN' ? `\n                        ${e.remediation}` : ''}`;
+}
+function renderHostedHealth(h, now) {
+  const yes = v => v ? 'YES' : 'NO';
+  const p = h.publication;
+  const heartbeat = !h.paired && p.heartbeat === 'NOT_AVAILABLE' ? 'NOT_APPLICABLE (unpaired; nothing is published)'
+    : p.heartbeat === 'NOT_AVAILABLE' ? 'NOT_AVAILABLE (no gateway publication journal; restart the gateway on this version)'
+      : `${p.heartbeat}${p.heartbeat_accepted_at ? ` (accepted ${age(p.heartbeat_accepted_at, now)}; cadence ${p.heartbeat_cadence_seconds}s; gateway journal)` : ''}`;
+  const roster = !h.paired && p.roster === 'NOT_AVAILABLE' ? 'NOT_APPLICABLE (unpaired)'
+    : p.roster === 'NOT_AVAILABLE' ? 'NOT_AVAILABLE' : `${p.roster}${p.roster_published_at ? ` (${p.roster_agents} agents, published ${age(p.roster_published_at, now)})` : ''}`;
+  return `Observa hosted health: ${h.state}
+Paired                  ${yes(h.paired)}
+Credential              ${h.credential}${h.credential_fingerprint ? ` (fingerprint ${h.credential_fingerprint})` : ''}
+Hosted endpoint         ${h.endpoint ?? 'none (unpaired)'}
+Hosted reachable        ${h.reachable}
+Installation binding    ${h.binding}${h.deployment_id ? ` (deployment ${h.deployment_id})` : ''}
+Workspace binding       ${h.workspace_binding} (resolved by Hosted from the credential; not disclosed)
+Last Hosted success     ${h.last_success_at ? `${h.last_success_at}${h.last_success_at === h.probed_at ? ' (this check)' : ' (gateway journal)'}` : 'none recorded'}
+Runtime heartbeat       ${heartbeat}
+Roster                  ${roster}
+Connector               configured ${yes(h.connector_configured)}, enabled ${yes(h.connector_enabled)}
+Refusal                 ${h.refusal ?? 'none'}
+Posture                 SHADOW ONLY / AUTHORITY NONE / ENFORCEMENT OFF / ACTIVE OFF
+${NO_ACTIVITY}${h.next.length ? `\n\nNext:\n${h.next.map(n => `  ${n}`).join('\n')}` : ''}`;
+}
+function renderIdentify(r) {
+  const local = r.local.state === 'IDENTIFIED'
+    ? `Configured agents (${r.local.agents.length}, OpenClaw configured roster):\n${r.local.agents.map(a => `  ${a}`).join('\n')}\nRoster revision         ${r.local.roster_revision}`
+    : `Configured agents       ${r.local.state}`;
+  const detail = r.hosted.state === 'ROSTER_CONFIRMED'
+    ? ` (Hosted's current roster for this installation matches; runtime ${r.hosted.runtime_instance_id}, generation ${r.hosted.runtime_generation})`
+    : r.hosted.reason ? ` (${r.hosted.reason})` : '';
+  return `Observa identify
+${local}
+Hosted roster           ${r.hosted.state}${detail}
+Posture                 SHADOW ONLY / AUTHORITY NONE / ENFORCEMENT OFF / ACTIVE OFF
+${NO_ACTIVITY}${r.next.length ? `\n\nNext:\n${r.next.map(n => `  ${n}`).join('\n')}` : ''}`;
 }
 
 export async function runObserva(argv, { packageRoot = dirname(dirname(fileURLToPath(import.meta.url))), env = process.env, home, now = Date.now(), providers = RUNTIME_PROVIDERS, dependencies = {}, legacy = false } = {}) {
@@ -169,7 +225,7 @@ export async function runObserva(argv, { packageRoot = dirname(dirname(fileURLTo
     }
     if (!Object.hasOwn(HELP, command)) refuse('COMMAND_INVALID');
     if (flags.help) return { code: 0, stdout: `Usage: observa ${HELP[command]}\n\nOptions: --json --runtime openclaw --profile <name> --profile-home <dir>` };
-    const allowed = [...COMMON, ...(command === 'request-access' ? ACCESS_FLAGS : command === 'request-status' ? ['api-url'] : []), ...(legacy ? ['api-url', 'deployment-id', 'agent-id'] : []), ...(command === 'pair' ? PAIR_FLAGS : []), ...(['activity', 'decisions', 'agent'].includes(command) ? ['limit'] : []), ...(command === 'credential' ? ['new-credential-file', 'rotation', 'rotation-operator'] : []), ...(legacy && ['killswitch', 'lock'].includes(command) ? ['on', 'off'] : [])];
+    const allowed = [...COMMON, ...(command === 'request-access' ? ACCESS_FLAGS : command === 'request-status' ? ['api-url'] : []), ...(legacy ? ['api-url', 'deployment-id', 'agent-id'] : []), ...(command === 'pair' ? PAIR_FLAGS : []), ...(['activity', 'decisions', 'agent'].includes(command) ? ['limit'] : []), ...(command === 'credential' ? ['new-credential-file', 'rotation', 'rotation-operator'] : []), ...(command === 'uninstall' ? ['yes'] : []), ...(legacy && ['killswitch', 'lock'].includes(command) ? ['on', 'off'] : [])];
     if (Object.keys(flags).some(k => !allowed.includes(k))) refuse('OPTIONS_INVALID');
     if (command === 'agent') { if (args.length !== 1 || !agentId(args[0])) refuse('AGENT_ID_INVALID'); }
     else if (['credential', 'killswitch', 'lock'].includes(command)) {
@@ -204,9 +260,15 @@ export async function runObserva(argv, { packageRoot = dirname(dirname(fileURLTo
       const result = (dependencies.runner ?? spawnSync)(process.execPath, [join(packageRoot, 'observa-pair-legacy.mjs'), ...pairArgs], { env: provider.pairEnv(), stdio: 'inherit' });
       return { code: result.status === 0 ? 0 : 1, stdout: result.status === 0 ? '' : 'Pairing did not complete. No success is claimed.' };
     }
+    if (['hosted-health', 'identify'].includes(command)) {
+      const report = await provider.hosted(command);
+      const key = command === 'identify' ? 'identify' : 'hosted_health';
+      const good = command === 'identify' ? ['ROSTER_CONFIRMED', 'NOT_PAIRED'].includes(report.hosted.state) && report.local.state === 'IDENTIFIED' : report.healthy;
+      return { code: good ? 0 : 2, stdout: json ? JSON.stringify(envelope({ [key]: report })) : command === 'identify' ? renderIdentify(report) : renderHostedHealth(report, now) };
+    }
     const view = provider.snapshot();
     let data; let human; let legacyResult;
-    if (command === 'status') { data = { status: view.status }; human = renderStatus(view.status); }
+    if (command === 'status') { data = { status: view.status }; human = renderStatus(view.status, now); }
     else if (command === 'agents') { data = { agents: view.agents, evidence: view.evidence }; human = view.agents.length ? renderAgents(view.agents, now) : 'No configured agents or local agent evidence available.'; }
     else if (command === 'agent') {
       const id = agentId(args[0]); const agent = view.agents.find(a => a.agent_id === id);
@@ -223,8 +285,8 @@ export async function runObserva(argv, { packageRoot = dirname(dirname(fileURLTo
       legacyResult = result;
       // Lifecycle implementations can return path/recovery internals; project
       // only explicitly non-secret outcomes. No arbitrary result serialization.
-      data = { result: { completed: true, config_updated: result.configUpdated === true, gateway_reload_may_be_required: result.gatewayReloadMayBeRequired === true, receipts_preserved: result.receiptsPreserved === true, observation_control: ['enable', 'disable', 'killswitch', 'lock'].includes(command) ? (command === 'enable' ? 'OFF' : command === 'disable' ? 'ON' : args[0].toUpperCase()) : null } };
-      human = `${command === 'credential' ? `Credential ${args[0]}` : command} completed.${result.configUpdated ? ' Host config updated; a gateway reload may be needed.' : ''} SHADOW ONLY / AUTHORITY NONE / ENFORCEMENT OFF / ACTIVE OFF`;
+      data = { result: { completed: true, config_updated: result.configUpdated === true, gateway_reload_may_be_required: result.gatewayReloadMayBeRequired === true, receipts_preserved: result.receiptsPreserved === true, observation_control: ['enable', 'disable', 'killswitch', 'lock'].includes(command) ? (command === 'enable' ? 'OFF' : command === 'disable' ? 'ON' : args[0].toUpperCase()) : null, ...(command === 'uninstall' ? { cli_entrypoint_removed: result.cliEntrypointRemoved === true } : {}) } };
+      human = `${command === 'credential' ? `Credential ${args[0]}` : command} completed.${result.configUpdated ? ' Host config updated; a gateway reload may be needed.' : ''}${command === 'uninstall' ? (result.cliEntrypointRemoved ? ' The observa command this plugin created was removed.' : ' No observa command owned by this plugin was removed; any other observa command was left unchanged.') : ''} SHADOW ONLY / AUTHORITY NONE / ENFORCEMENT OFF / ACTIVE OFF`;
     }
     if (view.evidence?.problems.length && ['status', 'agents', 'agent', 'activity', 'decisions'].includes(command)) human += `\nLocal evidence warning: ${view.evidence.problems.join(', ')}.`;
     if (['agents', 'agent', 'activity', 'decisions'].includes(command)) human += `\n\n${UPGRADE}`;
@@ -234,7 +296,7 @@ export async function runObserva(argv, { packageRoot = dirname(dirname(fileURLTo
   } catch (error) {
     // Never echo argv, raw parse errors, filesystem paths, record bodies,
     // environment values or untrusted exception messages/codes.
-    const safeCodes = new Set([...Object.keys(ERRORS), 'PROFILE_INVALID', 'STATE_PATH_INVALID', 'PLUGIN_CONFIG_INVALID', 'LOCAL_FILE_TOO_LARGE', 'LOCAL_FILE_CHANGED', 'ROSTER_TOO_LARGE', 'ROSTER_INVALID', 'ROSTER_LABEL_UNSAFE', 'PAIR_CUSTOM_STATE_UNSUPPORTED', 'PAIR_API_URL_REQUIRED', 'OPTION_REQUIRED', 'UNPAIR_INCOMPLETE', 'UNINSTALL_FAILED']);
+    const safeCodes = new Set([...Object.keys(ERRORS), 'PROFILE_INVALID', 'STATE_PATH_INVALID', 'PLUGIN_CONFIG_INVALID', 'LOCAL_FILE_TOO_LARGE', 'LOCAL_FILE_CHANGED', 'ROSTER_TOO_LARGE', 'ROSTER_INVALID', 'ROSTER_LABEL_UNSAFE', 'PAIR_CUSTOM_STATE_UNSUPPORTED', 'PAIR_API_URL_REQUIRED', 'OPTION_REQUIRED', 'UNPAIR_INCOMPLETE', 'UNINSTALL_FAILED', 'UNINSTALL_CONFIRMATION_REQUIRED']);
     const code = safeCodes.has(error?.code) ? error.code : 'LOCAL_OPERATION_FAILED';
     const message = ERRORS[code] ?? 'Operation could not complete safely. Check the selected profile and command help; lifecycle recovery state is retained.';
     return { code: 1, stderr: json ? JSON.stringify({ schema: 'observa-cli/v1', ok: false, code, message }) : `${code}: ${message}` };

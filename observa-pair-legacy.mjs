@@ -32,7 +32,7 @@ import {
   commitOpenClawPairing, createPairingObservationBootstrap,
   inspectOpenClawProfile, rollbackOpenClawPairing,
 } from "./pairing/openclaw-profile-pairing.mjs";
-const CANDIDATE_VERSION = "0.7.3";
+const CANDIDATE_VERSION = "0.7.4";
 
 const { values } = parseArgs({
   options: {

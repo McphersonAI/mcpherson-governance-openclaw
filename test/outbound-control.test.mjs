@@ -229,7 +229,7 @@ describe("the gate itself fails closed", () => {
       /HOSTED_OUTBOUND_PURPOSE_UNKNOWN/,
     );
     assert.deepEqual([...HOSTED_OUTBOUND_PURPOSES].sort(), [
-      "observation", "runtime_heartbeat", "runtime_inventory", "shadow_evaluation",
+      "hosted_health", "observation", "runtime_heartbeat", "runtime_inventory", "shadow_evaluation",
     ]);
   });
 

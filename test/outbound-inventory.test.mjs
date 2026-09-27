@@ -103,6 +103,10 @@ describe("every plugin-runtime Hosted path is gated", () => {
     ["/v1/openclaw/shadow/evaluate", "plugins/openclaw-connector/shadow-v070/runtime.mjs"],
     ["/v1/runtime/inventory", "plugins/openclaw-connector/runtime-publisher.mjs"],
     ["/v1/runtime/heartbeat", "plugins/openclaw-connector/runtime-publisher.mjs"],
+    // Operator-invoked hosted-health / identify: same gate, same contracts.
+    ["/v1/health", "plugins/openclaw-connector/hosted-ctl.mjs"],
+    ["/v1/credentials/identity", "plugins/openclaw-connector/hosted-ctl.mjs"],
+    ["/v1/runtime/inventory", "plugins/openclaw-connector/hosted-ctl.mjs"],
   ]);
 
   for (const [path, owner] of GATED) {
@@ -139,6 +143,26 @@ describe("every plugin-runtime Hosted path is gated", () => {
       "assert() must precede the credential provider call",
     );
     assert.ok(body.includes("beforeAttempt: assert"), "the caller gets a per-attempt re-check");
+  });
+
+  it("hosted-health and identify reach the credential and the client only through the gate", () => {
+    const text = code("plugins/openclaw-connector/hosted-ctl.mjs");
+    // Each command inspects the gate first and sends only inside gate.run().
+    for (const [start, end] of [["export async function probeHostedHealth", "export async function identifyRuntimeRoster"], ["export async function identifyRuntimeRoster", "\u0000"]]) {
+      const body = text.slice(text.indexOf(start), end === "\u0000" ? undefined : text.indexOf(end));
+      assert.ok(body.indexOf("gate.inspect()") > 0, `${start} inspects the gate`);
+      assert.ok(body.indexOf("gate.inspect()") < body.indexOf("gate.run("), `${start} inspects before running`);
+      assert.equal(/withCredential\(|readSecureFile|deployment-credential/.test(body), false, `${start} reads no credential directly`);
+      assert.equal(/owned\.(health|credentialIdentity|publishInventory)\(/.test(body.slice(0, body.indexOf("gate.run("))), false, `${start} sends nothing before the gate`);
+    }
+    assert.equal(/publishHeartbeat|\/v1\/runtime\/heartbeat|\/v1\/observations|\/v1\/decisions|allocateRuntimeGeneration/.test(text), false,
+      "hosted-ctl never heartbeats, observes, decides or claims a runtime generation");
+  });
+
+  it("the launcher module is local-only", () => {
+    const text = code("plugins/openclaw-connector/cli-entrypoint.mjs");
+    assert.equal(/node:child_process|\bspawn(?:Sync)?\(|\bexec(?:File)?(?:Sync)?\(\s*["'`]/.test(text), false);
+    assert.equal(/withCredential|deployment-credential/.test(text), false);
   });
 
   it("no plugin-runtime path swallows a refusal and sends anyway", () => {

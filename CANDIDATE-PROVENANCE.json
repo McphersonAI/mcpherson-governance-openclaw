@@ -1,15 +1,15 @@
 {
   "schema": "observa-unified-local-cli-candidate/v1",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "authorized_base": {
-    "head": "d0fe213c6b0c50896645a9a7ad7cc162bd758d81",
-    "tree": "da91a6cdb7156a69abd0ac98bb99f0a40ebdcfe4"
+    "head": "1237c59a70eb2c81318abc4b29d4724d0ad4d8ea",
+    "tree": "01e9d3b0c67f6c76a68b211dec3907c96044c8a2"
   },
   "immutable_runtime_input": {
     "version": "0.7.1-beta.1",
     "sha256": "bca0b9715a0e537bc39b0939610c047799f7450a5ac767b41a09a2bd2c8c6fb2"
   },
-  "scope": "Hosted outbound control repair: runtime roster and heartbeat publication now obey the same durable disable/killswitch/lock controls as observation, and the OpenClaw plugin entry declines prompt-injection and conversation-access grants it does not use",
+  "scope": "CLI discoverability and Hosted CTL: a normal OpenClaw install now gets a managed `observa` command beside the `openclaw` launcher (never overwriting Local Node or any unknown command), plus operator-invoked `observa hosted-health` and `observa identify` over the existing health, credential identity and runtime roster contracts, gated by the same disable/killswitch/lock controls, and writing no activity, decision or heartbeat",
   "posture": {
     "mode": "SHADOW",
     "authority": "NONE",

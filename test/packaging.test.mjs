@@ -11,9 +11,9 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const read = (path) => readFileSync(join(ROOT, path), "utf8");
 const json = (path) => JSON.parse(read(path));
 
-export const VERSION = "0.7.3";
+export const VERSION = "0.7.4";
 
-describe("every current-facing version surface says 0.7.3", () => {
+describe("every current-facing version surface says 0.7.4", () => {
   const surfaces = [
     ["package.json", () => json("package.json").version],
     ["plugins/openclaw-connector/package.json", () => json("plugins/openclaw-connector/package.json").version],
@@ -32,7 +32,7 @@ describe("every current-facing version surface says 0.7.3", () => {
   }
 
   it("no current-facing surface still advertises a superseded release", () => {
-    const stale = [/0\.7\.1-beta\.1/, /\b0\.7\.2\b/];
+    const stale = [/0\.7\.1-beta\.1/, /\b0\.7\.2\b/, /\b0\.7\.3\b/];
     // The provenance record's `immutable_runtime_input` is historical evidence
     // of the input this lineage was built from and keeps its own identity.
     const historical = new Set(["CANDIDATE-PROVENANCE.json"]);
@@ -52,7 +52,7 @@ describe("every current-facing version surface says 0.7.3", () => {
           const line = text.slice(0, hit.index).split("\n").length;
           const context = text.split("\n")[line - 1];
           assert.ok(
-            /Before v0\.7\.3|Upgrade from|Rollback replaces|previously pinned/.test(context),
+            /Before v0\.7\.3|Upgrade from|Rollback replaces|previously pinned|v0\.7\.3 changed|v0\.7\.3 was a|v0\.7\.3 or later|Since v0\.7\.3|patch on v0\.7\.3|Up to and|including v0\.7\.2/.test(context),
             `${rel}:${line} still presents ${hit[0]} as current: ${context.trim()}`,
           );
         }
@@ -95,8 +95,9 @@ describe("the manifests are valid and internally consistent", () => {
 
   it("records the exact authorized base this candidate was cut from", () => {
     const provenance = json("CANDIDATE-PROVENANCE.json");
-    assert.equal(provenance.authorized_base.head, "d0fe213c6b0c50896645a9a7ad7cc162bd758d81");
-    assert.equal(provenance.authorized_base.tree, "da91a6cdb7156a69abd0ac98bb99f0a40ebdcfe4");
+    // The exact commit the public v0.7.3 tag targets.
+    assert.equal(provenance.authorized_base.head, "1237c59a70eb2c81318abc4b29d4724d0ad4d8ea");
+    assert.equal(provenance.authorized_base.tree, "01e9d3b0c67f6c76a68b211dec3907c96044c8a2");
     assert.deepEqual(provenance.posture, {
       mode: "SHADOW", authority: "NONE", enforcement: "OFF", active: false,
     });
@@ -112,7 +113,7 @@ describe("the packed artifact carries exactly the release surface", () => {
   it("names the artifact for this version", () => {
     assert.equal(packed.name, "@mcphersonai/mcpherson-governance-openclaw");
     assert.equal(packed.version, VERSION);
-    assert.equal(packed.filename, "mcphersonai-mcpherson-governance-openclaw-0.7.3.tgz");
+    assert.equal(packed.filename, "mcphersonai-mcpherson-governance-openclaw-0.7.4.tgz");
   });
 
   it("includes every file the plugin needs at runtime", () => {
@@ -125,6 +126,9 @@ describe("the packed artifact carries exactly the release surface", () => {
       "plugins/openclaw-connector/index.mjs",
       "plugins/openclaw-connector/controls.mjs",
       "plugins/openclaw-connector/runtime-publisher.mjs",
+      "plugins/openclaw-connector/runtime-publication-status.mjs",
+      "plugins/openclaw-connector/cli-entrypoint.mjs",
+      "plugins/openclaw-connector/hosted-ctl.mjs",
       "plugins/openclaw-connector/openclaw.plugin.json",
     ]) {
       assert.ok(entries.includes(required), `missing ${required}`);

@@ -108,14 +108,16 @@ export function inspectObservationControls(config) {
 // gate is re-consulted before every transport attempt and every retry, so a
 // control that becomes active between scheduling and sending still refuses.
 
-// Every Hosted destination this connector may ever contact from the plugin
-// runtime. Adding a Hosted path means adding it here and routing it through a
-// gate; a purpose the gate does not know is refused.
+// Every Hosted destination this connector may ever contact with the paired
+// credential, from the plugin runtime or from the operator's `hosted-health` /
+// `identify` commands. Adding a Hosted path means adding it here and routing
+// it through a gate; a purpose the gate does not know is refused.
 export const HOSTED_OUTBOUND_PURPOSES = Object.freeze([
   "observation",
   "shadow_evaluation",
   "runtime_inventory",
   "runtime_heartbeat",
+  "hosted_health",
 ]);
 
 export class HostedOutboundRefused extends Error {

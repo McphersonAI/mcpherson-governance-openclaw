@@ -1,4 +1,4 @@
-# Observa OpenClaw plugin v0.7.3
+# Observa OpenClaw plugin v0.7.4
 
 `@mcphersonai/mcpherson-governance-openclaw` records what Observa would have decided at OpenClaw's native synchronous `before_tool_call` seam. Its release posture is fixed in source:
 
@@ -13,9 +13,47 @@ The supported host floor is OpenClaw `2026.8.2` with Node.js 22 or newer. OAuth-
 
 The v0.7 SHADOW bridge authenticates to `POST /v1/openclaw/shadow/evaluate` with the installation credential already used by the 0.6 connector. Requests contain bounded identity and classification metadata, the executable name, a correlation reference, and a digest of tool arguments. They do not contain the command body, prompt, message body, tool result, exception body, credential, or approval token. Responses must echo the exact installation, principal, request, and tool binding and must declare `authority=NONE`, `enforcement=OFF`, and `active=false`.
 
-## What v0.7.3 changes
+## What v0.7.4 changes
 
-v0.7.3 is a security patch on v0.7.2. It changes two things and nothing else.
+v0.7.4 is a CLI discoverability patch on v0.7.3. It adds three things and
+changes no observation, evidence, pairing, control or authority semantics.
+
+**A normal install gets an `observa` command.** OpenClaw installs plugins with
+package scripts disabled and never links a plugin's `bin` entries, so after
+`openclaw plugins install` the Observa CLI was reachable only as
+`node ~/.openclaw/extensions/mcpherson-governance-connector/observa.mjs`. On
+gateway start the plugin now places one small launcher named `observa` beside
+the `openclaw` launcher the gateway was started from (for an npm global install,
+the npm prefix `bin` directory, e.g. `~/.local/bin`). The launcher holds no
+product code: it runs the CLI of the installed plugin directory, so plugin
+updates take effect without rewriting it. It is created exclusively and only in
+an owner-controlled directory; an `observa` that belongs to Observa Local Node,
+a package manager or anything else is never overwritten or removed — the
+conflict and its remediation are recorded and shown by `observa status`.
+`observa uninstall` removes only this plugin's own launcher. OpenClaw 2026.8.2
+requires confirmation to remove a plugin, which the v0.7.3 `observa uninstall`
+could not give non-interactively; it now shows OpenClaw's prompt in a terminal
+and accepts `--yes` otherwise.
+
+**`observa hosted-health`** actively checks the paired Hosted path over the
+existing `GET /v1/health` and `GET /v1/credentials/identity` contracts:
+reachability, credential acceptance and installation binding, plus the heartbeat
+and roster freshness the gateway recorded. **`observa identify`** reports the
+agents OpenClaw configures and, when paired, confirms that roster on Hosted over
+the existing `POST /v1/runtime/inventory` contract under the running gateway's
+own runtime identity, so the gateway's heartbeat is never superseded. Both are
+operator-invoked, go through the same outbound gate as the runtime (disable,
+kill switch and lock refuse them before any credential read), print no
+credential, and write no receipt, activity, decision or heartbeat.
+
+To support both, the gateway's runtime publisher keeps an owner-only local
+journal (`runtime-publication-status.json`) of its last accepted roster and
+heartbeat. It is liveness metadata only and is written only after a publication
+the controls allowed.
+
+## What v0.7.3 changed
+
+v0.7.3 was a security patch on v0.7.2. It changed two things and nothing else.
 
 **Runtime roster and heartbeat now obey the outbound controls.** Up to and
 including v0.7.2, `gateway_start` published the runtime roster and then a 60s
@@ -46,9 +84,18 @@ Observation semantics, evidence, decision and execution linking, receipt
 vocabulary, pairing, rollback, credential storage and the SHADOW posture are
 unchanged.
 
+## Upgrade from 0.7.3
+
+Update the package in place (`openclaw plugins update mcpherson-governance-connector`)
+and restart the gateway. The plugin entry, connector state directory, endpoint,
+deployment ID, agent ID, `deployment-credential` and every receipt and evidence
+file are kept; no re-pairing or migration runs. The `observa` command appears on
+that gateway start, and `hosted-health` reports heartbeat freshness once the
+restarted gateway has had its first heartbeat accepted.
+
 ## Upgrade from 0.7.2
 
-Install the exact v0.7.3 package over v0.7.2 and keep the existing plugin entry,
+Install the v0.7.3 or later package over v0.7.2 and keep the existing plugin entry,
 connector state directory, endpoint, deployment ID, agent ID and
 `deployment-credential` file. No re-pairing, credential rotation or config
 migration is required, and no receipt or evidence file is rewritten. Run
@@ -78,11 +125,11 @@ An existing installation does not need this command for a package upgrade.
 
 The existing 0.6 keys remain supported: `enabled`, `apiUrl`, `deploymentId`, `agentId`, `policyVersion`, observation budgets, state paths, `toolMetadata`, and the profile-bound `runtimeObservation` bootstrap. Mode, authority, enforcement, ACTIVE, approval authority, and operator-token keys are rejected. The default state root remains inside the active OpenClaw profile.
 
-The operator CLI exposes status, enable/disable, kill/lock controls, credential lifecycle recovery, unpair, and uninstall. As of v0.7.3, disable, kill and lock stop **every** Hosted path the plugin runtime owns — observation, SHADOW evaluation, runtime roster and liveness heartbeat — with precedence disable > kill switch > system lock. A refused path reads no credential and opens no socket. These controls record an observational state and never produce a tool hook result, so ordinary OpenClaw tool execution is unaffected whether they are set or clear. No local blocking canary ships in v0.7.
+The operator CLI exposes status, enable/disable, kill/lock controls, credential lifecycle recovery, unpair, and uninstall, plus the operator-invoked `hosted-health` and `identify` checks. Since v0.7.3, disable, kill and lock stop **every** Hosted path the plugin runtime owns — observation, SHADOW evaluation, runtime roster and liveness heartbeat — with precedence disable > kill switch > system lock. A refused path reads no credential and opens no socket. These controls record an observational state and never produce a tool hook result, so ordinary OpenClaw tool execution is unaffected whether they are set or clear. No local blocking canary ships in v0.7.
 
 ## Runtime roster and heartbeat
 
-On `gateway_start` an enabled installation publishes `POST /v1/runtime/inventory` once (runtime instance id, runtime generation, the agent ids OpenClaw's own configured roster reports, and a roster revision hash) and then `POST /v1/runtime/heartbeat` every 60 seconds (runtime instance id, generation, sequence, cadence). Neither carries tool identities, capabilities, activity, prompts, results or any business claim: they say this runtime process is alive and which agent ids the host configures. Both are credential-bearing, so both obey the controls above. `mcpherson_connection_test` is a local marker-only probe: it accepts no arguments, makes no network call, uses no credential and returns a fixed string.
+On `gateway_start` an enabled installation publishes `POST /v1/runtime/inventory` once (runtime instance id, runtime generation, the agent ids OpenClaw's own configured roster reports, and a roster revision hash) and then `POST /v1/runtime/heartbeat` every 60 seconds (runtime instance id, generation, sequence, cadence). Neither carries tool identities, capabilities, activity, prompts, results or any business claim: they say this runtime process is alive and which agent ids the host configures. Both are credential-bearing, so both obey the controls above. The gateway records its last accepted roster and heartbeat in an owner-only local journal for `observa hosted-health` and `observa identify`; a refused run records nothing. `mcpherson_connection_test` is a local marker-only probe: it accepts no arguments, makes no network call, uses no credential and returns a fixed string.
 
 ## Evidence
 
