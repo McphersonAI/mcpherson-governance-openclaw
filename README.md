@@ -300,3 +300,42 @@ the very first `openclaw plugins install` shows the host default until `pair` or
 those two keys before installing.
 
 SHADOW ONLY / AUTHORITY NONE / ENFORCEMENT OFF / ACTIVE OFF
+
+## License
+
+The publicly distributed McPherson Governance OpenClaw plugin is licensed under
+the Apache License, Version 2.0 (SPDX: `Apache-2.0`). See [LICENSE](LICENSE) and
+[NOTICE](NOTICE) for the license text, attribution, scope and trademark boundary.
+The license covers this plugin distribution; it does not automatically license
+or grant access to Observa Hosted or separately distributed commercial/private
+products and services.
+
+The [v0.7.4 licensing clarification](LICENSE-CLARIFICATION-v0.7.4.md) explicitly
+covers the already-published artifact by tag, filename and SHA-256. Its original
+bytes and tag are unchanged; the original archive did not contain LICENSE,
+NOTICE or package license metadata. GitHub is the authoritative license surface.
+ClawHub may display only a generic "open source" label.
+
+## License verification for maintainers
+
+Run `npm run verify:license` and `npm test` before a future release. The checks
+require the standard Apache-2.0 text, NOTICE, consistent root and bundled
+connector license metadata, and inclusion of licensing files in npm's pack list.
+
+The licensing repair retains the source version 0.7.4 and must not be packed or
+published as a replacement 0.7.4 artifact. To run the existing artifact tests on
+this repair, set `OPENCLAW_TEST_ARTIFACT` to the downloaded original release
+archive; the test verifies its exact published SHA-256 before reading it.
+
+For the next separately authorized release, update the normal version surfaces,
+run the tests, build its new-version archive, then run:
+
+```sh
+npm run verify:release -- /path/to/the/new-version-artifact.tgz
+```
+
+This verifies LICENSE and NOTICE inside the actual archive, all packaged
+package.json license declarations, their source identities, and the v0.7.4
+clarification. A dry-run pack list alone is not final artifact verification.
+Do not publish unless both the tests and this artifact check pass. No new
+runtime dependency or install lifecycle script is required.

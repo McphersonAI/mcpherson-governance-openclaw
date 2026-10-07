@@ -1,0 +1,25 @@
+McPherson Governance OpenClaw plugin
+Copyright 2026 McPherson AI LLC
+
+The publicly distributed McPherson Governance OpenClaw plugin is licensed
+under the Apache License, Version 2.0 (SPDX: Apache-2.0). See LICENSE.
+The covered software is the OpenClaw plugin distribution, including the
+connector, bundled runtime modules, local CLI and pairing helpers distributed
+as @mcphersonai/mcpherson-governance-openclaw.
+
+This artifact license does not automatically license or grant access to
+Observa Hosted services, the commercial control plane, private infrastructure,
+internal deployment tooling, private repositories, customer data, or other
+separately distributed commercial products or services. Those separate works
+and services are outside this artifact license. These boundaries do not
+restrict the Apache-2.0 rights granted for the covered plugin software.
+
+McPherson AI, McPherson Governance, and Observa remain trademarks of
+McPherson AI LLC. As stated in Section 6 of the Apache License, Version 2.0,
+the license does not grant permission to use those trademarks, except as
+required for reasonable and customary use in describing the origin of the
+work and reproducing the content of this NOTICE.
+
+The exact already-published v0.7.4 artifact is covered by the later public
+grant in LICENSE-CLARIFICATION-v0.7.4.md. This NOTICE does not assert that
+licensing metadata was present in that original archive.

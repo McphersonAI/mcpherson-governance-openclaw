@@ -1,15 +1,17 @@
-// The exact packed artifact, not the repository: pack, extract into a path with
+// The exact packed artifact, not the repository: extract into a path with
 // spaces, let the extracted plugin install its launcher beside a global-npm
 // OpenClaw layout, and drive the real CLI through `observa` on PATH.
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, readdirSync } from "node:fs";
-import { delimiter, dirname, join } from "node:path";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { ROOT, cleanupTemps, makeOpenClawLayout, makeProfileHome, tempDir } from "./cli-fixtures.mjs";
 import { setControl } from "../plugins/openclaw-connector/controls.mjs";
+import { verifyArtifact } from "../scripts/verify-license.mjs";
 
 after(cleanupTemps);
 
@@ -18,10 +20,23 @@ const NODE_DIR = dirname(process.execPath);
 
 before(() => {
   const work = tempDir("observa packed");
-  const tarball = JSON.parse(execFileSync("npm", ["pack", "--json", "--pack-destination", work], { cwd: ROOT, encoding: "utf8" }))[0].filename;
+  const version = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version;
+  let archive;
+  if (version === "0.7.4") {
+    // Licensing-only repair: never rebuild or replace the already released bytes.
+    assert.ok(process.env.OPENCLAW_TEST_ARTIFACT, "set OPENCLAW_TEST_ARTIFACT to the original published v0.7.4 archive");
+    archive = resolve(process.env.OPENCLAW_TEST_ARTIFACT);
+    assert.equal(createHash("sha256").update(readFileSync(archive)).digest("hex"),
+      "084ae9e93dead73e59554b3315c47e11dc06e6f13e9d0dca073961755507de69",
+      "the v0.7.4 artifact must match its unchanged published identity");
+  } else {
+    const tarball = JSON.parse(execFileSync("npm", ["pack", "--json", "--pack-destination", work], { cwd: ROOT, encoding: "utf8" }))[0].filename;
+    archive = join(work, tarball);
+    verifyArtifact(archive);
+  }
   const target = join(work, "extensions dir with spaces");
   mkdirSync(target);
-  execFileSync("tar", ["-xzf", join(work, tarball), "-C", target]);
+  execFileSync("tar", ["-xzf", archive, "-C", target]);
   extracted = join(target, "package");
   layout = makeOpenClawLayout();
 });
