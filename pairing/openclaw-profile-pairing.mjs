@@ -281,6 +281,39 @@ export function createPairingObservationBootstrap(inspection) {
   return createRuntimeObservationBootstrap(inspection.profileState);
 }
 
+/**
+ * Least-privilege hook policy for this plugin's OpenClaw entry.
+ *
+ * OpenClaw grants `allowPromptInjection` to every non-bundled plugin by
+ * default and only withdraws it when the plugin's own entry sets it to false;
+ * there is no manifest field for it. This connector never calls
+ * `api.enqueueNextTurnInjection` and registers no prompt-building hook — only
+ * `before_tool_call`, `after_tool_call`, `gateway_start` and `gateway_stop` —
+ * so it declines the grant explicitly rather than holding a capability its
+ * code does not use. `allowConversationAccess: false` restates the host's own
+ * default for a non-bundled plugin, so the declared and effective grants
+ * agree and the capability review reports both as denied.
+ *
+ * This is a policy the operator owns: an existing explicit value in the
+ * profile is preserved, never overwritten.
+ */
+export const LEAST_PRIVILEGE_HOOK_POLICY = Object.freeze({
+  allowPromptInjection: false,
+  allowConversationAccess: false,
+});
+
+export function withLeastPrivilegeHookPolicy(current) {
+  const existing = current?.hooks && typeof current.hooks === "object"
+    && !Array.isArray(current.hooks) ? current.hooks : {};
+  return {
+    ...existing,
+    ...(typeof existing.allowPromptInjection === "boolean"
+      ? {} : { allowPromptInjection: LEAST_PRIVILEGE_HOOK_POLICY.allowPromptInjection }),
+    ...(typeof existing.allowConversationAccess === "boolean"
+      ? {} : { allowConversationAccess: LEAST_PRIVILEGE_HOOK_POLICY.allowConversationAccess }),
+  };
+}
+
 function updatedConfig(before, connectorConfig) {
   const plugins = before.plugins && typeof before.plugins === "object"
     && !Array.isArray(before.plugins) ? before.plugins : {};
@@ -294,7 +327,12 @@ function updatedConfig(before, connectorConfig) {
       ...plugins,
       entries: {
         ...entries,
-        [PLUGIN_ID]: { ...current, enabled: true, config: connectorConfig },
+        [PLUGIN_ID]: {
+          ...current,
+          enabled: true,
+          hooks: withLeastPrivilegeHookPolicy(current),
+          config: connectorConfig,
+        },
       },
     },
   };

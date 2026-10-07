@@ -1,8 +1,10 @@
+import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { agentId, assertPath, inside, readBounded, readJson, refuse, timestamp, toolId } from '../safe-local.mjs';
+import { withLeastPrivilegeHookPolicy } from '../../pairing/openclaw-profile-pairing.mjs';
 
 const PLUGIN = 'mcpherson-governance-connector';
 const ACTIONS = Object.freeze({ SHADOW_WOULD_ALLOW: 'WOULD_ALLOW', SHADOW_WOULD_DENY: 'WOULD_DENY', SHADOW_WOULD_REQUIRE_APPROVAL: 'WOULD_REQUIRE_APPROVAL', ABSTAIN: 'ABSTAIN', INDETERMINATE: 'INDETERMINATE', ERROR: 'ERROR' });
@@ -28,8 +30,9 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
   const configPath = join(root, 'openclaw.json');
   const pluginRoot = join(packageRoot, 'plugins/openclaw-connector');
   const load = (name) => import(pathToFileURL(join(pluginRoot, `${name}.mjs`)).href);
-  const [configModule, operator, controls, rosterModule, receiptModule] = await Promise.all([
+  const [configModule, operator, controls, rosterModule, receiptModule, entrypoint, publicationModule] = await Promise.all([
     load('config'), load('operator'), load('controls'), load('runtime-publisher'), load('receipts'),
+    load('cli-entrypoint'), load('runtime-publication-status'),
   ]);
   const host = readJson(root, configPath, { privateFile: false });
   // Native config includes / environment substitutions cannot be resolved by a
@@ -145,6 +148,29 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
       heartbeat: 'NOT_AVAILABLE', last_activity: evidence[0]?.at ?? null,
       observed_capabilities: [...new Set(evidence.map(a => a.capability))].sort() };
   });
+  // The gateway's local publication journal: liveness/identity metadata only,
+  // never activity. A missing or invalid journal is simply "not available".
+  let publication = null;
+  try {
+    const journal = readBounded(root, join(stateDir, publicationModule.PUBLICATION_STATUS_FILE), { maxBytes: 8192 });
+    if (journal) {
+      publication = publicationModule.parsePublicationStatus(journal.text);
+      if (publication === null) problems.push('PUBLICATION_JOURNAL_INVALID');
+    }
+  } catch { problems.push('PUBLICATION_JOURNAL_UNREADABLE'); }
+  const hostedModule = await load('hosted-ctl');
+  const publicationView = hostedModule.assessPublication(publication, { now, rosterRevision: null });
+  // How `observa` resolves: the gateway's last launcher outcome, and what the
+  // current PATH actually runs. Metadata only.
+  const recorded = entrypoint.readEntrypointRecord(stateDir);
+  const onPath = entrypoint.resolveObservaOnPath(env.PATH);
+  let installRoot = null;
+  try { installRoot = realpathSync(packageRoot); } catch { installRoot = null; }
+  const cliEntrypoint = {
+    recorded_state: recorded?.state ?? 'NOT_RECORDED', recorded_path: recorded?.path ?? null,
+    path_resolution: onPath.kind === 'OWNED' ? (onPath.root === installRoot ? 'THIS_PLUGIN' : 'OTHER_PLUGIN_INSTALL') : onPath.kind,
+    path: onPath.path, remediation: recorded?.remediation ?? null,
+  };
   const disabled = !status.enabled || status.controls.killswitch !== 'absent' || status.controls.lock !== 'absent';
   const stopped = lifecycle?.event === 'gateway_stop' && (!activities[0] || lifecycle.at >= activities[0].at);
   const observing = disabled ? 'DISABLED' : stopped ? 'STOPPED' : activities[0] && now - Date.parse(activities[0].at) <= 300000 ? 'RECENT_LOCAL_EVIDENCE' : activities.length ? 'STALE_LOCAL_EVIDENCE' : 'NO_LOCAL_EVIDENCE';
@@ -155,7 +181,9 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
     runtime: { type: 'OpenClaw', version: runtimeVersion, version_source: runtimeVersion ? 'local_shadow_evidence' : null, live_state: 'NOT_PROBED' },
     plugin_installed: installed,
     plugin_configured: entry !== undefined, configuration: host === null ? 'MISSING' : 'PROFILE_FILE',
-    enabled_source: 'PROFILE_CONFIG_AND_DURABLE_DISABLE', observing, heartbeat: 'NOT_AVAILABLE',
+    enabled_source: 'PROFILE_CONFIG_AND_DURABLE_DISABLE', observing, heartbeat: publicationView.heartbeat,
+    heartbeat_accepted_at: publicationView.heartbeat_accepted_at, heartbeat_source: publication ? 'GATEWAY_PUBLICATION_JOURNAL' : null,
+    cli_entrypoint: cliEntrypoint,
     configured_agent_count: roster === null ? null : configured.size,
     hosted_connection: status.pairing.paired ? 'PAIRED_CONNECTION_NOT_PROBED' : 'UNPAIRED',
     evidence: { health: evidenceHealth, bounded: true, truncated, activity_count: activities.length, decision_count: decisions.length, problems: [...new Set(problems)].sort() },
@@ -163,6 +191,19 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
   return {
     id: 'openclaw',
     snapshot: () => ({ status: summary, agents, activity: activities, decisions, evidence: summary.evidence }),
+    async hosted(command) {
+      // Operator-invoked and networked by design. The hosted module keeps the
+      // same outbound gate, credential reader and contracts as the runtime.
+      const options = {
+        config, pairing: summary.pairing, roster, publication, now,
+        client: dependencies.hostedClient ?? null,
+        credentialProvider: dependencies.hostedCredentialProvider,
+      };
+      if (options.credentialProvider === undefined) delete options.credentialProvider;
+      assertPath(root, stateDir);
+      if (command === 'hosted-health') return hostedModule.probeHostedHealth({ ...options, configured: entry !== undefined });
+      return hostedModule.identifyRuntimeRoster(options);
+    },
     async control(command, args, commandFlags) {
       let configUpdated = false;
       if (command === 'enable' && (!pluginEnabled || source.enabled !== true)) {
@@ -174,8 +215,16 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
         assertPath(root, configPath);
         const current = readJson(root, configPath, { privateFile: false });
         if (JSON.stringify(current) !== JSON.stringify(host)) refuse('LOCAL_FILE_CHANGED');
+        // Enabling re-asserts this plugin's least-privilege hook policy so the
+        // capability review keeps reporting prompt injection and conversation
+        // access as denied. An explicit operator value is never overwritten.
         const next = { ...host, plugins: { ...host.plugins, entries: { ...host.plugins.entries,
-          [PLUGIN]: { ...entry, enabled: true, config: { ...source, enabled: true } } } } };
+          [PLUGIN]: {
+            ...entry,
+            enabled: true,
+            hooks: withLeastPrivilegeHookPolicy(entry),
+            config: { ...source, enabled: true },
+          } } } };
         const { atomicWriteSecureFile } = await load('secure-files');
         atomicWriteSecureFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
         configUpdated = true;
@@ -185,7 +234,17 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
       assertPath(root, stateDir);
       for (const name of [CREDENTIAL_FILE, ...['disabled', 'killswitch', 'lock'].map(n => controls.controlPath(stateDir, n).split('/').at(-1))]) assertPath(root, join(stateDir, name));
       if (command === 'uninstall') {
-        return operator.uninstallConnector({ runner: (bin, argv, options) => (dependencies.runner ?? spawnSync)(bin, argv, { ...options, env: { ...env, OPENCLAW_PROFILE: selection.profile, OPENCLAW_STATE_DIR: root, OPENCLAW_CONFIG_PATH: configPath } }) });
+        const interactive = !commandFlags.json && (dependencies.interactive ?? Boolean(process.stdin.isTTY && process.stdout.isTTY));
+        if (commandFlags.yes !== true && !interactive) refuse('UNINSTALL_CONFIRMATION_REQUIRED');
+        const result = operator.uninstallConnector({ confirmed: commandFlags.yes === true, interactive, runner: (bin, argv, options) => (dependencies.runner ?? spawnSync)(bin, argv, { ...options, env: { ...env, OPENCLAW_PROFILE: selection.profile, OPENCLAW_STATE_DIR: root, OPENCLAW_CONFIG_PATH: configPath } }) });
+        // Only after OpenClaw confirmed the uninstall: remove the `observa`
+        // launcher this plugin created for this install, and nothing else.
+        let removal = { removed: [], kept: [] };
+        if (installRoot) {
+          try { removal = entrypoint.removeObservaEntrypoint({ pluginRoot: installRoot, stateDir, argv1: dependencies.argv1 ?? process.argv[1] }); }
+          catch { removal = { removed: [], kept: [{ path: null, kind: 'REMOVAL_FAILED' }] }; }
+        }
+        return { ...result, cliEntrypointRemoved: removal.removed.length > 0, cliEntrypointKept: removal.kept.map(k => k.kind) };
       }
       if (command === 'credential' && commandFlags['new-credential-file']) {
         const delivery = resolve(commandFlags['new-credential-file']);

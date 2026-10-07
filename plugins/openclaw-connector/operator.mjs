@@ -745,8 +745,12 @@ export async function unpairConnector(config, {
   }
 }
 
-export function uninstallConnector({ runner = spawnSync } = {}) {
-  const result = runner("openclaw", ["plugins", "uninstall", PLUGIN_ID], { encoding: "utf8", stdio: "pipe" });
+// OpenClaw 2026.8.2 asks for confirmation before removing a plugin. An
+// interactive operator answers OpenClaw's own prompt; a non-interactive caller
+// must have confirmed explicitly (`confirmed`), which OpenClaw calls --force.
+export function uninstallConnector({ runner = spawnSync, confirmed = false, interactive = false } = {}) {
+  const args = ["plugins", "uninstall", PLUGIN_ID, ...(confirmed ? ["--force"] : [])];
+  const result = runner("openclaw", args, { encoding: "utf8", stdio: interactive && !confirmed ? "inherit" : "pipe" });
   if (result.error || result.status !== 0) throw Object.assign(new Error("UNINSTALL_FAILED"), { code: "UNINSTALL_FAILED" });
   return Object.freeze({ ok: true, receiptsPreserved: true });
 }

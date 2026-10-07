@@ -1,7 +1,7 @@
 export const SHADOW_RELEASE = Object.freeze({
   schema: "observa-openclaw-shadow-release/v1",
   package_name: "@mcphersonai/mcpherson-governance-openclaw",
-  version: "0.7.2",
+  version: "0.7.4",
   mode: "SHADOW",
   authority: "NONE",
   enforcement: "OFF",

@@ -1,15 +1,15 @@
 {
   "schema": "observa-unified-local-cli-candidate/v1",
-  "version": "0.7.2",
+  "version": "0.7.4",
   "authorized_base": {
-    "head": "d86d4fc2df14aa822fb12ca21f65972aee47ef97",
-    "tree": "288fd727e66aa0be8d7295871abf4ca1a96870f7"
+    "head": "1237c59a70eb2c81318abc4b29d4724d0ad4d8ea",
+    "tree": "01e9d3b0c67f6c76a68b211dec3907c96044c8a2"
   },
   "immutable_runtime_input": {
     "version": "0.7.1-beta.1",
     "sha256": "bca0b9715a0e537bc39b0939610c047799f7450a5ac767b41a09a2bd2c8c6fb2"
   },
-  "scope": "Unified local CLI with verified-email access requests; existing lifecycle and pairing dispatch",
+  "scope": "CLI discoverability and Hosted CTL: a normal OpenClaw install now gets a managed `observa` command beside the `openclaw` launcher (never overwriting Local Node or any unknown command), plus operator-invoked `observa hosted-health` and `observa identify` over the existing health, credential identity and runtime roster contracts, gated by the same disable/killswitch/lock controls, and writing no activity, decision or heartbeat",
   "posture": {
     "mode": "SHADOW",
     "authority": "NONE",
