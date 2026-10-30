@@ -7,7 +7,10 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const REQUIRED = ["LICENSE", "NOTICE", "LICENSE-CLARIFICATION-v0.7.4.md"];
+const REQUIRED = ["LICENSE", "NOTICE", "LICENSE-CLARIFICATION-v0.7.4.md", "LICENSE-V7-v0.8.0.md"];
+const V7_ROOT = "plugins/openclaw-connector/v7/";
+const V7_MANIFEST_SHA256 = "3fd6cb7734e1183024b0e44993a8f8abb595583c5d58ce9ee2ec24f37a07c209";
+const V7_SOURCE_COMMIT = "b20c39b45f3f80693e38726e456164feae90c272";
 const METADATA = ["package.json", "plugins/openclaw-connector/package.json"];
 // Standard text from Apache's LICENSE-2.0.txt; CRLF checkout conversion is OK.
 const APACHE_SHA256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30";
@@ -26,6 +29,24 @@ function checkLicense(readText, metadataPaths) {
   }
 }
 
+function checkApprovedV7(readText, paths) {
+  const manifestText = readText(`${V7_ROOT}PROVENANCE.json`);
+  assert.equal(createHash("sha256").update(manifestText).digest("hex"), V7_MANIFEST_SHA256,
+    "V7 manifest must be the exact founder-approved file");
+  const manifest = JSON.parse(manifestText);
+  assert.equal(manifest.source_commit, V7_SOURCE_COMMIT);
+  assert.equal(Object.keys(manifest.files).length, 39);
+  const expected = Object.keys(manifest.files).map(path => V7_ROOT + path).sort();
+  assert.deepEqual(paths.filter(path => path.startsWith(V7_ROOT) && path !== `${V7_ROOT}PROVENANCE.json`).sort(), expected,
+    "the distribution must contain only the approved V7 closure");
+  for (const [path, sha] of Object.entries(manifest.files)) {
+    assert.equal(createHash("sha256").update(readText(V7_ROOT + path)).digest("hex"), sha, `V7 bytes changed: ${path}`);
+  }
+  const grant = readText("LICENSE-V7-v0.8.0.md");
+  assert.ok(grant.includes(V7_MANIFEST_SHA256) && grant.includes(V7_SOURCE_COMMIT) && grant.includes("Apache-2.0"));
+  assert.ok(readText("NOTICE").includes("LICENSE-V7-v0.8.0.md"));
+}
+
 export function verifySource(root = ROOT) {
   checkLicense((path) => read(root, path), METADATA);
   // Inventory only: do not rebuild an existing release or run package hooks.
@@ -35,6 +56,7 @@ export function verifySource(root = ROOT) {
   const paths = pack.files.map(({ path }) => path);
   for (const path of [...REQUIRED, ...METADATA]) assert.ok(paths.includes(path), `pack list missing ${path}`);
   checkLicense((path) => read(root, path), paths.filter(isMetadata));
+  checkApprovedV7((path) => read(root, path), paths);
   return paths;
 }
 
@@ -49,6 +71,7 @@ export function verifyArtifact(artifact, root = ROOT) {
   const text = (path) => execFileSync("tar", ["-xOzf", archive, `package/${path}`], { encoding: "utf8" });
   const metadataPaths = entries.filter((path) => path.startsWith("package/")).map((path) => path.slice(8)).filter(isMetadata);
   checkLicense(text, metadataPaths);
+  checkApprovedV7(text, entries.filter(path => path.startsWith("package/")).map(path => path.slice(8)));
   for (const path of REQUIRED) assert.equal(normalized(text(path)), normalized(read(root, path)), `${path}: artifact differs from source`);
   for (const path of metadataPaths) {
     const actual = JSON.parse(text(path));

@@ -1,7 +1,7 @@
 # Observa OpenClaw plugin v0.8.0
 
-Thin native adapter for the exact OpenClaw 2026.10.9 plugin contract. Public
-release acceptance is pending. See the distribution's root README for onboarding,
+Thin native adapter qualified for the exact OpenClaw 2026.10.9 plugin contract.
+See the distribution's root README for onboarding,
 CLI commands, runtime qualification, continuity limitations and coverage.
 
 The stable plugin id remains `mcpherson-governance-connector`. Ordinary operation

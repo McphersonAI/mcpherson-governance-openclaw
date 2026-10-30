@@ -9,7 +9,21 @@
     "version": "0.7.1-beta.1",
     "sha256": "bca0b9715a0e537bc39b0939610c047799f7450a5ac767b41a09a2bd2c8c6fb2"
   },
-  "scope": "OpenClaw 2026.10.9 native evidence adapter, access CLI, and disabled-by-default synthetic pre-action V7 binding. Qualification and release acceptance pending.",
+  "scope": "OpenClaw 2026.10.9 native evidence adapter, access CLI, and disabled-by-default synthetic pre-action V7 binding. Independently accepted for the documented connector scope; known upstream dependency and Hosted continuity limitations remain.",
+  "accepted_engineering_candidate": {
+    "commit": "607bdd93a01437d1e799697b622f085fcb2a3102",
+    "tree": "3c87883b6f5eb27c7612d046df2175bc0a107b5b",
+    "artifact_sha256": "4882a15438ab1481a3b3f2f340f51b26230ed8f3c0ef49f8ad395038ece94fa5",
+    "preserved": true
+  },
+  "v7_license_authorization": {
+    "approved_on": "2026-10-30",
+    "license": "Apache-2.0",
+    "files": 39,
+    "manifest_sha256": "3fd6cb7734e1183024b0e44993a8f8abb595583c5d58ce9ee2ec24f37a07c209",
+    "declaration": "LICENSE-V7-v0.8.0.md",
+    "scope": "Exact V7 closure in this distribution; excludes separately distributed private Hosted services, commercial control-plane code and unreleased SDK software."
+  },
   "posture": {
     "mode": "SHADOW",
     "authority": "NONE",

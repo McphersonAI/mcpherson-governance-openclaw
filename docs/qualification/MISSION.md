@@ -2,8 +2,11 @@
 
 Owner: Codex. Mission authority: founder prompt, SOP-03 v1.5 (2026-10-30).
 Candidate worktree starts at a4038550796dbcaf51894ae1646d78d9da9553d9.
-Engineering candidate: 0.8.0. Public release is held for the exact frozen V7
-source disclosure/license decision. No production activation or certification is claimed.
+Engineering candidate: 0.8.0, independently accepted at source
+`607bdd93a01437d1e799697b622f085fcb2a3102`. The founder approved public Apache-2.0
+distribution of the exact V7 closure on October 30, 2026. No production
+activation or certification is claimed. Publication and public installation
+verification are recorded separately in the v0.8.0 release evidence.
 
 Target: OpenClaw 2026.10.9, source 8b18b5578f66eab1501cba4cef2310d88bfb9a41.
 Node constraint from official package: >=24.22.1 <25 || >=26.12.1.
@@ -112,11 +115,13 @@ applied to the exact official target.
 
 The exact V7 closure is the 39 immutable files in
 `plugins/openclaw-connector/v7/PROVENANCE.json`, frozen source
-`b20c39b45f3f80693e38726e456164feae90c272`. The existing public connector license
-does not itself establish a grant for this previously private closure.
-SOP-03 v1.5 §3's legal-commitment gate is the reason for the narrow pending
-owner decision. No public code push, tag, GitHub release or ClawHub upload has
-occurred. Public fresh-install verification necessarily follows publication.
+`b20c39b45f3f80693e38726e456164feae90c272`. The earlier SOP-03 v1.5 §3 licensing
+hold is resolved by the founder's explicit October 30, 2026 authorization.
+`LICENSE-V7-v0.8.0.md` and `NOTICE` record the approved exact-file grant.
+The accepted candidate archive is preserved; only licensing/package declarations
+and release documentation change for publication. No evaluator or runtime source
+bytes change. Separate private Hosted services, commercial control-plane code
+and unreleased SDK software remain outside this grant.
 
 Detailed lab logs and original failures are retained under
 `/Users/bmcpherson/observa-qualification/openclaw-v080/evidence`; independent

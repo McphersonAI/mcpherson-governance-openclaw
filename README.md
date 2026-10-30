@@ -1,8 +1,8 @@
 # Observa local CLI — 0.8.0
 
 Observa connects supported OpenClaw runtime events to local evidence and Hosted
-Observa. This candidate targets **OpenClaw 2026.10.9**. Qualification and public
-release acceptance are still in progress; see `CANDIDATE-PROVENANCE.json`.
+Observa. Version 0.8.0 is qualified for **OpenClaw 2026.10.9** within the runtime,
+evidence and enforcement limits below; see `CANDIDATE-PROVENANCE.json`.
 
 ## Start here
 
@@ -52,12 +52,11 @@ The existing OpenClaw distribution channel is ClawHub's **code-plugin** package
 `@mcphersonai/mcpherson-governance-openclaw`. The established install command is:
 
 ```sh
-openclaw plugins install clawhub:@mcphersonai/mcpherson-governance-openclaw
+openclaw plugins install clawhub:@mcphersonai/mcpherson-governance-openclaw@0.8.0
 ```
 
-Before this candidate is publicly released, that command installs the existing
-published version. Use the release's verified version and artifact identity when
-performing an upgrade. Restart the selected gateway to register the plugin and
+Use the release's verified version and artifact identity when performing an
+upgrade. Restart the selected gateway to register the plugin and
 refresh its CLI launchers. Do not reset OpenClaw memory, agents or state.
 
 The stable plugin configuration key is `mcpherson-governance-connector`; it
@@ -181,7 +180,8 @@ credentials, memories, backups or worktrees to repair an installation.
 ## License
 
 See `LICENSE`, `NOTICE` and `LICENSE-CLARIFICATION-v0.7.4.md` for the existing
-plugin's Apache-2.0 grant and service/trademark boundaries. The proposed V7 file
-set is identified in `plugins/openclaw-connector/v7/PROVENANCE.json`; authorization
-for that previously private source's public disclosure and license is pending.
-No public release of this candidate is authorized by this README.
+plugin's Apache-2.0 grant and service/trademark boundaries. The exact 39-file V7
+set in `plugins/openclaw-connector/v7/PROVENANCE.json` is covered by the explicit
+Apache-2.0 grant in `LICENSE-V7-v0.8.0.md`. The grant does not extend to separately
+distributed private Hosted services, commercial control-plane code or unreleased
+SDK software.
