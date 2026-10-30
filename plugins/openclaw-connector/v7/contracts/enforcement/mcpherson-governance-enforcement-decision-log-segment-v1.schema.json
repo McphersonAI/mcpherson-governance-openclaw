@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-decision-log-segment-v1.schema.json",
+  "title": "McPherson Governance v0.7 decision-log segment",
+  "description": "An append-only, hash-chained segment of decision records for one (tenant, workspace, policy_bundle) scope. Full verification recomputes every record evidence_hash and decision_id, validates every prev_record_hash link including the first supplied segment, and recomputes count/first_hash/last_hash/segment_id. segment_seq and prev_segment_last_hash are checked against an explicit export anchor and adjacent segments. UNSIGNED integrity evidence only: authentication is const NONE and signed is const false. A coherently rebuilt unsigned chain remains unauthenticated; this is not producer authentication.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "wireSafeId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
+    "version": { "type": "string", "pattern": "^[A-Za-z0-9._+-]{1,32}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "nullableSha256": {
+      "oneOf": [ { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }, { "type": "null" } ]
+    }
+  },
+  "required": [
+    "schema", "segment_version", "segment_id", "segment_seq",
+    "prev_segment_last_hash", "tenant_id", "workspace_id", "policy_bundle_id",
+    "count", "first_hash", "last_hash", "records", "authentication", "signed"
+  ],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-decision-log-segment/v1" },
+    "segment_version": { "const": "1" },
+    "segment_id": { "$ref": "#/$defs/wireSafeId" },
+    "segment_seq": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
+    "prev_segment_last_hash": { "$ref": "#/$defs/nullableSha256" },
+    "tenant_id": { "$ref": "#/$defs/wireSafeId" },
+    "workspace_id": { "$ref": "#/$defs/wireSafeId" },
+    "policy_bundle_id": { "$ref": "#/$defs/wireSafeId" },
+    "count": { "type": "integer", "minimum": 0, "maximum": 1024 },
+    "first_hash": { "$ref": "#/$defs/nullableSha256" },
+    "last_hash": { "$ref": "#/$defs/nullableSha256" },
+    "records": { "type": "array", "maxItems": 1024, "items": { "type": "object" } },
+    "authentication": { "const": "NONE" },
+    "signed": { "const": false }
+  }
+}

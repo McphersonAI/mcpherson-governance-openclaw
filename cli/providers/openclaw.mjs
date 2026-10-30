@@ -1,3 +1,4 @@
+import { readNativeEvidenceStatus } from '../../plugins/openclaw-connector/native-ledger.mjs';
 import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
@@ -69,6 +70,12 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
   let installed = 'UNKNOWN';
   const installPath = host?.plugins?.installs?.[PLUGIN]?.installPath;
   const installRoots = installPath === undefined ? [join(root, 'extensions', PLUGIN)] : [installPath];
+  // 2026.10.9 uses per-plugin npm projects. The running CLI path and our own
+  // gateway-written launcher record are bounded package evidence; no private
+  // host installation database or guessed encoded project name is consulted.
+  for (const candidate of [packageRoot, entrypoint.readEntrypointRecord(stateDir)?.plugin_root]) {
+    if (typeof candidate === 'string' && isAbsolute(candidate) && inside(root, candidate) && candidate !== root && !installRoots.includes(candidate)) installRoots.push(candidate);
+  }
   for (const dir of installRoots) {
     if (typeof dir !== 'string' || !isAbsolute(dir) || !inside(root, dir) || dir === root) { problems.push('INSTALL_PATH_UNVERIFIED'); continue; }
     try {
@@ -174,11 +181,16 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
   const disabled = !status.enabled || status.controls.killswitch !== 'absent' || status.controls.lock !== 'absent';
   const stopped = lifecycle?.event === 'gateway_stop' && (!activities[0] || lifecycle.at >= activities[0].at);
   const observing = disabled ? 'DISABLED' : stopped ? 'STOPPED' : activities[0] && now - Date.parse(activities[0].at) <= 300000 ? 'RECENT_LOCAL_EVIDENCE' : activities.length ? 'STALE_LOCAL_EVIDENCE' : 'NO_LOCAL_EVIDENCE';
-  const evidenceHealth = problems.length ? 'DEGRADED' : activities.length || decisions.length ? 'AVAILABLE' : 'EMPTY';
+  const nativeEvidence = readNativeEvidenceStatus(stateDir);
+  if (nativeEvidence.health === 'UNREADABLE_OR_INVALID') problems.push('NATIVE_EVIDENCE_UNREADABLE_OR_INVALID');
+  if (nativeEvidence.runtime_version) runtimeVersion = nativeEvidence.runtime_version;
+  const evidenceHealth = problems.length ? 'DEGRADED' : activities.length || decisions.length || nativeEvidence.records > 0 ? 'AVAILABLE' : 'EMPTY';
   const summary = {
     pluginId: PLUGIN, ...status, pipeline: null, receipts: null,
     pairing: { paired: status.pairing.paired, credentialId: status.pairing.credentialId, fingerprint: status.pairing.fingerprint, ...(status.pairing.error ? { error: 'CREDENTIAL_UNREADABLE' } : {}) },
-    runtime: { type: 'OpenClaw', version: runtimeVersion, version_source: runtimeVersion ? 'local_shadow_evidence' : null, live_state: 'NOT_PROBED' },
+    runtime: { type: 'OpenClaw', version: runtimeVersion, version_source: nativeEvidence.runtime_version ? 'signed_native_adapter_evidence' : runtimeVersion ? 'local_shadow_evidence' : null, live_state: 'NOT_PROBED' },
+    native_evidence: nativeEvidence,
+    bound_node: { configured: source.boundNode?.enabled === true, mode: source.boundNode?.enabled === true ? 'SYNTHETIC' : 'DISABLED', live_state: 'NOT_PROBED' },
     plugin_installed: installed,
     plugin_configured: entry !== undefined, configuration: host === null ? 'MISSING' : 'PROFILE_FILE',
     enabled_source: 'PROFILE_CONFIG_AND_DURABLE_DISABLE', observing, heartbeat: publicationView.heartbeat,

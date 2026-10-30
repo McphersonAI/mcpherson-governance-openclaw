@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-policy-test-fixture-v1.schema.json",
+  "title": "McPherson Governance v0.7 policy test fixture",
+  "description": "A bundle's own regression suite: (envelope, approvals, expected_decision, expected_reason, expected_permit) cases the simulation harness runs to prove the bundle behaves as intended. envelope and approvals members are validated against their member schemas by the fixture loader.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "wireSafeId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
+    "reasonCode": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(?::[a-z0-9_]+)*$", "maxLength": 96 }
+  },
+  "required": ["schema", "fixture_version", "bundle_id", "case_count", "cases"],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-policy-test-fixture/v1" },
+    "fixture_version": { "const": "1" },
+    "bundle_id": { "$ref": "#/$defs/wireSafeId" },
+    "case_count": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "cases": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_label", "envelope", "approvals", "expected_decision", "expected_reason", "expected_permit"],
+        "properties": {
+          "case_label": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "envelope": { "type": "object" },
+          "approvals": { "type": "array", "maxItems": 64, "items": { "type": "object" } },
+          "expected_decision": { "type": "string", "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN", "INDETERMINATE", "ERROR"] },
+          "expected_reason": { "$ref": "#/$defs/reasonCode" },
+          "expected_permit": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-evaluation-context-v1.schema.json",
+  "title": "McPherson Governance v0.7 deterministic evaluation context",
+  "description": "The explicit fourth evaluator input. It supplies evaluated_at, engine_version, the audit predecessor, out-of-core approval issuer-verification results, and approval-consumption state. The core performs no key custody or external verification and keeps no replay state: a REQUIRE_APPROVAL permit requires a matching VERIFIED entry whose canonical verification_hash binds every approval field, and the approval_id must be absent from consumed_approval_ids. This is deterministic supplied context, not runtime authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "wireSafeId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
+    "wireSafeLabel": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" },
+    "wireSafeRef": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "nullableSha256": {
+      "oneOf": [
+        { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "version": { "type": "string", "pattern": "^[A-Za-z0-9._+-]{1,32}$" },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    },
+    "approvalVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verification_method", "verification_state", "verification_hash",
+        "approval_id", "issuer_id", "tenant_id", "workspace_id",
+        "bound_envelope_hash", "bound_bundle_id", "bound_bundle_version",
+        "bound_bundle_hash", "approval_subject", "approval_scope",
+        "approval_state", "issued_at", "expires_at"
+      ],
+      "properties": {
+        "verification_method": { "const": "SUPPLIED_TRUST_RESULT" },
+        "verification_state": { "const": "VERIFIED" },
+        "verification_hash": { "$ref": "#/$defs/sha256" },
+        "approval_id": { "$ref": "#/$defs/wireSafeRef" },
+        "issuer_id": { "$ref": "#/$defs/wireSafeId" },
+        "tenant_id": { "$ref": "#/$defs/wireSafeId" },
+        "workspace_id": { "$ref": "#/$defs/wireSafeId" },
+        "bound_envelope_hash": { "$ref": "#/$defs/sha256" },
+        "bound_bundle_id": { "$ref": "#/$defs/wireSafeId" },
+        "bound_bundle_version": { "$ref": "#/$defs/version" },
+        "bound_bundle_hash": { "$ref": "#/$defs/sha256" },
+        "approval_subject": { "$ref": "#/$defs/wireSafeId" },
+        "approval_scope": { "$ref": "#/$defs/wireSafeLabel" },
+        "approval_state": {
+          "type": "string",
+          "enum": ["NOT_REQUIRED", "PENDING", "APPROVED", "DENIED", "EXPIRED"]
+        },
+        "issued_at": { "$ref": "#/$defs/timestamp" },
+        "expires_at": { "$ref": "#/$defs/timestamp" }
+      }
+    }
+  },
+  "required": [
+    "schema", "context_version", "evaluated_at", "engine_version",
+    "prev_record_hash", "approval_verifications", "consumed_approval_ids"
+  ],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-evaluation-context/v1" },
+    "context_version": { "const": "1" },
+    "evaluated_at": { "$ref": "#/$defs/timestamp" },
+    "engine_version": { "$ref": "#/$defs/version" },
+    "prev_record_hash": { "$ref": "#/$defs/nullableSha256" },
+    "approval_verifications": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/approvalVerification" }
+    },
+    "consumed_approval_ids": {
+      "type": "array",
+      "maxItems": 1024,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/wireSafeRef" }
+    }
+  }
+}

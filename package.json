@@ -1,13 +1,14 @@
 {
   "name": "@mcphersonai/mcpherson-governance-openclaw",
-  "version": "0.7.4",
-  "description": "Observa SHADOW governance evidence plugin for OpenClaw",
+  "version": "0.8.0",
+  "description": "Observa native evidence adapter for OpenClaw 2026.10.9; enforcement disabled by default, optional isolated V7 synthetic binding.",
   "type": "module",
   "license": "Apache-2.0",
   "bin": {
     "observa-pair": "./observa-pair.mjs",
     "observa-openclaw-ctl": "./plugins/openclaw-connector/connector-ctl.mjs",
-    "observa": "./observa.mjs"
+    "observa": "./observa.mjs",
+    "observa-openclaw": "./observa.mjs"
   },
   "files": [
     "plugins/",
@@ -24,10 +25,10 @@
     "observa-pair-legacy.mjs"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=24.22.1 <25 || >=26.12.1"
   },
   "peerDependencies": {
-    "openclaw": ">=2026.8.2"
+    "openclaw": "2026.10.9"
   },
   "peerDependenciesMeta": {
     "openclaw": {
@@ -44,10 +45,10 @@
       "./plugins/openclaw-connector/plugin.mjs"
     ],
     "compat": {
-      "pluginApi": ">=2026.8.2"
+      "pluginApi": "2026.10.9"
     },
     "build": {
-      "openclawVersion": "2026.8.2",
+      "openclawVersion": "2026.10.9",
       "shadowMode": "SHADOW",
       "authority": "NONE",
       "enforcement": "OFF",

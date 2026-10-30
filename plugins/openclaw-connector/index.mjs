@@ -1,3 +1,6 @@
+import { NativeAdapter } from "./native-adapter.mjs";
+import { NativeLedger } from "./native-ledger.mjs";
+import { registerBoundWrite } from "./bound-write.mjs";
 import { randomUUID } from "node:crypto";
 import {
   DEFAULT_MODES,
@@ -141,6 +144,9 @@ function buildGovernanceConnector(options, capabilityProfile) {
         random: options.random,
       });
       const runtimeInstanceId = options.runtimeInstanceId || randomUUID();
+      const nativeLedger = options.nativeLedger || new NativeLedger(config.stateDir);
+      const nativeAdapter = new NativeAdapter({ config, client, ledger: nativeLedger, runtimeInstanceId, hostVersion: compatibility.hostVersion });
+      const boundWrite = compatibility.status === 'SUPPORTED' ? registerBoundWrite(api, { config, ledger: nativeLedger }) : null;
       const pipeline = options.pipeline || new ObservationPipeline({
         config,
         client,
@@ -209,7 +215,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
         normalizer: options.normalizer,
         attributionResolver: options.attributionResolver,
         runtimeEligibilityResolver: options.runtimeEligibilityResolver,
-        runtimeObserver,
+        runtimeObserver: null,
         codeOwnedTools: options.codeOwnedTools || codeOwnedTools,
       });
       const cleanup = [];
@@ -227,10 +233,11 @@ function buildGovernanceConnector(options, capabilityProfile) {
       const installCliEntrypoint = () => {
         if (typeof options.cliEntrypoint !== "function") return;
         try {
-          const outcome = options.cliEntrypoint(config);
+          const outcome = options.cliEntrypoint(config, api);
           const line = `[observa-cli] observa command ${outcome?.state ?? "UNKNOWN"}${outcome?.path ? `: ${outcome.path}` : ""}`;
           if (["INSTALLED", "CURRENT", "UPDATED"].includes(outcome?.state)) api.logger?.info?.(line);
           else api.logger?.warn?.(`${line}${outcome?.remediation ? `. ${outcome.remediation}` : ""}`);
+          if (outcome?.namespaced) api.logger?.info?.(`[observa-cli] observa-openclaw command ${outcome.namespaced.state}`);
         } catch {
           api.logger?.warn?.("[observa-cli] observa command not installed");
         }
@@ -252,10 +259,12 @@ function buildGovernanceConnector(options, capabilityProfile) {
       const terminate = ({ reason, lifecycleEvent = null } = {}) => {
         if (terminalPromise !== null) return terminalPromise;
         terminalReason = reason || "shutdown";
+        boundWrite?.stop();
         pipeline.stopAdmission();
         terminalPromise = (async () => {
           try {
             await runtimePublisher.stop();
+            await nativeAdapter.stop();
             await controller.shutdown(5_000);
             if (lifecycleEvent !== null) {
               receiptWriter.write(makeLifecycleReceipt({ event: lifecycleEvent, receiptMode }));
@@ -275,6 +284,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
 
       const hookRegistrations = [
         ["before_tool_call", async (event, ctx) => {
+          try { nativeAdapter.before(event, ctx); } catch { api.logger?.error?.("[observa-native] evidence acquisition unavailable"); }
           await shadowRuntime.beforeToolCall(event, ctx);
           return controller.beforeToolCall(event, ctx);
         }, { priority: 100, timeoutMs: SHADOW_HOOK_TIMEOUT_MS }],
@@ -285,6 +295,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
         // cadence loop and the publisher's own outbound gate decides, per run,
         // whether anything may leave this host.
         ["gateway_start", async () => {
+          nativeAdapter.start();
           shadowRuntime.onGatewayStart();
           runtimePublisher.start(config);
           receiptWriter.write(makeLifecycleReceipt({ event: "gateway_start", receiptMode }));
@@ -297,6 +308,7 @@ function buildGovernanceConnector(options, capabilityProfile) {
       if (postHookName !== null) {
         hookRegistrations.splice(1, 0, [
           postHookName, (event, ctx) => {
+            try { nativeAdapter.after(event, ctx, shadowRuntime.linkageFor(event, ctx)); } catch { api.logger?.error?.("[observa-native] evidence acquisition unavailable"); }
             shadowRuntime.afterToolCall(event, ctx);
             return controller.afterToolCall(event, ctx, shadowRuntime.linkageFor(event, ctx));
           },
@@ -307,6 +319,13 @@ function buildGovernanceConnector(options, capabilityProfile) {
         // Current OpenClaw's supported api.on contract returns void. A host test
         // adapter may return an unregister callback; use it when available.
         if (typeof unregister === "function") cleanup.push(unregister);
+      }
+      for (const hookName of ['session_start', 'session_end', 'model_call_started', 'model_call_ended']) {
+        const unregister = api.on(hookName, (event, ctx) => {
+          try { nativeAdapter.lifecycle(hookName, event, ctx); }
+          catch { api.logger?.error?.('[observa-native] lifecycle evidence unavailable'); }
+        });
+        if (typeof unregister === 'function') cleanup.push(unregister);
       }
 
       return Object.freeze({
@@ -327,6 +346,8 @@ function buildGovernanceConnector(options, capabilityProfile) {
           compatibility,
           shadow: shadowRuntime.status(),
           runtimePublication: runtimePublisher.status(),
+          nativeEvidence: nativeAdapter.status(),
+          boundNode: boundWrite?.status() ?? { enabled: false, enforcement: "OFF" },
           lifecycle: Object.freeze({
             terminal: terminalPromise !== null,
             reason: terminalReason,

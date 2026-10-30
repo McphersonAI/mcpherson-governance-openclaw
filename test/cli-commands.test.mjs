@@ -21,8 +21,8 @@ describe("help and version", () => {
       assert.equal(result.code, 0);
       assert.equal(result.stdout, `Observa ${CLI_VERSION}`);
     }
-    assert.equal(CLI_VERSION, "0.7.4");
-    assert.equal(json(await cli(["--version", "--json"])).version, "0.7.4");
+    assert.equal(CLI_VERSION, "0.8.0");
+    assert.equal(json(await cli(["--version", "--json"])).version, "0.8.0");
   });
 
   it("--help groups commands local-first and puts the Hosted funnel up front", async () => {
@@ -60,11 +60,11 @@ describe("local commands work with or without Hosted, and never contact it", () 
     const { home } = makeProfileHome();
     const result = await cli(["status", "--profile-home", home], { dependencies: noNetwork });
     assert.equal(result.code, 0, result.stderr);
-    assert.match(result.stdout, /^Observa 0\.7\.4/);
+    assert.match(result.stdout, /^Observa 0\.8\.0/);
     assert.match(result.stdout, /Paired\s+YES/);
     assert.match(result.stdout, /Enabled\s+YES/);
     assert.match(result.stdout, /Observing\s+STALE_LOCAL_EVIDENCE/);
-    assert.match(result.stdout, /Posture\s+SHADOW ONLY \/ AUTHORITY NONE \/ ENFORCEMENT OFF \/ ACTIVE OFF/);
+    assert.match(result.stdout, /Observation posture\s+SHADOW ONLY \/ AUTHORITY NONE \/ ENFORCEMENT OFF \/ ACTIVE OFF/);
     assert.match(result.stdout, /Configured agents\s+3/);
     assert.match(result.stdout, /Heartbeat\s+NOT_AVAILABLE \(no gateway publication journal\)/);
     assert.match(result.stdout, /Hosted connection\s+PAIRED_CONNECTION_NOT_PROBED \(observa hosted-health probes it\)/);
@@ -218,14 +218,15 @@ describe("the Hosted access funnel is available before pairing", () => {
     const { home } = makeProfileHome({ paired: false, enabled: false, evidence: false });
     const result = await cli(["request-status", "--api-url", "https://observa.example", "--profile-home", home]);
     assert.equal(result.code, 1);
-    assert.equal(result.stderr, "ACCESS_NO_REQUEST: No request receipt exists in this profile. Run observa request-access.");
+    assert.equal(result.stderr, "ACCESS_NO_REQUEST: No request receipt exists in this profile. Run observa access.");
   });
 
-  it("pair stays available and refuses deterministically without an endpoint", async () => {
+  it("pair resolves the configured origin without an endpoint argument", async () => {
     const { home } = makeProfileHome({ paired: false, enabled: false, evidence: false });
-    const result = await cli(["pair", "--profile-home", home]);
-    assert.equal(result.code, 1);
-    assert.match(result.stderr, /^PAIR_API_URL_REQUIRED:/);
+    let captured;
+    const result = await cli(["pair", "--profile-home", home], { dependencies: { runner: (_node, args) => { captured = args; return { status: 0 }; } } });
+    assert.equal(result.code, 0, result.stderr);
+    assert.ok(captured.includes("--api-url"));
     assert.equal(JSON.parse((await cli(["pair", "--json"])).stderr).code, "PAIR_JSON_UNSUPPORTED");
   });
 });

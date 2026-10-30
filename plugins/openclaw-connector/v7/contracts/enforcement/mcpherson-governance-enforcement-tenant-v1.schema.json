@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-tenant-v1.schema.json",
+  "title": "McPherson Governance v0.7 tenant (SaaS shell, contract-only)",
+  "description": "Contract/data-model only. The top-level isolation boundary. No store, server, billing, or customer access exists in v0.7; non-authority constants are fixed.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "wireSafeId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32, "format": "date-time-utc"
+    }
+  },
+  "required": ["schema", "tenant_version", "tenant_id", "display_label",
+    "created_at", "authority", "runtime_active", "enforcement_eligible"],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-tenant/v1" },
+    "tenant_version": { "const": "1" },
+    "tenant_id": { "$ref": "#/$defs/wireSafeId" },
+    "display_label": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "authority": { "const": "NONE" },
+    "runtime_active": { "const": false },
+    "enforcement_eligible": { "const": false }
+  }
+}

@@ -37,22 +37,6 @@ function canonicalAliasOf(a, b) {
   return null;
 }
 
-function observedOutcome(event) {
-  // The supported OpenClaw embedded-run host builds the after-hook event as
-  // an object literal with `error: isToolError ? <message> : undefined`, so a
-  // SUCCESSFUL tool call carries an OWN `error` key whose value is nullish
-  // (other host paths spread the key in conditionally, or send null). Key
-  // presence is therefore not a failure signal — only a non-nullish value is.
-  // The 2026-08-24 live beta proved the old own-key test classified every
-  // successful real built-in action FAILED / TOOL_ERROR.
-  const error = event?.error;
-  if (error === undefined || error === null) return "COMPLETED";
-  if (typeof error !== "string") return "FAILED";
-  if (error.length === 0) return "COMPLETED";
-  const exact = error.trim().toUpperCase();
-  return exact === "TIMEOUT" || exact === "TIMED_OUT" ? "TIMED_OUT" : "FAILED";
-}
-
 // Exact execution identity needs BOTH host ids; only then can a result carry
 // a decision proof (V2). With exactly one id the 0.7.0 behaviour is kept: the
 // result is still observed, over the legacy V1 contract, and can never link.
@@ -348,7 +332,8 @@ export class RuntimeShadowObserver {
       record.names.add(entry.toolId);
       if (entry.ambiguous) record.poisoned = true;
     }
-    const outcome = observedOutcome(normalized.event);
+    const outcome = normalized.outcome;
+    if (outcome === "UNKNOWN") return true; // Preserved by the authenticated native ledger; Hosted legacy lane cannot represent it.
     if (entry.ambiguous || !this.#accepting || !this.#controlsAllowRemote()) {
       this.#writeCompletion(entry, outcome);
       return true;

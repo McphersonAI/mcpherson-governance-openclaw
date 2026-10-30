@@ -1,11 +1,11 @@
 export const PLUGIN_ID = "mcpherson-governance-connector";
 export const PLUGIN_NAME = "McPherson Governance Connector";
-export const PLUGIN_VERSION = "0.7.4";
+export const PLUGIN_VERSION = "0.8.0";
 
 // Source-owned runtime compatibility floor. It is enforced by the connector at
 // activation time and is deliberately not delegated to package-manager or
 // host-side compatibility metadata, which is not enforced by every installer.
-export const MIN_SUPPORTED_OPENCLAW_VERSION = "2026.8.2";
+export const MIN_SUPPORTED_OPENCLAW_VERSION = "2026.10.9";
 
 // The connector's state root is always this directory name inside the ACTIVE
 // OpenClaw profile state directory.

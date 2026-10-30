@@ -30,6 +30,7 @@ const ALLOWED_KEYS = new Set([
   "caFile",
   "toolMetadata",
   "runtimeObservation",
+  "boundNode",
 ]);
 
 function fail(code) {
@@ -104,6 +105,10 @@ export function loadConnectorConfig(input = {}, pathOverrides = {}) {
   try { parsed = new URL(apiUrl); } catch { fail("CONFIG_API_URL_INVALID"); }
   if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash) fail("CONFIG_API_URL_NOT_VERIFIED_HTTPS");
 
+  if (input.boundNode !== undefined && (!input.boundNode || typeof input.boundNode !== "object"
+      || Object.keys(input.boundNode).sort().join(",") !== "customerAuthorization,enabled,mode"
+      || typeof input.boundNode.enabled !== "boolean" || input.boundNode.mode !== "SYNTHETIC"
+      || input.boundNode.customerAuthorization !== false)) fail("CONFIG_BOUND_NODE_INVALID");
   const config = {
     enabled: input.enabled === true,
     apiUrl: parsed.origin,

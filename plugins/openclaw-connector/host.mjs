@@ -13,7 +13,7 @@ import { dirname, isAbsolute, join } from "node:path";
 import { CONNECTOR_STATE_DIR_NAME, MIN_SUPPORTED_OPENCLAW_VERSION } from "./constants.mjs";
 
 const VERSION = /^(\d+)\.(\d+)\.(\d+)(?:([-+])(.*))?$/;
-const MANIFEST_MAX_BYTES = 64 * 1024;
+const MANIFEST_MAX_BYTES = 1024 * 1024;
 const MANIFEST_MAX_DEPTH = 6;
 
 function nonEmptyAbsolute(value) {
@@ -145,7 +145,7 @@ export function compatibilityMessage(hostVersion, minimum = MIN_SUPPORTED_OPENCL
   const reported = hostVersion === null
     ? "a version it could not determine"
     : hostVersion;
-  return `McPherson Governance Connector requires OpenClaw >=${minimum}; this host reports ${
+  return `McPherson Governance Connector is qualified for OpenClaw ${minimum}; this host reports ${
     reported
   }. Connector activation is refused: no governance requests, no observation receipts, and no shadow observation occur. OpenClaw and every other plugin continue to run normally.`;
 }
@@ -188,7 +188,7 @@ export function evaluateHostCompatibility(
     });
   }
   const comparison = compareOpenClawVersions(version, minimum);
-  if (comparison === null || comparison < 0) {
+  if (comparison === null || comparison !== 0) {
     return Object.freeze({
       status: "UNSUPPORTED",
       activate: false,

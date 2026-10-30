@@ -13,15 +13,6 @@ import {
   resolveRuntimeObservationEligibility,
 } from "./hook-adapter.mjs";
 
-function observedOutcome(event) {
-  if (event && Object.prototype.hasOwnProperty.call(event, "error") && typeof event.error !== "string") {
-    return Object.freeze({ outcome: "FAILED", errorCategory: "TOOL_ERROR" });
-  }
-  if (typeof event?.error !== "string" || event.error.length === 0) return Object.freeze({ outcome: "COMPLETED", errorCategory: null });
-  const exact = event.error.trim().toUpperCase();
-  if (exact === "TIMEOUT" || exact === "TIMED_OUT") return Object.freeze({ outcome: "TIMED_OUT", errorCategory: "TOOL_TIMEOUT" });
-  return Object.freeze({ outcome: "FAILED", errorCategory: "TOOL_ERROR" });
-}
 
 function boundedDeadline(value) {
   return Math.max(1, Math.min(Number.isFinite(value) ? Math.floor(value) : 5_000, 5_000));
@@ -204,7 +195,8 @@ export class ConnectorHookController {
     const pending = queue?.shift();
     if (queue && queue.length === 0) this.#pending.delete(ref);
     if (!pending) return undefined;
-    const observed = observedOutcome(normalized.event);
+    if (normalized.outcome === "UNKNOWN") return undefined; // Native ledger retains explicit UNKNOWN. Legacy completion contract cannot carry it.
+    const observed = { outcome: normalized.outcome, errorCategory: normalized.outcome === "TIMED_OUT" ? "TOOL_TIMEOUT" : normalized.outcome === "FAILED" ? "TOOL_ERROR" : null };
     const task = pending.attemptPromise.then((attempt) => {
       const receipt = makeCompletionReceipt({
         decisionId: attempt.decision_id ?? pending.decisionId,

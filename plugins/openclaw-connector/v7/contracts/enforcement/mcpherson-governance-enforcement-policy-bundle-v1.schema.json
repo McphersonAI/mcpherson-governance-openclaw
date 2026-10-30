@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-policy-bundle-v1.schema.json",
+  "title": "McPherson Governance v0.7 enforcement policy bundle",
+  "description": "A versioned, content-addressed policy bundle. Single closed object built from $defs (no allOf). default_decision is limited to DENY/REQUIRE_APPROVAL/ABSTAIN (ALLOW-by-default is prohibited, D2). Matchers are declarative equality/enum/set/bounded-numeric predicates only; regex/free-text/executable/model-generated predicates are structurally absent (D5) and per-op operand shapes plus all size bounds are enforced by the policy registry. bundle_hash binds the exact canonical ruleset. engine_range declares the evaluator versions the bundle is authored for.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "wireSafeId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
+    "wireSafeLabel": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "version": { "type": "string", "pattern": "^[A-Za-z0-9._+-]{1,32}$" },
+    "engineRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min_inclusive", "max_inclusive"],
+      "properties": {
+        "min_inclusive": { "$ref": "#/$defs/version" },
+        "max_inclusive": { "$ref": "#/$defs/version" }
+      }
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "op", "value"],
+      "properties": {
+        "field": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+        "op": { "type": "string", "enum": ["eq", "in", "lt", "lte", "gt", "gte", "range"] },
+        "value": { "description": "Operand; per-op shape and bounds validated by the policy registry (scalar for eq; array set for in; number for lt/lte/gt/gte; {min,max} for range)." }
+      }
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["all"],
+      "properties": {
+        "all": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/predicate" }
+        }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision"],
+      "properties": {
+        "decision": { "type": "string", "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN"] },
+        "log_obligation": { "type": "boolean" },
+        "required_approval_subject": { "$ref": "#/$defs/wireSafeId" },
+        "required_approval_scope": { "$ref": "#/$defs/wireSafeLabel" }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "description_label", "priority", "match", "effect", "enabled"],
+      "properties": {
+        "rule_id": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._:-]{0,94}[A-Za-z0-9])?$" },
+        "description_label": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "priority": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "match": { "$ref": "#/$defs/match" },
+        "effect": { "$ref": "#/$defs/effect" },
+        "enabled": { "type": "boolean" }
+      }
+    }
+  },
+  "required": [
+    "schema", "bundle_version", "bundle_id", "engine_range",
+    "default_decision", "conflict_strategy", "rules", "bundle_hash"
+  ],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-policy-bundle/v1" },
+    "bundle_version": { "$ref": "#/$defs/version" },
+    "bundle_id": { "$ref": "#/$defs/wireSafeId" },
+    "description_label": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "engine_range": { "$ref": "#/$defs/engineRange" },
+    "default_decision": { "type": "string", "enum": ["DENY", "REQUIRE_APPROVAL", "ABSTAIN"] },
+    "conflict_strategy": { "type": "string", "enum": ["lattice", "strict"] },
+    "approval_ttl_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+    "required_context": {
+      "type": "array", "maxItems": 32, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 1024,
+      "items": { "$ref": "#/$defs/rule" }
+    },
+    "metadata": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+      "additionalProperties": { "type": "string", "minLength": 0, "maxLength": 512 }
+    },
+    "bundle_hash": { "$ref": "#/$defs/sha256" }
+  }
+}

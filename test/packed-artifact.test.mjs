@@ -48,7 +48,7 @@ function observa(args, env = {}) {
   });
 }
 
-describe("the packed 0.7.4 artifact", () => {
+describe("the packed successor artifact", () => {
   it("installs its own launcher from the extracted package", async () => {
     entrypoint = await import(pathToFileURL(join(extracted, "plugins/openclaw-connector/cli-entrypoint.mjs")).href);
     outcome = entrypoint.ensureObservaEntrypoint({ packageRoot: extracted, argv1: layout.launcher, env: { PATH: "/usr/bin" } });
@@ -59,7 +59,7 @@ describe("the packed 0.7.4 artifact", () => {
   it("observa --version / --help come from the installed package", () => {
     const version = observa(["--version"]);
     assert.equal(version.status, 0, version.stderr);
-    assert.equal(version.stdout.trim(), "Observa 0.7.4");
+    assert.equal(version.stdout.trim(), "Observa 0.8.0");
     const help = observa(["--help"]);
     assert.equal(help.status, 0);
     assert.match(help.stdout, /request-access[\s\S]*request-status[\s\S]*pair[\s\S]*hosted-health[\s\S]*identify/);
@@ -69,7 +69,7 @@ describe("the packed 0.7.4 artifact", () => {
     const { home } = makeProfileHome({ journal: {} });
     const p = ["--profile-home", home];
     for (const [args, code, pattern] of [
-      [["status", ...p], 0, /Paired\s+YES[\s\S]*Posture\s+SHADOW ONLY/],
+      [["status", ...p], 0, /Paired\s+YES[\s\S]*Observation posture\s+SHADOW ONLY/],
       [["agents", ...p], 0, /aegis[\s\S]*main[\s\S]*sterling/],
       [["agent", "main", ...p], 0, /COMPLETED[\s\S]*WOULD_/],
       [["activity", "--limit", "5", ...p], 0, /COMPLETED/],

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-approval-v1.schema.json",
+  "title": "McPherson Governance v0.7 enforcement approval artifact",
+  "description": "An unsigned approval claim bound to an issuer identity, exact envelope hash, applicable policy/bundle id + version + hash, approval subject, approval scope, and issued/expires window. This artifact alone can never permit: the evaluator also requires a matching supplied VERIFIED trust result and explicit consumption state in mcpherson-governance-enforcement-evaluation-context/v1. authentication is const NONE and signed is const false; no producer-authentication claim is made. Freshness is computed purely from supplied timestamps, never an ambient clock.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "wireSafeId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
+    "wireSafeLabel": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" },
+    "wireSafeRef": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "version": { "type": "string", "pattern": "^[A-Za-z0-9._+-]{1,32}$" },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    }
+  },
+  "required": [
+    "schema", "approval_version", "approval_id", "issuer_id", "tenant_id", "workspace_id",
+    "bound_envelope_hash", "bound_bundle_id", "bound_bundle_version",
+    "bound_bundle_hash", "approval_subject", "approval_scope",
+    "approval_state", "issued_at", "expires_at", "authentication", "signed"
+  ],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-approval/v1" },
+    "approval_version": { "const": "1" },
+    "approval_id": { "$ref": "#/$defs/wireSafeRef" },
+    "issuer_id": { "$ref": "#/$defs/wireSafeId" },
+    "tenant_id": { "$ref": "#/$defs/wireSafeId" },
+    "workspace_id": { "$ref": "#/$defs/wireSafeId" },
+    "bound_envelope_hash": { "$ref": "#/$defs/sha256" },
+    "bound_bundle_id": { "$ref": "#/$defs/wireSafeId" },
+    "bound_bundle_version": { "$ref": "#/$defs/version" },
+    "bound_bundle_hash": { "$ref": "#/$defs/sha256" },
+    "approval_subject": { "$ref": "#/$defs/wireSafeId" },
+    "approval_scope": { "$ref": "#/$defs/wireSafeLabel" },
+    "approval_state": {
+      "type": "string",
+      "enum": ["NOT_REQUIRED", "PENDING", "APPROVED", "DENIED", "EXPIRED"]
+    },
+    "issued_at": { "$ref": "#/$defs/timestamp" },
+    "expires_at": { "$ref": "#/$defs/timestamp" },
+    "authentication": { "const": "NONE" },
+    "signed": { "const": false }
+  }
+}

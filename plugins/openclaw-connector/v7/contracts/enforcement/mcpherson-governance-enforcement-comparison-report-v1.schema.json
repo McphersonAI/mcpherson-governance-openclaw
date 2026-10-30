@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-comparison-report-v1.schema.json",
+  "title": "McPherson Governance v0.7 expected-vs-actual comparison report",
+  "description": "Non-authoritative simulation output. Classifies each fixture case as MATCH / DECISION_MISMATCH / PERMIT_MISMATCH / REASON_MISMATCH / EVALUATION_ERROR. Counts partition the total. Coverage is not correctness.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0, "maximum": 10000000 }
+  },
+  "required": ["schema", "report_version", "total", "counts", "results"],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-comparison-report/v1" },
+    "report_version": { "const": "1" },
+    "total": { "$ref": "#/$defs/count" },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["MATCH", "DECISION_MISMATCH", "PERMIT_MISMATCH", "REASON_MISMATCH", "EVALUATION_ERROR"],
+      "properties": {
+        "MATCH": { "$ref": "#/$defs/count" },
+        "DECISION_MISMATCH": { "$ref": "#/$defs/count" },
+        "PERMIT_MISMATCH": { "$ref": "#/$defs/count" },
+        "REASON_MISMATCH": { "$ref": "#/$defs/count" },
+        "EVALUATION_ERROR": { "$ref": "#/$defs/count" }
+      }
+    },
+    "results": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["case_index", "classification", "expected_decision", "actual_decision",
+          "expected_permit", "actual_permit", "expected_reason", "actual_reason"],
+        "properties": {
+          "case_index": { "type": "integer", "minimum": 0, "maximum": 10000000 },
+          "classification": {
+            "type": "string",
+            "enum": ["MATCH", "DECISION_MISMATCH", "PERMIT_MISMATCH", "REASON_MISMATCH", "EVALUATION_ERROR"]
+          },
+          "expected_decision": { "type": "string", "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN", "INDETERMINATE", "ERROR"] },
+          "actual_decision": { "type": "string", "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN", "INDETERMINATE", "ERROR"] },
+          "expected_permit": { "type": "boolean" },
+          "actual_permit": { "type": "boolean" },
+          "expected_reason": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(?::[a-z0-9_]+)*$", "maxLength": 96 },
+          "actual_reason": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(?::[a-z0-9_]+)*$", "maxLength": 96 }
+        }
+      }
+    }
+  }
+}

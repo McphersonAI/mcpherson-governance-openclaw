@@ -219,8 +219,8 @@ describe("another product's `observa` is never overwritten or removed", () => {
     assert.equal(lstatSync(link).isSymbolicLink(), true);
     assert.equal(readFileSync(link, "utf8"), target);
     assert.equal(run(layout.bin, []).stdout, "LOCAL_NODE_OBSERVA");
-    assert.match(outcome.remediation, /npm uninstall -g @mcpherson-ai\/observa-local-node/);
-    assert.match(outcome.remediation, /Until then run: node '.*observa\.mjs' <command>/);
+    assert.doesNotMatch(outcome.remediation, /Use observa-openclaw <command>/);
+    assert.match(outcome.remediation, /Direct fallback: node '.*observa\.mjs' <command>/);
     assert.equal(readEntrypointRecord(stateDir).state, "COLLISION_LOCAL_NODE");
     // Uninstall does not touch it either.
     const removal = removeObservaEntrypoint({ pluginRoot: outcome.pluginRoot, stateDir });
@@ -411,6 +411,6 @@ describe("the plugin lifecycle installs the launcher on gateway start", () => {
   it("the shipped plugin entry wires the installer to its own package root", () => {
     const text = readFileSync(join(ROOT, "plugins/openclaw-connector/plugin.mjs"), "utf8");
     assert.ok(text.includes('new URL("../..", import.meta.url)'));
-    assert.ok(text.includes("ensureObservaEntrypoint({ packageRoot: PACKAGE_ROOT, stateDir: config.stateDir })"));
+    assert.ok(text.includes("ensureObservaEntrypoint({ packageRoot, stateDir: config.stateDir, namespaced })"));
   });
 });

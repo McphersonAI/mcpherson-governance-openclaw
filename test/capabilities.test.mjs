@@ -1,6 +1,6 @@
 // The managed-install capability surface must match what the code actually does.
 //
-// OpenClaw 2026.8.2 resolves the two hook grants like this
+// OpenClaw 2026.10.9 resolves the two hook grants like this
 // (dist/hook-policy-decisions-*.js):
 //
 //   allowPromptInjection    = entry?.hooks?.allowPromptInjection !== false
@@ -30,7 +30,7 @@ after(cleanupProfiles);
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const manifest = JSON.parse(readFileSync(join(ROOT, "openclaw.plugin.json"), "utf8"));
 
-// The exact resolver OpenClaw 2026.8.2 uses, reproduced so the assertions are
+// The exact resolver OpenClaw 2026.10.9 uses, reproduced so the assertions are
 // about the host's rule and not about our wording of it.
 const promptInjectionAllowed = (hooks) => hooks?.allowPromptInjection !== false;
 const conversationAccessAllowed = (origin, hooks) => (origin === "bundled"
@@ -60,12 +60,12 @@ function sourceFiles() {
 }
 
 describe("declared capabilities match registered capabilities", () => {
-  it("registers exactly four hooks, none of which build or mutate a prompt", () => {
+  it("registers eight metadata/tool/gateway hooks without conversation access or prompt mutation", () => {
     const index = readFileSync(join(ROOT, "plugins/openclaw-connector/index.mjs"), "utf8");
     const registered = new Set([...index.matchAll(/api\.on\(\s*(?:"([a-z_]+)"|hookName)/g)]
       .map((match) => match[1]).filter(Boolean));
-    for (const name of ["before_tool_call", "after_tool_call", "gateway_start", "gateway_stop"]) {
-      assert.ok(index.includes(`"${name}"`), `${name} must remain registered`);
+    for (const name of ["before_tool_call", "after_tool_call", "gateway_start", "gateway_stop", "session_start", "session_end", "model_call_started", "model_call_ended"]) {
+      assert.ok((index.includes(`"${name}"`) || index.includes(`'${name}'`)), `${name} must remain registered`);
     }
     void registered;
     // Prompt-mutating OpenClaw hooks. None may appear anywhere in the package.
@@ -73,7 +73,7 @@ describe("declared capabilities match registered capabilities", () => {
       "before_prompt_build", "before_agent_start", "before_model_resolve",
       "llm_input", "llm_output", "agent_end", "before_compaction", "after_compaction",
       "message_received", "message_sending", "before_message_write",
-      "session_start", "session_end", "tool_result_persist",
+      "tool_result_persist",
       "subagent_spawning", "subagent_spawned",
     ];
     for (const path of sourceFiles()) {
@@ -127,8 +127,8 @@ describe("declared capabilities match registered capabilities", () => {
     assert.equal(LEAST_PRIVILEGE_HOOK_POLICY.allowPromptInjection, false);
   });
 
-  it("the manifest declares exactly one tool and no other reviewed surface", () => {
-    assert.deepEqual(manifest.contracts.tools, [CONNECTION_TOOL_NAME]);
+  it("the manifest declares connection and optional synthetic bound tools only", () => {
+    assert.deepEqual(manifest.contracts.tools, [CONNECTION_TOOL_NAME, "observa_bound_write"]);
     for (const key of ["channels", "providers", "mcpServers", "cliCommands", "cliBackends", "skills"]) {
       assert.equal(manifest[key], undefined, `manifest must not declare ${key}`);
     }

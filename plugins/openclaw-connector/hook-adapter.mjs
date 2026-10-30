@@ -1,3 +1,4 @@
+import { nativeToolOutcome } from "./native-outcome.mjs";
 import { createHash } from "node:crypto";
 
 import { isSafeConnectorId } from "./config.mjs";
@@ -102,9 +103,10 @@ function runtimeToolKind(eventDescriptors, contextDescriptors) {
   }
   return Object.freeze({
     ok: true,
-    value: (fromContext.value ?? fromEvent.value) === "code_mode_exec"
-      ? "CODEX_NATIVE"
-      : "OPENCLAW_DYNAMIC",
+    // code_mode_exec identifies generic outer Code Mode, not its harness.
+    // Neither its presence nor absence proves Codex native provenance.
+    value: "OPENCLAW_DYNAMIC",
+    hostKind: fromContext.value ?? fromEvent.value,
   });
 }
 
@@ -149,8 +151,10 @@ export function normalizeOpenClawToolHook(event, ctx, phase) {
   }
   const toolCall = consistentIdentity(eventDescriptors, contextDescriptors, "toolCallId");
   const run = consistentIdentity(eventDescriptors, contextDescriptors, "runId");
+  const session = consistentIdentity(eventDescriptors, contextDescriptors, "sessionId");
+  const sessionKey = consistentIdentity(eventDescriptors, contextDescriptors, "sessionKey");
   const kind = runtimeToolKind(eventDescriptors, contextDescriptors);
-  if (!toolCall.ok || !run.ok) return refused("HOOK_CORRELATION_IDENTITY_CONFLICT");
+  if (!toolCall.ok || !run.ok || !session.ok || !sessionKey.ok) return refused("HOOK_CORRELATION_IDENTITY_CONFLICT");
   if (!kind.ok) return refused("HOOK_RUNTIME_TOOL_KIND_INVALID");
 
   const errorDescriptor = eventDescriptors.error;
@@ -178,6 +182,10 @@ export function normalizeOpenClawToolHook(event, ctx, phase) {
     runId: run.value,
     toolCallId: toolCall.value,
     runtimeToolKind: kind.value,
+    hostToolKind: kind.hostKind,
+    sessionId: session.value,
+    sessionKey: sessionKey.value,
+    outcome: phase === "after_tool_call" ? nativeToolOutcome(event) : "UNKNOWN",
     params,
     event: normalizedEvent,
     context: normalizedContext,

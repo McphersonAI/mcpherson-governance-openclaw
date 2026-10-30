@@ -27,9 +27,9 @@ import {
 // currently publishing (stopped, refused, or unable to reach Hosted).
 export const HEARTBEAT_FRESH_CADENCES = 3;
 export const FUNNEL = Object.freeze([
-  "observa request-access --api-url https://<host>",
-  "observa request-status",
-  "observa pair --api-url https://<host>",
+  "observa access",
+  "observa access status",
+  "observa pair",
 ]);
 
 const age = (at, now) => (at ? Math.max(0, Math.floor((now - Date.parse(at)) / 1000)) : null);
@@ -118,7 +118,7 @@ export async function probeHostedHealth({
   };
   if (!report.paired) {
     report.state = pairing?.error ? "CREDENTIAL_UNUSABLE" : "NOT_PAIRED";
-    report.next = pairing?.error ? ["Repair or re-pair: observa pair --api-url https://<host> --replace-existing"] : [...FUNNEL];
+    report.next = pairing?.error ? ["Repair or re-pair: observa pair --replace-existing"] : [...FUNNEL];
     return Object.freeze(report);
   }
   const gate = gateFor(config, "hosted_health", { credentialProvider, controlInspector });
@@ -158,7 +158,7 @@ export async function probeHostedHealth({
     if (["CREDENTIAL_REFUSED", "BINDING_MISMATCH"].includes(mapped.state)) report.binding = "INVALID";
     report.last_success_at = report.publication.heartbeat_accepted_at ?? report.publication.roster_published_at;
     report.next = mapped.state === "CREDENTIAL_REFUSED" || mapped.state === "BINDING_MISMATCH"
-      ? ["Hosted does not accept this installation's credential. Re-pair: observa pair --api-url https://<host> --replace-existing"]
+      ? ["Hosted does not accept this installation's credential. Re-pair: observa pair --replace-existing"]
       : mapped.state === "UNREACHABLE" ? ["Check network access to the Hosted endpoint, then retry."]
         : ["Retry shortly. Local inspection (observa status) is unaffected."];
   } finally {

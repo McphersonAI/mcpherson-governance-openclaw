@@ -1,341 +1,187 @@
-# Observa local CLI — 0.7.4
+# Observa local CLI — 0.8.0
 
-Observa provides governance visibility for AI agents. This OpenClaw
-package adds one primary executable, `observa`. It adds no execution authority.
+Observa connects supported OpenClaw runtime events to local evidence and Hosted
+Observa. This candidate targets **OpenClaw 2026.10.9**. Qualification and public
+release acceptance are still in progress; see `CANDIDATE-PROVENANCE.json`.
 
-```text
-# Local (offline; never contacts Hosted)
-observa --help
-observa --version
-observa status
-observa agents
-observa agent <id>
-observa activity [--limit 20]
-observa decisions [--limit 20]
+## Start here
 
-# Hosted access (start here for the Hosted dashboard)
-observa request-access --api-url https://<host>
-observa request-status
-observa pair --api-url https://<host> [--code-file <owner-only-file>]
+After installing the connector and starting your OpenClaw gateway:
 
-# Hosted health / refresh (after pairing; contacts Hosted)
-observa hosted-health
-observa identify
-
-# Controls
-observa enable
-observa disable
-observa killswitch on|off
-observa lock on|off
-
-# Lifecycle
-observa credential rotate --new-credential-file <file> --rotation <id>
-observa credential recover --new-credential-file <file>
-observa unpair
-observa uninstall [--yes]
+```sh
+observa access
+observa access status
+observa pair
+observa doctor
 ```
 
-## Getting the `observa` command
+`access` guides you through your name, email, workspace/organization, intended
+use, confirmation and email verification. It saves a private request receipt so
+`access status` can check the same request. Approval, account sign-in and pairing
+are separate steps: an access request alone does not pair an installation.
+`pair` accepts your pairing code through hidden terminal input; do not put codes
+or credentials in command arguments.
+
+You do not normally supply a Hosted server address. The CLI resolves a saved
+request's origin, a private trusted access binding, the selected profile's Hosted
+configuration, or the verified public onboarding origin recorded in
+`cli/trusted-hosted.json`. Explicit `--api-url` remains available for advanced
+operators. Saved requests cannot silently change origin. Redirects are refused.
+The currently verified beta origin requires connectivity to the Hosted service;
+this release does not claim an internet-public ingress independent of that service.
+
+```sh
+observa status       # actual local configuration and retained evidence
+observa doctor       # local diagnostics and paired Hosted health
+observa stop         # safely stop observation and delivery
+observa enable       # resume observation; restart gateway if instructed
+observa --help
+```
+
+`status` is offline. Configured/enabled does not prove that a gateway is running.
+`doctor` checks the supported runtime evidence, local proof integrity, delivery
+backlog and authenticated Hosted binding; it reports incomplete setup rather
+than inventing a healthy installation. `stop` preserves configuration,
+credentials, evidence and pending delivery. Other OpenClaw tools continue to
+operate. If the isolated synthetic bound tool was explicitly configured, it
+refuses new effects while observation controls are stopped.
+
+## Installation and CLI collisions
+
+The existing OpenClaw distribution channel is ClawHub's **code-plugin** package
+`@mcphersonai/mcpherson-governance-openclaw`. The established install command is:
 
 ```sh
 openclaw plugins install clawhub:@mcphersonai/mcpherson-governance-openclaw
-# restart the OpenClaw gateway (required for any plugin to load), then:
-observa --help
 ```
 
-OpenClaw installs plugins with package scripts disabled and does not link a
-plugin's `bin` entries, and its plugin CLI API only adds `openclaw <command>`
-subcommands, so the plugin provides the command itself. On every gateway start
-it ensures one small launcher named `observa` in the directory that holds the
-`openclaw` launcher the gateway was started from — for an npm global install
-the npm prefix `bin` directory, such as `~/.local/bin` or `/usr/local/bin`. No
-PATH edit, alias, Local Node install or knowledge of the extension directory is
-needed: if `openclaw` is on your PATH, so is `observa`.
+Before this candidate is publicly released, that command installs the existing
+published version. Use the release's verified version and artifact identity when
+performing an upgrade. Restart the selected gateway to register the plugin and
+refresh its CLI launchers. Do not reset OpenClaw memory, agents or state.
 
-The launcher contains no product code. It runs the CLI of the installed plugin
-directory and passes arguments through unchanged, so an update takes effect
-without rewriting it, and a reinstall is idempotent. It is written exclusively
-(never over an existing file) and only into a directory, and ancestors, that no
-other user can write. If the plugin is later removed, the launcher prints
-`OBSERVA_PLUGIN_NOT_INSTALLED` with the reinstall and `rm` commands and runs
-nothing else; it never falls back to another Observa package.
+The stable plugin configuration key is `mcpherson-governance-connector`; it
+intentionally differs from the package name. Existing configuration remains
+under this key.
 
-An existing `observa` that is not this plugin's launcher is never overwritten
-or removed. Observa Local Node (`@mcpherson-ai/observa-local-node`) also ships
-an `observa` command; when it holds the name, the plugin records
-`COLLISION_LOCAL_NODE`, leaves Local Node untouched, and `observa status` (run
-as `node <extension-dir>/observa.mjs status`) prints the remediation: remove
-Local Node's global command or keep using the direct path. Any other file gives
-`COLLISION_UNKNOWN`. `observa uninstall` removes only this plugin's own
-launcher. `openclaw plugins uninstall` alone does not run plugin code, so after
-it the leftover launcher explains itself and can be removed with `rm`. With
-several OpenClaw profiles, the launcher follows the most recently started
-gateway; `--profile` still selects which profile's state every command reads.
-Windows is not supported by the launcher; use `node <extension-dir>\observa.mjs`.
+When Observa Local Node owns `observa`, use the namespaced OpenClaw command:
 
-Every major command supports `--help`. No arguments also prints help. `--json`
-selects the versioned `observa-cli/v1` metadata envelope for inspection, controls,
-lifecycle, version and Hosted request commands. Help remains text. Pairing uses
-the existing hidden-terminal/owner-only-file flow and explicitly refuses `--json`.
-Unknown options and invalid arguments return a bounded error with exit status 1;
-empty local views exit 0. Failed admission operations return a bounded error and
-retain the private request receipt for a retry.
+```sh
+observa-openclaw access
+observa-openclaw access status
+observa-openclaw pair
+observa-openclaw status
+observa-openclaw doctor
+observa-openclaw stop
+```
 
-Use `--profile <name>` and, when needed, `--profile-home <home>` to select an
-OpenClaw profile. `OPENCLAW_STATE_DIR` supports a custom runtime root; it must agree
-with explicit profile selectors. A conflicting `OPENCLAW_CONFIG_PATH` is refused.
-No command searches other profiles. Pair retains the existing named/default
-profile model; custom roots cannot be coerced into another profile for pairing.
+The connector never overwrites Local Node, unknown commands or package-manager
+links. It creates `observa-openclaw` alongside the verified OpenClaw launcher when
+that name is available. If either name is occupied or the launcher directory is
+unwritable, gateway diagnostics provide the verified installed CLI's direct
+`node …/observa.mjs` fallback. Namespace failures are recorded, not hidden.
 
-## Hosted beta access
+## Runtime and evidence boundaries
 
-Run `observa request-access --api-url https://<host>`. Enter name, email and
-optional organization/use case, review the exact bounded metadata, and explicitly
-confirm. A one-time email code expires in 10 minutes; paste it at the hidden
-prompt. The verified request enters the founder's Access Requests queue.
+The tested target is the official OpenClaw `v2026.10.9` source commit
+`8b18b5578f66eab1501cba4cef2310d88bfb9a41`. Its Node engine requirement is
+`>=24.22.1 <25 || >=26.12.1`; qualification uses Node 24.22.1 on macOS arm64.
+A declared Node range is not a test claim for every Node version, platform or
+OpenClaw release. Plugin APIs remain version-pinned and subject to upstream change.
 
-For automation, supply `--name`, `--email`, `--yes` and `--json`. Verify in a
-second invocation with `--code-file <0600-file>`; verification codes and private
-request credentials never appear in JSON. `--resend` retries email delivery.
-The owner-only receipt is in the selected profile's `observa-access/request.json`;
-request status never authenticates with a runtime or installation credential.
+The exact upstream installation is not free of dependency advisories. The
+October 30 audit reports six affected package entries (four high, two moderate),
+including OpenClaw's pinned undici 8.11.2 and zod 4.6.5. This connector adds no npm
+runtime dependencies and does not patch or certify the host. Compatibility tests
+do not establish that untrusted host networking or other OpenClaw features are safe.
 
-`observa request-status --json` returns the saved request's state. Approval sends
-an existing single-use beta invite to the verified email. Redeem it in Hosted,
-sign in, accept the beta documents, and obtain a pairing code. Then run
-`observa pair`. Missing invitation mail can be retried with
-`observa request-access --resend`. Expired or denied requests can start again
-with `--new`. Different emails require new verification.
+The adapter registers supported tool, session and model lifecycle hooks. It does
+not read OpenClaw's private agent/session database or infer execution from the
+configured agent roster. The connector owns a separate `native-v1/evidence.sqlite`
+inside its existing state directory. Signed, chained records and delivery intent
+commit together with full SQLite synchronization. Replay indexes and acceptance
+indexes are verified against signed evidence in one consistent database snapshot.
 
-Approval authorizes beta onboarding only: tenant/workspace and role come from
-the staff decision; composition approval and automatic signed-manifest issuance
-retain their existing separate server-side authority. No paid entitlement or
-installation credential is issued by an access request. Public local use remains
-available without approval. Access requests need a Hosted service with
-admission routing, durable storage and email delivery configured.
-This package includes the root `openclaw.plugin.json` required for managed installation.
-Its plugin manifest id is `mcpherson-governance-connector` and the npm package is
-`@mcphersonai/mcpherson-governance-openclaw`. OpenClaw notes the difference and uses
-the manifest id as the config key; that is intentional and stable. Installed profiles
-key `plugins.entries.mcpherson-governance-connector` on it, so the id is not renamed.
-Signed component manifests are consumed by the Local Node installer. This
-OpenClaw package uses managed plugin installation and credential pairing.
+Before/after tool evidence uses deployment, agent, run, tool-call and tool
+identity. Optional session identities are correlated when present. Missing or
+contradictory identity remains unresolved. A missing, asynchronous or unrecognized
+result is `UNKNOWN`; a tool return does not prove a business outcome. No prompt,
+argument body, result body or raw exception text is stored in the native journal.
+Session identifiers and local run/call references are hashes. The existing closed
+Hosted v2 envelope retains its bounded, screened native run/tool-call identifiers
+for exact execution linkage; those identifiers are part of durable delivery intent.
 
-## What the local views prove
+Supported completed, failed or timed-out observations use the existing Hosted
+`/v1/observations` v2 contract. UNKNOWN outcomes, lifecycle metadata and bound-policy
+evidence remain local. Current Hosted native-v3 is specific to another adapter;
+it does not accept OpenClaw. This connector does not relabel OpenClaw events to
+fit it. Existing receipts and their schemas remain intact.
 
-`agents` uses the runtime-completeness configured roster function: `agents.entries`
-or the supported `agents.list` equivalent. A readable empty host config has
-OpenClaw's implicit default roster; missing/corrupt config never invents one.
-Configured agents without completion receipts have no observed capabilities.
-`agent <id>` combines that roster with locally evidenced activity and decisions.
+Delivery completes only after authenticated HTTPS acceptance with the exact
+request hash and a durable local acceptance record. Requests remain bound to the
+capture-time credential, origin and deployment. Re-pairing or credential rotation
+does not silently redirect old evidence. Network failures retain pending evidence
+for retry/restart. The current Hosted route has a five-minute freshness window
+and refuses consumed-nonce/correlation replay: a lost acknowledgement or expired
+request remains unresolved, even if a server row might exist. A 409 is never
+reported as acceptance. These limits prevent a universal eventual-delivery claim.
 
-`activity` reads actual validated completion receipts, including completion/failure/
-timeout metadata. Attempt receipts, lifecycle records and heartbeat are not
-meaningful activity. `decisions` reads SHADOW decision records and projects only
-WOULD_ALLOW, WOULD_DENY, WOULD_REQUIRE_APPROVAL, ABSTAIN, INDETERMINATE and ERROR
-when present. It never derives decisions from activity or claims business success.
-An agent with decision evidence alone remains `DECISION_ONLY`, not observed.
+## First bound operation
 
-Each evidence file is read from its final 1 MiB; each record is limited to 16 KiB.
-The default result limit is 20 (maximum 100). Agent identity and capability sets
-refer to this inspected local window, not all-time history. ACTIVE means meaningful
-activity in the last five minutes, not active governance. QUIET means older local
-activity; CONFIGURED means no completion in the inspected window. `never` means no
-meaningful activity evidenced in this view. Truncation and corrupt/rejected records
-are reported; healthy-looking partial output does not hide evidence warnings.
+**Customer enforcement is disabled by default.** The optional binding currently
+permits isolated synthetic qualification only. It registers one connector-owned
+tool, `observa_bound_write`, for exclusive creation of a bounded synthetic text
+file beneath the connector's `bound-synthetic` directory.
 
-`status` resolves plugin configuration from the selected `openclaw.json`, then
-combines it with durable observation controls. It distinguishes plugin installation
-metadata, plugin configuration, pairing, enabled configuration intent, observing
-evidence and Hosted connection state. Package manifests prove an installed package
-where available; they do not prove a loaded gateway. Runtime version comes from
-last local SHADOW evidence and is labelled as historical. Credentials are read only
-through the existing safe descriptor path; only the existing identifier/fingerprint
-can appear, never the credential.
+The actual OpenClaw `before_tool_call` hook invokes the unchanged V7 deterministic
+evaluator. The adapter consumes its decision; it does not decide policy itself.
+The vocabulary is ALLOW, DENY, REQUIRE_APPROVAL, ABSTAIN, INDETERMINATE and ERROR.
+Only a valid permit proceeds. A supported interactive host approval is bound to
+the exact request and re-evaluated by V7. `allow-always` is not offered. The tool
+also checks the exact parameter digest and unchanged policy at execution, and
+persists a single-use claim before creating a file. Uncertain crash-after-effect
+claims remain consumed after restart.
 
-`status` never contacts Hosted. Its heartbeat line comes from the gateway's local
-publication journal (the last heartbeat Hosted accepted) and is `NOT_AVAILABLE`
-until a gateway running this version has had one accepted; live runtime stays
-`NOT_PROBED`, and pairing is never called a current Hosted connection. Recent
-completion evidence is labelled `RECENT_LOCAL_EVIDENCE`; old evidence is STALE;
-a later gateway-stop receipt produces STOPPED. None is a live-process claim.
-No inspection starts a gateway, contacts Hosted or changes local files.
+Ordinary shell `exec`, file `write`/`edit`/`apply_patch`, other plugin tools, MCP
+routes, native harness tools, subagent tools, gateway commands and external
+processes are **not governed by this policy binding**. A subagent cannot invoke
+this bound tool under an unapproved agent identity, but that does not govern its
+other tools. OpenClaw may expose routes that do not run these hooks; direct access
+to this bound executor still requires its exact unconsumed permit. Neither this
+hook nor its synthetic tests establish comprehensive enforcement or independent
+certification.
 
-Plain JSON is supported, matching the existing pairing configuration reader.
-JSON5, includes, environment substitutions and foreign state/receipt paths are
-refused explicitly instead of falling back to standalone defaults. This is a
-bounded local CLI, not a second OpenClaw configuration engine.
+Production activation requires separate Control Gate C qualification, explicit
+customer authorization and a separately accepted activation path. This release
+has no production-enforcement switch. V7 evaluator records retain their own
+SIMULATION/NONE posture; the synthetic host binding and actual downstream outcome
+are recorded separately.
 
-## Hosted health and identify
+## Advanced compatibility
 
-`observa hosted-health` is the deliberate, networked counterpart of `status`.
-With the paired credential it calls the existing `GET /v1/health` and
-`GET /v1/credentials/identity` contracts and reports: paired, credential
-present, Hosted reachable, installation binding (credential id and deployment
-accepted by Hosted), the deployment id, workspace binding (resolved by Hosted
-from the credential and not disclosed), last successful Hosted contact, and
-the runtime heartbeat and roster freshness the gateway recorded. States include
-`HEALTHY`, `NOT_PAIRED` (with the request-access → request-status → pair next
-steps), `REFUSED_BY_CONTROL`, `UNREACHABLE`, `CREDENTIAL_REFUSED`,
-`BINDING_MISMATCH`, `HOSTED_UNAVAILABLE`, `CONNECTED_HEARTBEAT_STALE` and
-`CONNECTED_HEARTBEAT_UNKNOWN`. Exit status is 0 only for `HEALTHY`, 2 for a
-completed check that is not healthy, 1 when the check could not run.
+`request-access` remains an alias for `access`; `request-status` remains an alias
+for `access status`. Existing advanced commands remain available: `agents`,
+`agent`, `activity`, `decisions`, `hosted-health`, `identify`, `enable`, `disable`,
+`killswitch`, `lock`, `credential rotate`, `credential recover`, `unpair` and
+`uninstall`. Existing flags and `observa-pair` / `observa-openclaw-ctl` entrypoints
+are retained. Use `<command> --help` for exact options.
 
-`observa identify` reports the agents the selected OpenClaw profile configures
-(the same configured-roster function the runtime publishes). When paired, it
-confirms that roster on Hosted through the existing `POST /v1/runtime/inventory`
-contract under the running gateway's own runtime instance and generation, read
-from the gateway's local publication journal. Hosted gives roster ownership to
-the highest runtime generation, so `identify` never claims one: an unchanged
-roster is an idempotent confirmation (`ROSTER_CONFIRMED`), and a roster changed
-since the gateway started is reported as `ROSTER_CHANGED_RESTART_REQUIRED` and
-left for the gateway to publish on restart. Unpaired, it still identifies the
-agents locally and shows the access funnel.
+`activity` and `decisions` retain their existing receipt/counterfactual views;
+they are not a complete projection of the new native journal. `status` reports
+native evidence integrity and delivery backlog separately. Profile selection and
+state-path safety checks apply to all commands.
 
-Neither command sends a heartbeat or writes a receipt, activity record or
-governance decision, so no agent becomes ACTIVE and the dashboard's activity
-stays truthful. Both obey `disable`, the kill switch and the lock: when one is
-active they report `REFUSED_BY_CONTROL` without reading the credential or
-opening a connection. Neither changes controls, mappings, configuration,
-policy or authority.
-
-## Controls and compatibility
-
-`enable` enables this plugin's entry and connector configuration when necessary,
-preserves other config, and clears its durable disable flag. A gateway reload may
-be required after a configuration change; the command says so. It never opens
-global plugin gates or enables other plugins.
-
-`disable`, `killswitch on` and `lock on` each stop **all** Observa Hosted outbound
-traffic from the plugin runtime: observations, SHADOW evaluations, the startup
-runtime roster, and the periodic liveness heartbeat. While any of them is active
-the plugin makes zero Hosted requests and never reads the paired credential, on a
-fresh gateway start as well as mid-session, and a retry armed before the control
-was set still refuses when it fires. Precedence is disable, then kill switch, then
-lock; an unreadable or malformed control file fails closed. Clearing the control
-resumes ordinary publication without a gateway restart. Ordinary OpenClaw tools
-continue unchanged throughout — these controls stop Observa, never your agents.
-
-The operator's `hosted-health` and `identify` commands are inside that stop too.
-Two Hosted paths are deliberately outside it, because each is an explicit
-operator command rather than background traffic: `pair` (which redeems a pairing
-code and has no credential to obey a control with yet) and `unpair` (which sets
-the durable disable flag first, then confirms server-side revocation before
-deleting the local credential). `request-access`/`request-status` use their own
-per-request owner key and never touch the installation credential.
-
-Pair, authenticated rotation/recovery and unpair reuse the inherited lifecycle
-implementation. Rotation still requires the existing trusted server operator;
-there is no new admin backend. Unpair deletes credentials only after revocation
-confirmation and retains existing recovery state on failure. Uninstall invokes
-the existing OpenClaw plugin uninstaller in the selected profile and preserves
-receipts; it does not itself revoke credentials. OpenClaw 2026.8.2 asks to
-confirm a plugin removal: in a terminal you answer OpenClaw's own prompt, and
-non-interactive callers pass `observa uninstall --yes` (without it they get
-`UNINSTALL_CONFIRMATION_REQUIRED` and nothing is removed). Only after OpenClaw
-confirms the removal does `uninstall` delete this plugin's own `observa`
-launcher.
-
-`observa-pair` routes to `observa pair` and retains its existing options.
-`observa-openclaw-ctl status|enable|disable|unpair|uninstall` routes to the matching
-command. `rotate`/`recover` route to `credential rotate`/`credential recover`, and
-`killswitch --on|--off`/`lock --on|--off` route to the corresponding subcommands.
-The ctl alias retains its legacy JSON result fields and callable `runConnectorCtl`
-export. Help works through both aliases. Explicit legacy endpoint/deployment/agent/
-state flags must agree with the selected profile; mismatched selectors now fail
-safely instead of operating on ambiguous or foreign state. The original lifecycle
-implementation is also retained in `connector-ctl-legacy.mjs`.
-
-The existing Local Node installer package (`@mcphersonai/observa-cli`) and its
-working entry points are unchanged in this release. This OpenClaw package does
-not replace or bundle that installer. The shared command router selects a bounded
-runtime provider (`--runtime openclaw`); Local Node/n8n, MCP and custom adapters can
-supply the same projected snapshot and bounded controls later. No dynamic plugin
-platform, alternate runtime adapter or MCP implementation is included here.
-
-All paths, outputs and status fields describe local metadata. No prompts, messages,
-command bodies, tool result bodies, environment values, pairing codes, approval
-tokens or credential contents are emitted by the inspection views. Unsafe file
-ownership/permissions, symlinks, hardlinks and foreign paths fail safely. The
-owner-controlled local evidence files are not a remotely authenticated ledger.
-
-## What leaves this machine
-
-A paired, enabled installation sends exactly four kinds of background request,
-all to the endpoint bound at pairing, all over verified TLS, all bearing the
-installation credential:
-
-| Request | When | Contents |
-| --- | --- | --- |
-| `POST /v1/runtime/inventory` | once per gateway start | runtime instance id, generation, the configured agent id list, roster revision |
-| `POST /v1/runtime/heartbeat` | every 60s | runtime instance id, generation, sequence, cadence |
-| `POST /v1/observations`, `POST /v1/decisions` | per observed tool call | bounded identity and classification metadata |
-| `POST /v1/openclaw/shadow/evaluate` | per governed tool call | bounded metadata, executable name, correlation reference, digest of tool arguments |
-
-Roster and heartbeat carry no tool identities, no capabilities, no activity and
-no business claim; they say this runtime is alive and which agent ids the host
-configures. No request ever carries a prompt, message body, command body, tool
-result, exception body, environment value, pairing code, approval token or
-credential content. All five paths obey `disable`, the kill switch and the lock.
-
-Only when you run them, `observa hosted-health` sends `GET /v1/health` and
-`GET /v1/credentials/identity` (no body), and `observa identify` sends one
-`POST /v1/runtime/inventory` with the same roster fields as the gateway. They
-obey the same controls.
-
-## Capabilities this plugin asks for
-
-The plugin registers four OpenClaw hooks — `before_tool_call`, `after_tool_call`,
-`gateway_start`, `gateway_stop` — and one tool, `mcpherson_connection_test`, which
-takes no arguments, makes no network call and returns a fixed marker.
-
-It builds no prompt and mutates no conversation, so `pair` and `enable` write
-`hooks.allowPromptInjection: false` and `hooks.allowConversationAccess: false`
-into this plugin's own `openclaw.json` entry, and OpenClaw's capability review
-then reports both as denied. An explicit value you have already set is preserved.
-Because OpenClaw grants prompt injection by default to any plugin whose entry is
-silent, and because a first-time install has no entry yet, the approval screen on
-the very first `openclaw plugins install` shows the host default until `pair` or
-`enable` writes the policy; to see it denied at first install, add the entry with
-those two keys before installing.
-
-SHADOW ONLY / AUTHORITY NONE / ENFORCEMENT OFF / ACTIVE OFF
+Preserve the original 0.7.4 artifact, state directory and any configuration
+backups before an upgrade. Rolling package code back does not require deleting
+native evidence; an older connector simply does not consume the new journal.
+Remove a newly configured synthetic binding from the active configuration before
+using code whose configuration schema predates that field. Do not delete proof,
+credentials, memories, backups or worktrees to repair an installation.
 
 ## License
 
-The publicly distributed McPherson Governance OpenClaw plugin is licensed under
-the Apache License, Version 2.0 (SPDX: `Apache-2.0`). See [LICENSE](LICENSE) and
-[NOTICE](NOTICE) for the license text, attribution, scope and trademark boundary.
-The license covers this plugin distribution; it does not automatically license
-or grant access to Observa Hosted or separately distributed commercial/private
-products and services.
-
-The [v0.7.4 licensing clarification](LICENSE-CLARIFICATION-v0.7.4.md) explicitly
-covers the already-published artifact by tag, filename and SHA-256. Its original
-bytes and tag are unchanged; the original archive did not contain LICENSE,
-NOTICE or package license metadata. GitHub is the authoritative license surface.
-ClawHub may display only a generic "open source" label.
-
-## License verification for maintainers
-
-Run `npm run verify:license` and `npm test` before a future release. The checks
-require the standard Apache-2.0 text, NOTICE, consistent root and bundled
-connector license metadata, and inclusion of licensing files in npm's pack list.
-
-The licensing repair retains the source version 0.7.4 and must not be packed or
-published as a replacement 0.7.4 artifact. To run the existing artifact tests on
-this repair, set `OPENCLAW_TEST_ARTIFACT` to the downloaded original release
-archive; the test verifies its exact published SHA-256 before reading it.
-
-For the next separately authorized release, update the normal version surfaces,
-run the tests, build its new-version archive, then run:
-
-```sh
-npm run verify:release -- /path/to/the/new-version-artifact.tgz
-```
-
-This verifies LICENSE and NOTICE inside the actual archive, all packaged
-package.json license declarations, their source identities, and the v0.7.4
-clarification. A dry-run pack list alone is not final artifact verification.
-Do not publish unless both the tests and this artifact check pass. No new
-runtime dependency or install lifecycle script is required.
+See `LICENSE`, `NOTICE` and `LICENSE-CLARIFICATION-v0.7.4.md` for the existing
+plugin's Apache-2.0 grant and service/trademark boundaries. The proposed V7 file
+set is identified in `plugins/openclaw-connector/v7/PROVENANCE.json`; authorization
+for that previously private source's public disclosure and license is pending.
+No public release of this candidate is authorized by this README.

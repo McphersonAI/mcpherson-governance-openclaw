@@ -11,9 +11,9 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const read = (path) => readFileSync(join(ROOT, path), "utf8");
 const json = (path) => JSON.parse(read(path));
 
-export const VERSION = "0.7.4";
+export const VERSION = "0.8.0";
 
-describe("every current-facing version surface says 0.7.4", () => {
+describe("every current-facing version surface says 0.8.0", () => {
   const surfaces = [
     ["package.json", () => json("package.json").version],
     ["plugins/openclaw-connector/package.json", () => json("plugins/openclaw-connector/package.json").version],
@@ -82,22 +82,22 @@ describe("the manifests are valid and internally consistent", () => {
 
   it("keeps the OpenClaw compatibility floor", () => {
     const pkg = json("package.json");
-    assert.equal(pkg.peerDependencies.openclaw, ">=2026.8.2");
-    assert.equal(pkg.openclaw.compat.pluginApi, ">=2026.8.2");
-    assert.equal(pkg.engines.node, ">=22");
+    assert.equal(pkg.peerDependencies.openclaw, "2026.10.9");
+    assert.equal(pkg.openclaw.compat.pluginApi, "2026.10.9");
+    assert.equal(pkg.engines.node, ">=24.22.1 <25 || >=26.12.1");
     assert.deepEqual(pkg.openclaw.extensions, ["./plugins/openclaw-connector/plugin.mjs"]);
     assert.equal(pkg.openclaw.build.shadowMode, "SHADOW");
     assert.equal(pkg.openclaw.build.authority, "NONE");
     assert.equal(pkg.openclaw.build.enforcement, "OFF");
     assert.equal(pkg.openclaw.build.active, false);
-    assert.ok(/MIN_SUPPORTED_OPENCLAW_VERSION = "2026\.8\.2"/.test(read("plugins/openclaw-connector/constants.mjs")));
+    assert.ok(/MIN_SUPPORTED_OPENCLAW_VERSION = "2026\.10\.9"/.test(read("plugins/openclaw-connector/constants.mjs")));
   });
 
   it("records the exact authorized base this candidate was cut from", () => {
     const provenance = json("CANDIDATE-PROVENANCE.json");
     // The exact commit the public v0.7.3 tag targets.
-    assert.equal(provenance.authorized_base.head, "1237c59a70eb2c81318abc4b29d4724d0ad4d8ea");
-    assert.equal(provenance.authorized_base.tree, "01e9d3b0c67f6c76a68b211dec3907c96044c8a2");
+    assert.equal(provenance.authorized_base.head, "a4038550796dbcaf51894ae1646d78d9da9553d9");
+    assert.equal(provenance.authorized_base.tree, "2b544c809b38df1ab584dfc70fff69891e0d0cbd");
     assert.deepEqual(provenance.posture, {
       mode: "SHADOW", authority: "NONE", enforcement: "OFF", active: false,
     });
@@ -113,7 +113,7 @@ describe("the packed artifact carries exactly the release surface", () => {
   it("names the artifact for this version", () => {
     assert.equal(packed.name, "@mcphersonai/mcpherson-governance-openclaw");
     assert.equal(packed.version, VERSION);
-    assert.equal(packed.filename, "mcphersonai-mcpherson-governance-openclaw-0.7.4.tgz");
+    assert.equal(packed.filename, "mcphersonai-mcpherson-governance-openclaw-0.8.0.tgz");
   });
 
   it("includes every file the plugin needs at runtime", () => {

@@ -16,5 +16,11 @@ const pathOverrides = Object.freeze({
 export default createGovernanceConnector({
   pathOverrides,
   subscribeDiagnostics: onInternalDiagnosticEvent,
-  cliEntrypoint: (config) => ensureObservaEntrypoint({ packageRoot: PACKAGE_ROOT, stateDir: config.stateDir }),
+  cliEntrypoint: (config, api) => {
+    // The public API identifies the durable installation; import.meta may be
+    // a disposable host capture in OpenClaw 2026.10.9.
+    const packageRoot = api.rootDir ?? PACKAGE_ROOT;
+    const namespaced = ensureObservaEntrypoint({ packageRoot, stateDir: config.stateDir, entrypointName: "observa-openclaw" });
+    return ensureObservaEntrypoint({ packageRoot, stateDir: config.stateDir, namespaced });
+  },
 });

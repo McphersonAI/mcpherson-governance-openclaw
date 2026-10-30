@@ -1,19 +1,28 @@
 {
-  "schema": "observa-unified-local-cli-candidate/v1",
-  "version": "0.7.4",
+  "schema": "observa-openclaw-bound-node-candidate/v1",
+  "version": "0.8.0",
   "authorized_base": {
-    "head": "1237c59a70eb2c81318abc4b29d4724d0ad4d8ea",
-    "tree": "01e9d3b0c67f6c76a68b211dec3907c96044c8a2"
+    "head": "a4038550796dbcaf51894ae1646d78d9da9553d9",
+    "tree": "2b544c809b38df1ab584dfc70fff69891e0d0cbd"
   },
   "immutable_runtime_input": {
     "version": "0.7.1-beta.1",
     "sha256": "bca0b9715a0e537bc39b0939610c047799f7450a5ac767b41a09a2bd2c8c6fb2"
   },
-  "scope": "CLI discoverability and Hosted CTL: a normal OpenClaw install now gets a managed `observa` command beside the `openclaw` launcher (never overwriting Local Node or any unknown command), plus operator-invoked `observa hosted-health` and `observa identify` over the existing health, credential identity and runtime roster contracts, gated by the same disable/killswitch/lock controls, and writing no activity, decision or heartbeat",
+  "scope": "OpenClaw 2026.10.9 native evidence adapter, access CLI, and disabled-by-default synthetic pre-action V7 binding. Qualification and release acceptance pending.",
   "posture": {
     "mode": "SHADOW",
     "authority": "NONE",
     "enforcement": "OFF",
     "active": false
+  },
+  "prior_authorized_base": {
+    "head": "1237c59a70eb2c81318abc4b29d4724d0ad4d8ea",
+    "tree": "01e9d3b0c67f6c76a68b211dec3907c96044c8a2"
+  },
+  "upstream": {
+    "version": "2026.10.9",
+    "commit": "8b18b5578f66eab1501cba4cef2310d88bfb9a41",
+    "npm_integrity": "sha512-KbIl0/7an0/nKBo92FnJg7LFcEpFVQyOgSRfHNE9yxELg1Ebql7BmBsdLL+1dDOLZnQtuwjt6Hy45CCrmYdJNA=="
   }
 }

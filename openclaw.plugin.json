@@ -1,13 +1,14 @@
 {
   "id": "mcpherson-governance-connector",
   "name": "McPherson Governance Connector",
-  "description": "Observa v0.7 SHADOW governance evidence for OpenClaw. AUTHORITY NONE, ENFORCEMENT OFF, ACTIVE OFF; simulated decisions never alter execution.",
+  "description": "Observa native evidence adapter for OpenClaw 2026.10.9; enforcement disabled by default, optional isolated V7 synthetic binding.",
   "activation": {
     "onStartup": true
   },
   "contracts": {
     "tools": [
-      "mcpherson_connection_test"
+      "mcpherson_connection_test",
+      "observa_bound_write"
     ]
   },
   "configSchema": {
@@ -147,8 +148,29 @@
             }
           }
         }
+      },
+      "boundNode": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "mode",
+          "customerAuthorization"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "mode": {
+            "const": "SYNTHETIC"
+          },
+          "customerAuthorization": {
+            "const": false
+          }
+        }
       }
     }
   },
-  "version": "0.7.4"
+  "version": "0.8.0"
 }

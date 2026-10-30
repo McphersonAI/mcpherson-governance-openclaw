@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-audit-export-v1.schema.json",
+  "title": "McPherson Governance v0.7 audit export",
+  "description": "A scoped, read-only export bundle of decision-log segments for an auditor. audit_anchor explicitly fixes the expected first segment sequence, previous-segment hash/genesis marker, and first-record predecessor/genesis marker. Export construction runs full record, segment, scope, and cross-segment verification before returning. UNSIGNED integrity evidence, not a claim of authenticity or producer authentication: authentication is const NONE and signed is const false.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "wireSafeId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
+    "nullableSha256": {
+      "oneOf": [
+        { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        { "type": "null" }
+      ]
+    },
+    "auditAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_first_segment_seq", "expected_prev_segment_last_hash",
+        "expected_first_record_prev_hash"
+      ],
+      "properties": {
+        "expected_first_segment_seq": {
+          "type": "integer", "minimum": 0, "maximum": 1000000000
+        },
+        "expected_prev_segment_last_hash": { "$ref": "#/$defs/nullableSha256" },
+        "expected_first_record_prev_hash": { "$ref": "#/$defs/nullableSha256" }
+      }
+    }
+  },
+  "required": [
+    "schema", "export_version", "tenant_id", "workspace_id", "policy_bundle_id",
+    "audit_anchor", "segment_count", "segments", "authentication", "signed"
+  ],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-audit-export/v1" },
+    "export_version": { "const": "1" },
+    "tenant_id": { "$ref": "#/$defs/wireSafeId" },
+    "workspace_id": { "$ref": "#/$defs/wireSafeId" },
+    "policy_bundle_id": { "$ref": "#/$defs/wireSafeId" },
+    "audit_anchor": { "$ref": "#/$defs/auditAnchor" },
+    "segment_count": { "type": "integer", "minimum": 0, "maximum": 100000 },
+    "segments": { "type": "array", "maxItems": 100000, "items": { "type": "object" } },
+    "authentication": { "const": "NONE" },
+    "signed": { "const": false }
+  }
+}

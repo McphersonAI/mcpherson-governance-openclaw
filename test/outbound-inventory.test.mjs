@@ -183,7 +183,11 @@ describe("every plugin-runtime Hosted path is gated", () => {
 
   it("ships no background timer other than the governed cadence and bounded deadlines", () => {
     for (const path of sources()) {
-      assert.equal(/setInterval/.test(code(path)), false, `${path} uses setInterval`);
+      if (path === "plugins/openclaw-connector/native-adapter.mjs") {
+        assert.ok(code(path).includes('if (this.#busy || !this.#enabled()) return;'));
+        assert.ok(code(path).includes('this.#timer.unref()'));
+        assert.ok(code(path).includes('clearInterval(this.#timer)'));
+      } else assert.equal(/setInterval/.test(code(path)), false, `${path} uses setInterval`);
     }
     const publisher = code("plugins/openclaw-connector/runtime-publisher.mjs");
     assert.ok(publisher.includes("unref"), "the cadence timer never holds the process open");

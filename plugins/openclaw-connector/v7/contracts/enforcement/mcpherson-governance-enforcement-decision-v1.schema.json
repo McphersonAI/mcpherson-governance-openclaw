@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-decision-v1.schema.json",
+  "title": "McPherson Governance v0.7 enforcement decision record",
+  "description": "Non-authoritative, evidence-bound decision record. Single closed object (no allOf). Carries the abstract_decision + decision_permit + reason_code ALONGSIDE the mapped mgp/1 wire_decision; consumers read the carried abstract value and MUST NOT reconstruct it from the wire value alone. authority is const NONE; runtime_active/enforcement_eligible are const false; evaluation_mode is const SIMULATION. engine_version and evaluation_context_hash are pinned for replay/rederivation. decision_permit is the only permit signal and is true only for an affirmative rederivable policy match or a fresh, unconsumed approval with a matching supplied trust result.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "wireSafeId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
+    "wireSafeLabel": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" },
+    "wireSafeRef": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "version": { "type": "string", "pattern": "^[A-Za-z0-9._+-]{1,32}$" },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+      "maxLength": 32,
+      "format": "date-time-utc"
+    },
+    "reasonCode": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(?::[a-z0-9_]+)*$", "maxLength": 96 },
+    "contributedDecision": {
+      "oneOf": [
+        { "type": "string", "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN"] },
+        { "type": "null" }
+      ]
+    },
+    "nullableSha256": {
+      "oneOf": [ { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }, { "type": "null" } ]
+    },
+    "nullableRef": {
+      "oneOf": [ { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" }, { "type": "null" } ]
+    },
+    "nullableVersion": {
+      "oneOf": [ { "type": "string", "pattern": "^[A-Za-z0-9._+-]{1,32}$" }, { "type": "null" } ]
+    },
+    "nullableWireSafeId": {
+      "oneOf": [ { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" }, { "type": "null" } ]
+    },
+    "nullableWireSafeLabel": {
+      "oneOf": [ { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" }, { "type": "null" } ]
+    },
+    "nullableTimestamp": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$",
+          "maxLength": 32,
+          "format": "date-time-utc"
+        },
+        { "type": "null" }
+      ]
+    },
+    "ruleEvaluated": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "matched", "contributed_decision", "precedence_rank", "enabled"],
+      "properties": {
+        "rule_id": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._:-]{0,94}[A-Za-z0-9])?$" },
+        "matched": { "type": "boolean" },
+        "contributed_decision": { "$ref": "#/$defs/contributedDecision" },
+        "precedence_rank": { "type": "integer", "minimum": -1, "maximum": 3 },
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "contradiction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["priority", "rule_ids", "decisions"],
+      "properties": {
+        "priority": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "rule_ids": {
+          "type": "array", "minItems": 2, "maxItems": 1024,
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._:-]{0,94}[A-Za-z0-9])?$" }
+        },
+        "decisions": {
+          "type": "array", "minItems": 2, "maxItems": 4, "uniqueItems": true,
+          "items": { "type": "string", "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN"] }
+        }
+      }
+    },
+    "conflictResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "winning_rule_id", "losing_rule_ids", "same_priority_contradictions"],
+      "properties": {
+        "strategy": { "type": "string", "enum": ["lattice", "strict"] },
+        "winning_rule_id": { "$ref": "#/$defs/nullableWireSafeId" },
+        "losing_rule_ids": {
+          "type": "array", "maxItems": 1024,
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._:-]{0,94}[A-Za-z0-9])?$" }
+        },
+        "same_priority_contradictions": {
+          "type": "array", "maxItems": 256,
+          "items": { "$ref": "#/$defs/contradiction" }
+        }
+      }
+    },
+    "approvalBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_state", "bound_approval_ref", "verified", "staleness",
+        "bound_envelope_hash", "bound_bundle_id", "bound_bundle_version",
+        "bound_bundle_hash", "bound_tenant_id", "bound_workspace_id",
+        "approval_issuer", "approval_subject", "approval_scope",
+        "issued_at", "expires_at", "trust_verification_hash", "trust_verified",
+        "consumption_status"
+      ],
+      "properties": {
+        "required_state": {
+          "oneOf": [
+            { "type": "string", "enum": ["NOT_REQUIRED", "PENDING", "APPROVED", "DENIED", "EXPIRED"] },
+            { "type": "null" }
+          ]
+        },
+        "bound_approval_ref": { "$ref": "#/$defs/nullableRef" },
+        "verified": { "type": "boolean" },
+        "staleness": {
+          "type": "string",
+          "enum": ["FRESH", "STALE", "MISSING", "EXPIRED", "MISMATCH", "UNVERIFIABLE", "REPLAYED"]
+        },
+        "bound_envelope_hash": { "$ref": "#/$defs/nullableSha256" },
+        "bound_bundle_id": { "$ref": "#/$defs/nullableWireSafeId" },
+        "bound_bundle_version": { "$ref": "#/$defs/nullableVersion" },
+        "bound_bundle_hash": { "$ref": "#/$defs/nullableSha256" },
+        "bound_tenant_id": { "$ref": "#/$defs/nullableWireSafeId" },
+        "bound_workspace_id": { "$ref": "#/$defs/nullableWireSafeId" },
+        "approval_issuer": { "$ref": "#/$defs/nullableWireSafeId" },
+        "approval_subject": { "$ref": "#/$defs/nullableWireSafeId" },
+        "approval_scope": { "$ref": "#/$defs/nullableWireSafeLabel" },
+        "issued_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "expires_at": { "$ref": "#/$defs/nullableTimestamp" },
+        "trust_verification_hash": { "$ref": "#/$defs/nullableSha256" },
+        "trust_verified": { "type": "boolean" },
+        "consumption_status": {
+          "type": "string",
+          "enum": ["NOT_APPLICABLE", "AVAILABLE", "CONSUMED", "UNKNOWN"]
+        }
+      }
+    }
+  },
+  "required": [
+    "schema", "contract_version", "engine_version", "evaluation_context_hash", "evaluation_mode",
+    "decision_id", "abstract_decision", "wire_decision", "decision_permit",
+    "authority", "runtime_active", "enforcement_eligible",
+    "envelope_id", "envelope_hash", "request_hash",
+    "policy_bundle_id", "policy_bundle_version", "policy_bundle_hash",
+    "tenant_id", "workspace_id",
+    "rules_evaluated", "default_applied", "conflict_resolution",
+    "reason_code", "rationale", "approval_required", "approval_binding",
+    "observed_at", "evaluated_at", "redaction_note",
+    "evidence_hash", "prev_record_hash"
+  ],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-decision/v1" },
+    "contract_version": { "const": "1" },
+    "engine_version": { "$ref": "#/$defs/version" },
+    "evaluation_context_hash": { "$ref": "#/$defs/sha256" },
+    "evaluation_mode": { "const": "SIMULATION" },
+    "decision_id": { "type": "string", "pattern": "^ench-dec-[a-f0-9]{24}$" },
+    "abstract_decision": {
+      "type": "string",
+      "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN", "INDETERMINATE", "ERROR"]
+    },
+    "wire_decision": {
+      "type": "string",
+      "enum": ["ALLOW", "ALLOW_AND_LOG", "REQUIRE_APPROVAL", "DENY", "SHADOW_ONLY", "HOLD"]
+    },
+    "decision_permit": { "type": "boolean" },
+    "authority": { "const": "NONE" },
+    "runtime_active": { "const": false },
+    "enforcement_eligible": { "const": false },
+    "envelope_id": {
+      "type": "string",
+      "oneOf": [
+        { "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" },
+        { "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$" }
+      ]
+    },
+    "envelope_hash": { "$ref": "#/$defs/sha256" },
+    "request_hash": { "$ref": "#/$defs/sha256" },
+    "correlation_ref": { "type": "string", "pattern": "^sha256:(?:[a-f0-9]{24}|[a-f0-9]{64})$" },
+    "trace_id": { "$ref": "#/$defs/wireSafeId" },
+    "policy_bundle_id": { "$ref": "#/$defs/wireSafeId" },
+    "policy_bundle_version": { "$ref": "#/$defs/version" },
+    "policy_bundle_hash": { "$ref": "#/$defs/sha256" },
+    "tenant_id": { "$ref": "#/$defs/wireSafeId" },
+    "workspace_id": { "$ref": "#/$defs/wireSafeId" },
+    "rules_evaluated": {
+      "type": "array", "maxItems": 1024,
+      "items": { "$ref": "#/$defs/ruleEvaluated" }
+    },
+    "default_applied": { "type": "boolean" },
+    "conflict_resolution": { "$ref": "#/$defs/conflictResolution" },
+    "reason_code": { "$ref": "#/$defs/reasonCode" },
+    "rationale": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "approval_required": { "type": "boolean" },
+    "approval_binding": { "$ref": "#/$defs/approvalBinding" },
+    "observed_at": { "$ref": "#/$defs/timestamp" },
+    "evaluated_at": { "$ref": "#/$defs/timestamp" },
+    "redaction_note": { "const": "no_raw_arguments_credentials_hosts_or_pii" },
+    "evidence_hash": { "$ref": "#/$defs/sha256" },
+    "prev_record_hash": { "$ref": "#/$defs/nullableSha256" }
+  }
+}

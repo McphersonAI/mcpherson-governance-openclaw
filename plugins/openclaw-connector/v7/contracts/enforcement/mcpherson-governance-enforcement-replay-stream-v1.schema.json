@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-replay-stream-v1.schema.json",
+  "title": "McPherson Governance v0.7 replay stream",
+  "description": "A recorded, fixture/replay-only stream of normalized envelopes for deterministic replay against a pinned engine_version and policy bundle. Each member of envelopes is additionally validated against mcpherson-governance-enforcement-envelope/v1 by contract composition; record_count must agree. provenance is FIXTURE or REPLAY only; v0.7 has NO live provenance. Sequence numbers must be contiguous from 1 (validated by the replay loader).",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "wireSafeId": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,96}$" },
+    "version": { "type": "string", "pattern": "^[A-Za-z0-9._+-]{1,32}$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  },
+  "required": ["schema", "stream_version", "provenance", "engine_version",
+    "policy_bundle_id", "policy_bundle_version", "record_count", "content_hash", "envelopes"],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-replay-stream/v1" },
+    "stream_version": { "const": "1" },
+    "provenance": { "type": "string", "enum": ["FIXTURE", "REPLAY"] },
+    "engine_version": { "$ref": "#/$defs/version" },
+    "policy_bundle_id": { "$ref": "#/$defs/wireSafeId" },
+    "policy_bundle_version": { "$ref": "#/$defs/version" },
+    "record_count": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "content_hash": { "$ref": "#/$defs/sha256" },
+    "envelopes": { "type": "array", "maxItems": 10000, "items": { "type": "object" } }
+  }
+}

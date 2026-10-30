@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-counterexample-v1.schema.json",
+  "title": "McPherson Governance v0.7 counterexample",
+  "description": "A minimal, reproducible envelope perturbation that flips a decision, emitted as a fixture. Non-authoritative. Also used to surface a same-priority contradiction even when the lattice resolved it (D3).",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "reasonCode": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(?::[a-z0-9_]+)*$", "maxLength": 96 }
+  },
+  "required": ["schema", "counterexample_version", "kind", "base_envelope",
+    "perturbed_field", "perturbed_envelope", "base_decision", "perturbed_decision"],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-counterexample/v1" },
+    "counterexample_version": { "const": "1" },
+    "kind": { "type": "string", "enum": ["DECISION_FLIP", "PERMIT_FLIP", "SAME_PRIORITY_CONTRADICTION"] },
+    "base_envelope": { "type": "object" },
+    "perturbed_field": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+    "perturbed_envelope": { "type": "object" },
+    "base_decision": { "type": "string", "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN", "INDETERMINATE", "ERROR"] },
+    "perturbed_decision": { "type": "string", "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN", "INDETERMINATE", "ERROR"] },
+    "note": { "type": "string", "minLength": 0, "maxLength": 256 }
+  }
+}

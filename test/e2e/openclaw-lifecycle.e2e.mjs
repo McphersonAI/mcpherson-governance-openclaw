@@ -121,7 +121,7 @@ const a = sandbox("A clean");
   const rs = observa(a, ["request-status", "--api-url", "https://observa.example"]);
   check("clean-install", "observa request-status (no request yet) is deterministic", rs.status === 1 && /^ACCESS_NO_REQUEST/.test(rs.stderr), rs.stderr.trim());
   const hh = observa(a, ["hosted-health"]);
-  check("clean-install", "observa hosted-health unpaired -> NOT_PAIRED + funnel", hh.status === 2 && /NOT_PAIRED[\s\S]*request-access[\s\S]*request-status[\s\S]*pair/.test(hh.stdout), hh.stdout.split("\n")[0]);
+  check("clean-install", "observa hosted-health unpaired -> NOT_PAIRED + funnel", hh.status === 2 && /NOT_PAIRED[\s\S]*observa access[\s\S]*observa access status[\s\S]*observa pair/.test(hh.stdout), hh.stdout.split("\n")[0]);
   const id = observa(a, ["identify"]);
   check("clean-install", "observa identify unpaired -> local roster, NOT_PAIRED", id.status === 0 && /Configured agents \(1[\s\S]*main[\s\S]*NOT_PAIRED/.test(id.stdout), id.stdout.split("\n").slice(1, 3).join(" "));
   const status = observa(a, ["status"]).stdout;

@@ -144,7 +144,7 @@ describe("hosted-health", () => {
     const result = await cli(["hosted-health"], { home: profile.home, hosted, credentialProvider: spy.provider });
     assert.equal(result.code, 2);
     assert.match(result.stdout, /^Observa hosted health: NOT_PAIRED/);
-    assert.match(result.stdout, /observa request-access[\s\S]*observa request-status[\s\S]*observa pair/);
+    assert.match(result.stdout, /observa access[\s\S]*observa access status[\s\S]*observa pair/);
     assert.deepEqual(hosted.state.requests, []);
     assert.deepEqual(spy.reads, []);
   });
@@ -245,7 +245,7 @@ describe("identify", () => {
     assert.equal(result.code, 0);
     assert.match(result.stdout, /Configured agents \(3, OpenClaw configured roster\):\n  aegis\n  main\n  sterling/);
     assert.match(result.stdout, /Hosted roster\s+NOT_PAIRED/);
-    assert.match(result.stdout, /observa request-access/);
+    assert.match(result.stdout, /observa access/);
     assert.deepEqual(hosted.state.requests, []);
   });
 

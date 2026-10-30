@@ -1,0 +1,8 @@
+{
+  "schema": "observa-published-access-origin/v1",
+  "origin": "https://governance-plane-observa.tailb473db.ts.net",
+  "source": "https://mcphersonai.com/getting-started",
+  "verified_on": "2026-10-30",
+  "source_sha256": "fe84d1433e818b2e63131ea2481fddb701db9293dba8e1a911636673f5c1c0ad",
+  "scope": "Published Hosted beta origin; access remains subject to connectivity and admission. No redirects are trusted."
+}

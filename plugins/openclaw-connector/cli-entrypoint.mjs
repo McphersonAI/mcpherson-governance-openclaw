@@ -42,6 +42,7 @@ export const ENTRYPOINT_STATES = Object.freeze([
   "COLLISION_LOCAL_NODE", "COLLISION_UNKNOWN", "PROVIDED_BY_PACKAGE_MANAGER",
   "NO_LAUNCHER_DIR", "UNSAFE_BIN_DIR", "UNSUPPORTED_PLATFORM", "FAILED",
 ]);
+export const NAMESPACED_ENTRYPOINT = "observa-openclaw";
 const MAX_LAUNCHER_BYTES = 16 * 1024;
 // OpenClaw 2026.8.2 ships a ~130 KiB package.json; stay well above that.
 const MAX_MANIFEST_BYTES = 1024 * 1024;
@@ -328,17 +329,17 @@ function replaceLauncher(dir, target, text, ino) {
   fsyncDirectory(dir);
 }
 
-function remediation(state, path, root) {
+function remediation(state, path, root, namespaced = null) {
   const direct = root ? `node ${shellQuote(join(root, "observa.mjs"))} <command>` : null;
+  const namespaceAdvice = namespaced && ['INSTALLED', 'CURRENT', 'UPDATED', 'PROVIDED_BY_PACKAGE_MANAGER'].includes(namespaced.state)
+    ? ' Use observa-openclaw <command> for this OpenClaw installation.' : '';
   if (state === "COLLISION_LOCAL_NODE") {
-    return `${path} belongs to Observa Local Node and was left unchanged. To use this plugin's CLI as observa, `
-      + `remove Local Node's global command (npm uninstall -g @mcpherson-ai/observa-local-node) and restart the `
-      + `OpenClaw gateway.${direct ? ` Until then run: ${direct}` : ""}`;
+    return `${path} belongs to Observa Local Node.${namespaceAdvice}${direct ? ` Direct fallback: ${direct}` : ""}`;
   }
   if (state === "COLLISION_UNKNOWN") {
-    return `${path} is not managed by this plugin and was left unchanged. Rename or remove it, then restart the `
-      + `OpenClaw gateway.${direct ? ` Until then run: ${direct}` : ""}`;
+    return `${path} is not managed by this plugin.${namespaceAdvice}${direct ? ` Direct fallback: ${direct}` : ""}`;
   }
+
   if (state === "PROVIDED_BY_PACKAGE_MANAGER") {
     return `${path} is a package-manager link to this package and was left unchanged.`;
   }
@@ -358,6 +359,7 @@ function record(stateDir, result) {
     plugin_version: PLUGIN_VERSION,
     recorded_at: new Date().toISOString(),
     remediation: result.remediation,
+    ...(result.namespaced ? { namespaced: result.namespaced } : {}),
   };
   atomicWriteSecureFile(join(stateDir, ENTRYPOINT_RECORD_FILE), `${JSON.stringify(value)}\n`);
 }
@@ -369,11 +371,12 @@ function record(stateDir, result) {
  */
 export function ensureObservaEntrypoint({
   packageRoot, stateDir = null, argv1 = process.argv[1], env = process.env,
-  platform = process.platform,
+  platform = process.platform, entrypointName = ENTRYPOINT_NAME, namespaced = null,
 } = {}) {
   let pluginRoot = null;
   let result;
   try {
+    if (![ENTRYPOINT_NAME, NAMESPACED_ENTRYPOINT].includes(entrypointName)) fail("ENTRYPOINT_NAME_INVALID");
     pluginRoot = realpathSync(packageRoot);
     if (readManifestName(pluginRoot) !== PACKAGE_NAME) fail("ENTRYPOINT_ROOT_INVALID");
     if (platform === "win32") {
@@ -386,12 +389,12 @@ export function ensureObservaEntrypoint({
         try { dir = safeLauncherDir(candidate); visible = candidate; break; } catch { /* try the next launcher directory */ }
       }
       if (dirs.length === 0) result = { state: "NO_LAUNCHER_DIR", path: null };
-      else if (dir === null) result = { state: "UNSAFE_BIN_DIR", path: join(dirs[0], ENTRYPOINT_NAME) };
+      else if (dir === null) result = { state: "UNSAFE_BIN_DIR", path: join(dirs[0], entrypointName) };
       else {
         // Written through the verified real directory; reported as the
         // directory the operator's PATH names.
-        const target = join(dir, ENTRYPOINT_NAME);
-        const shown = join(visible, ENTRYPOINT_NAME);
+        const target = join(dir, entrypointName);
+        const shown = join(visible, entrypointName);
         const text = renderEntrypoint(pluginRoot);
         const current = classifyEntrypoint(target);
         if (current.kind === "ABSENT") {
@@ -416,9 +419,10 @@ export function ensureObservaEntrypoint({
     result = { state: "FAILED", path: result?.path ?? null, code: errorCode(error) };
   }
   const outcome = Object.freeze({
-    ...result, pluginRoot, remediation: remediation(result.state, result.path, pluginRoot),
+    ...result, pluginRoot, remediation: remediation(result.state, result.path, pluginRoot, namespaced),
+    ...(namespaced ? { namespaced: { state: namespaced.state, path: namespaced.path } } : {}),
   });
-  try { record(stateDir, outcome); } catch { /* the launcher outcome stands without its record */ }
+  try { if (entrypointName === ENTRYPOINT_NAME) record(stateDir, outcome); } catch { /* the launcher outcome stands without its record */ }
   return outcome;
 }
 
@@ -440,7 +444,7 @@ export function removeObservaEntrypoint({ pluginRoot, stateDir = null, argv1 = p
   const root = pluginRoot;
   const candidates = new Set();
   const recorded = stateDir ? readEntrypointRecord(stateDir) : null;
-  if (recorded?.path) candidates.add(recorded.path);
+  if (recorded?.path) { candidates.add(recorded.path); candidates.add(join(dirname(recorded.path), NAMESPACED_ENTRYPOINT)); }
   if (typeof argv1 === "string" && isAbsolute(argv1) && basename(argv1) === ENTRYPOINT_NAME) candidates.add(argv1);
   const removed = [];
   const kept = [];

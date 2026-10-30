@@ -1,3 +1,4 @@
+import { resolveAccessOrigin } from './access-origin.mjs';
 import { randomBytes } from 'node:crypto';
 import { closeSync, constants, fsyncSync, mkdirSync, openSync, readSync, renameSync, writeFileSync, writeSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -7,7 +8,7 @@ import { assertPath, readBounded, readJson, refuse } from './safe-local.mjs';
 import { resolveProfile } from './providers/openclaw.mjs';
 
 export const ACCESS_HELP = {
-  'request-access': `request-access --api-url <https://host> [--name <name> --email <email>]
+  'request-access': `request-access [--api-url <https://host>] [--name <name> --email <email>]
 Request Hosted beta access. Verified email and founder approval are required.
 Optional: --organization <company> --use-case <description>.
 Review the exact admission metadata before confirming. --yes confirms submission
@@ -16,13 +17,13 @@ verification codes or request credentials. Runtime metadata is self-reported.
 Run again with --code-file <0600-file> to verify, or --resend to send a new code (or retry an approved invitation email).
 Without --code-file, interactive verification input is hidden. Codes expire in
 10 minutes. --new starts a new request only after DENIED, EXPIRED or CANCELLED.
-Example: observa request-access --api-url https://observa.example`,
+Start with observa access. The Hosted origin comes from trusted local configuration.`,
   'request-status': `request-status [--api-url <https://host>] [--json]
 Check the request saved for this profile using its private local receipt.
 Only this request's owner can check it; a request id alone is insufficient.
 Approved: redeem the emailed invitation, sign in, accept beta documents, and
 obtain a pairing code in Hosted Observa. Then run observa pair.
-Expired: run observa request-access --new --api-url <https://host>.`,
+Expired: run observa access --new.`,
 };
 export const ACCESS_FLAGS = ['api-url', 'name', 'email', 'organization', 'use-case', 'yes', 'code-file', 'resend', 'new'];
 const STATES = new Set(['EMAIL_PENDING', 'PENDING_REVIEW', 'APPROVED', 'DENIED', 'EXPIRED', 'CANCELLED']);
@@ -41,11 +42,11 @@ function terminal(prompt, secret = false) {
   let fd; let hidden = false;
   try {
     fd = openSync('/dev/tty', 'r+');
-    writeSync(fd, prompt);
     if (secret) {
       if (spawnSync('stty', ['-echo'], { stdio: [fd, fd, fd] }).status !== 0) refuse('ACCESS_INPUT_REQUIRED');
       hidden = true;
     }
+    writeSync(fd, prompt);
     const byte = Buffer.alloc(1); const bytes = [];
     while (readSync(fd, byte, 0, 1, null)) {
       if (byte[0] === 10 || byte[0] === 13) break;
@@ -87,9 +88,9 @@ async function call(endpointUrl, owner, action, payload, fetcher) {
 function projection(row, rid) {
   if (!row || row.request_id !== rid || !STATES.has(row.status)) refuse('ACCESS_REFUSED');
   return { request_id: rid, status: row.status, next_action: row.status === 'APPROVED'
-    ? 'Redeem the invitation sent to your verified email. Sign in, accept beta documents, obtain a pairing code, then run observa pair. Missing invitation? Run observa request-access --resend.'
-    : row.status === 'EXPIRED' ? 'Run observa request-access --new.'
-      : row.status === 'EMAIL_PENDING' ? 'Verify with observa request-access --code-file <0600-file>.' : null };
+    ? 'Redeem the invitation sent to your verified email. Sign in, accept beta documents, obtain a pairing code, then run observa pair. Missing invitation? Run observa access --resend.'
+    : row.status === 'EXPIRED' ? 'Run observa access --new.'
+      : row.status === 'EMAIL_PENDING' ? 'Verify with observa access --code-file <0600-file>.' : null };
 }
 export async function runAccess(command, { flags, env, home = homedir(), version, metadata = {}, dependencies = {} }) {
   if ([env, process.env].some(values => Object.hasOwn(values, 'NODE_TLS_REJECT_UNAUTHORIZED') && values.NODE_TLS_REJECT_UNAUTHORIZED !== '1')) refuse('ACCESS_TLS_REQUIRED');
@@ -99,7 +100,7 @@ export async function runAccess(command, { flags, env, home = homedir(), version
   const input = dependencies.accessPrompt ?? terminal;
   const output = dependencies.accessOutput ?? (s => process.stderr.write(`${s}\n`));
   const fetcher = dependencies.accessFetch ?? globalThis.fetch;
-  const url = endpoint(flags['api-url'] ?? state?.endpoint);
+  const url = resolveAccessOrigin({ flags, env, home, receipt: state });
   if (state && (state.endpoint !== url || !/^req_[a-f0-9]{32}$/.test(state.request_id) || !/^[a-f0-9]{64}$/.test(state.owner_key))) refuse('ACCESS_RECEIPT_INVALID');
   const invoke = (action, payload) => call(url, state.owner_key, action, payload, fetcher);
   if (command === 'request-status') {
@@ -117,14 +118,14 @@ export async function runAccess(command, { flags, env, home = homedir(), version
       request_id: `req_${randomBytes(16).toString('hex')}`,
       name: text(flags.name ?? (interactive ? input('Name: ') : null), 120, true),
       email: text(flags.email ?? (interactive ? input('Email: ') : null), 254, true)?.toLowerCase(),
-      organization: text(flags.organization ?? (interactive ? input('Organization (optional): ') : null), 160),
+      organization: text(flags.organization ?? (interactive ? input('Workspace or organization (optional): ') : null), 160),
       use_case: text(flags['use-case'] ?? (interactive ? input('Use case (optional): ') : null), 1000),
       runtime_type: 'openclaw', runtime_version: /^\d[\w.+-]{0,39}$/.test(metadata.runtime?.version ?? '') ? metadata.runtime.version : null,
       observa_version: version, agent_count: Number.isInteger(metadata.configured_agent_count) && metadata.configured_agent_count >= 0 && metadata.configured_agent_count <= 10000 ? metadata.configured_agent_count : null,
       platform: ['darwin', 'linux', 'win32'].includes(process.platform) ? process.platform : 'unknown',
     };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) refuse('ACCESS_INPUT_INVALID');
-    output(`Send to ${url}:\n${JSON.stringify(data, null, 2)}\nA private request receipt authenticates subsequent requests. No runtime credentials or content are sent.`);
+    output(`Send to ${url}:\nAccess request identity and optional workspace information entered above.\nA private request receipt authenticates subsequent requests. No runtime credentials or content are sent.`);
     if (!flags.yes && (flags.json || input('Submit this access request? Type yes: ') !== 'yes')) refuse('ACCESS_CONFIRMATION_REQUIRED');
     const previous = Boolean(state);
     state = { endpoint: url, request_id: data.request_id, owner_key: randomBytes(32).toString('hex'), data, created: false, verification_sent: false };

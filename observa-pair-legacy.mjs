@@ -22,19 +22,21 @@
 // owner-only --code-file); it is never accepted in argv.
 import { parseArgs } from "node:util";
 import {
-  closeSync, existsSync, openSync, readFileSync, readSync, statSync, writeSync,
+  closeSync, existsSync, openSync, readFileSync, readSync, writeSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { request as httpsRequest } from "node:https";
+import { readSecureFile } from "./plugins/openclaw-connector/secure-files.mjs";
 import {
   commitOpenClawPairing, createPairingObservationBootstrap,
   inspectOpenClawProfile, rollbackOpenClawPairing,
 } from "./pairing/openclaw-profile-pairing.mjs";
-const CANDIDATE_VERSION = "0.7.4";
+const CANDIDATE_VERSION = "0.8.0";
 
-const { values } = parseArgs({
+let values;
+try { ({ values } = parseArgs({
   options: {
     "code-file": { type: "string" },
     "api-url": { type: "string" },
@@ -50,7 +52,7 @@ const { values } = parseArgs({
     rollback: { type: "string" },
     help: { type: "boolean", default: false },
   },
-});
+})); } catch { die("Invalid pairing options. Run observa pair --help."); }
 
 const USAGE = `
 Pair this OpenClaw profile with your Observa dashboard.
@@ -78,6 +80,7 @@ function die(message) {
   process.stderr.write(`\n${message}\n`);
   process.exit(1);
 }
+const safeFailure = error => typeof error?.code === 'string' && /^(?:CONNECTOR|PROFILE|CONFIG|CREDENTIAL|PAIRING|ROLLBACK|EXISTING|UNSAFE)_[A-Z0-9_]{1,64}$/.test(error.code) ? error.code : 'OPERATION_REFUSED';
 
 if (values.help) { process.stdout.write(USAGE); process.exit(0); }
 if (!values["api-url"] && !values.rollback && !values["preflight-only"]) {
@@ -87,12 +90,9 @@ if (!values["api-url"] && !values.rollback && !values["preflight-only"]) {
 function readPairingCode() {
   if (values["code-file"]) {
     const path = resolve(values["code-file"]);
-    const stat = statSync(path);
-    if (!stat.isFile() || (stat.mode & 0o077) !== 0) {
-      die("--code-file must be a regular owner-only file (mode 0600 or stricter).");
-    }
-    const bytes = readFileSync(path);
-    if (bytes.length > 512) die("--code-file is too large.");
+    let bytes;
+    try { bytes = readSecureFile(path, 512); }
+    catch { die("--code-file must be a bounded, regular, owner-only file without links."); }
     try { return bytes.toString("utf8").trim(); }
     finally { bytes.fill(0); }
   }
@@ -101,9 +101,9 @@ function readPairingCode() {
   const chunks = [];
   try {
     tty = openSync("/dev/tty", "r+");
-    writeSync(tty, "Pairing code (input hidden): ");
     const hidden = spawnSync("stty", ["-echo"], { stdio: [tty, tty, tty] });
     if (hidden.status !== 0) die("Could not hide terminal input; use a 0600 --code-file.");
+    writeSync(tty, "Pairing code (input hidden): ");
     const byte = Buffer.alloc(1);
     while (chunks.length < 512 && readSync(tty, byte, 0, 1, null) === 1) {
       if (byte[0] === 10 || byte[0] === 13) break;
@@ -126,7 +126,7 @@ function readPairingCode() {
 const apiUrl = values["api-url"] ? (() => {
   let parsed;
   try { parsed = new URL(values["api-url"]); } catch { die("--api-url is not a URL."); }
-  if (parsed.protocol !== "https:") die("--api-url must be https.");
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== '/') die("--api-url must be an HTTPS origin without credentials, path, query or fragment.");
   return parsed.origin;
 })() : null;
 
@@ -152,7 +152,7 @@ try {
     instructions = "OpenClaw reported multiple sources for this plugin id. Remove the stale "
       + "source, refresh the plugin registry, and confirm one exact candidate remains.";
   }
-  die(`Pairing preflight refused: ${error?.code ?? error?.message}\n${instructions}`);
+  die(`Pairing preflight refused: ${safeFailure(error)}\n${instructions}`);
 }
 const { connectorRoot, connectorState: stateDir, profileState } = inspection;
 
@@ -160,7 +160,7 @@ if (values.rollback) {
   try {
     rollbackOpenClawPairing({ inspection, transactionId: values.rollback });
   } catch (error) {
-    die(`Rollback refused: ${error?.code ?? error?.message}`);
+    die(`Rollback refused: ${safeFailure(error)}`);
   }
   process.stdout.write(`Rolled back pairing transaction ${values.rollback}.\n`);
   process.exit(0);
@@ -194,6 +194,8 @@ function postJson(path, body, caFile) {
   return new Promise((resolvePromise, reject) => {
     const payload = Buffer.from(JSON.stringify(body), "utf8");
     const url = new URL(path, apiUrl);
+    let timer;
+    const finish = (error, value) => { clearTimeout(timer); payload.fill(0); if (error) reject(error); else resolvePromise(value); };
     const req = httpsRequest(url, {
       method: "POST",
       headers: {
@@ -205,23 +207,26 @@ function postJson(path, body, caFile) {
       ...(caFile ? { ca: readFileSync(caFile) } : {}),
       rejectUnauthorized: true,
     }, (res) => {
-      const chunks = [];
-      res.on("data", (c) => chunks.push(c));
+      const chunks = []; let size = 0;
+      res.on("data", (c) => { size += c.length; if (size > 16384) req.destroy(new Error('PAIRING_RESPONSE_TOO_LARGE')); else chunks.push(c); });
+      res.once('error', error => finish(error));
+      res.once('aborted', () => finish(new Error('PAIRING_RESPONSE_ABORTED')));
       res.on("end", () => {
         const text = Buffer.concat(chunks).toString("utf8");
         let parsed = null;
         try { parsed = JSON.parse(text); } catch { /* reported below */ }
-        resolvePromise({ status: res.statusCode ?? 0, body: parsed, text });
+        finish(null, { status: res.statusCode ?? 0, body: parsed });
       });
     });
-    req.once("error", reject);
+    req.once("error", error => finish(error));
+    timer = setTimeout(() => req.destroy(new Error('PAIRING_REQUEST_TIMEOUT')), 15000); timer.unref();
     req.write(payload);
     req.end();
   });
 }
 
 const caFile = values["ca-file"] ? resolve(values["ca-file"]) : null;
-if (caFile && !existsSync(caFile)) die(`--ca-file not found: ${caFile}`);
+if (caFile && !existsSync(caFile)) die("--ca-file was not found.");
 
 // Validate the complete target config before consuming a single-use code.
 const config = {
@@ -238,7 +243,7 @@ let loaded;
 try {
   loaded = loadConnectorConfig(config, { openclawStateDir: profileState });
 } catch (error) {
-  die(`The connector refused this configuration: ${error?.code ?? error?.message}`);
+  die(`The connector refused this configuration: ${safeFailure(error)}`);
 }
 
 const pairingCode = readPairingCode();
@@ -255,7 +260,7 @@ try {
     installation_name: values["installation-name"] ?? deploymentId,
   }, caFile);
 } catch (error) {
-  die(`Could not reach the dashboard: ${error?.code ?? error?.message}\n`
+  die(`Could not complete a bounded, verified dashboard connection.\n`
     + `Check --api-url, and --ca-file if your dashboard uses a private CA.`);
 }
 if (redeemed.status === 403) {
@@ -263,8 +268,8 @@ if (redeemed.status === 403) {
     + "after a few minutes — create a fresh one in the dashboard and retry.");
 }
 if (redeemed.status === 503) die("The dashboard's control plane is unavailable. Try again shortly.");
-if (redeemed.status !== 200 || !redeemed.body?.paired) {
-  die(`Pairing failed (HTTP ${redeemed.status}): ${redeemed.body?.reason ?? redeemed.text.slice(0, 200)}`);
+if (redeemed.status !== 200 || redeemed.body?.paired !== true) {
+  die(`Pairing was not accepted (HTTP ${redeemed.status}). Check the Hosted address and request a fresh pairing code if needed.`);
 }
 
 // The credential lives in this variable and goes straight into the connector's
@@ -277,7 +282,9 @@ const identity = {
   installation_id: redeemed.body.installation_id,
   deployment_id: redeemed.body.deployment_id,
 };
-process.stdout.write(`      installation ${identity.installation_id}\n`);
+if (!/^[a-f0-9]{32}$/.test(identity.credential_id) || !/^sha256:[a-f0-9]{16}$/.test(identity.fingerprint)
+    || typeof identity.installation_id !== 'string' || !/^[A-Za-z0-9._:-]{1,96}$/.test(identity.installation_id)
+    || identity.deployment_id !== loaded.deploymentId) die('Hosted returned an invalid or contradictory pairing identity. No local pairing was activated.');
 
 step(2, "Staging and verifying the credential…");
 const { installCredential, credentialPath, withCredential } =
@@ -289,7 +296,7 @@ const client = new GovernanceApiClient({
   caFile: loaded.caFile,
 });
 const verifyCredential = async (candidateState, descriptor) => {
-  if (descriptor.credentialId !== identity.credential_id) {
+  if (descriptor.credentialId !== identity.credential_id || descriptor.fingerprint !== identity.fingerprint) {
     throw new Error("issued credential identity mismatch");
   }
   await withCredential(candidateState, async (value) => {
@@ -321,7 +328,7 @@ try {
 }
 if (activationError) {
   die(`Pairing activation failed and local state was rolled back: `
-    + `${activationError?.remoteStatus ?? activationError?.code ?? activationError?.message}`);
+    + `${safeFailure(activationError)}`);
 }
 process.stdout.write(`      credential ${committed.credentialId} (${committed.fingerprint})\n`);
 process.stdout.write(`      endpoint ${loaded.apiUrl} as ${loaded.deploymentId}\n`);

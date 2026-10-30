@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.mcpherson.ai/governance/enforcement/mcpherson-governance-enforcement-coverage-report-v1.schema.json",
+  "title": "McPherson Governance v0.7 coverage report",
+  "description": "Non-authoritative simulation output. Reports rule, decision, decision_permit, default-path, and conflict-path coverage (including surfaced same-priority contradictions). Carries a fixed caveat: coverage is not correctness and not a safety proof.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0, "maximum": 10000000 }
+  },
+  "required": ["schema", "report_version", "rules_total", "rules_covered",
+    "decisions_covered", "permit_true_covered", "permit_false_covered",
+    "default_path_covered", "conflict_path_covered",
+    "same_priority_contradictions_surfaced", "caveat"],
+  "properties": {
+    "schema": { "const": "mcpherson-governance-enforcement-coverage-report/v1" },
+    "report_version": { "const": "1" },
+    "rules_total": { "$ref": "#/$defs/count" },
+    "rules_covered": { "$ref": "#/$defs/count" },
+    "decisions_covered": {
+      "type": "array", "maxItems": 6, "uniqueItems": true,
+      "items": { "type": "string", "enum": ["ALLOW", "DENY", "REQUIRE_APPROVAL", "ABSTAIN", "INDETERMINATE", "ERROR"] }
+    },
+    "permit_true_covered": { "type": "boolean" },
+    "permit_false_covered": { "type": "boolean" },
+    "default_path_covered": { "type": "boolean" },
+    "conflict_path_covered": { "type": "boolean" },
+    "same_priority_contradictions_surfaced": { "$ref": "#/$defs/count" },
+    "caveat": { "const": "coverage_is_not_correctness_and_not_a_safety_proof" }
+  }
+}
