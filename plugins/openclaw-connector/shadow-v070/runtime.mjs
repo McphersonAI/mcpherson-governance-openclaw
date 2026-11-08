@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { withCredential } from "../credentials.mjs";
-import { inspectObservationControls } from "../controls.mjs";
+import { inspectHostedOutboundControls, inspectObservationControls } from "../controls.mjs";
 import {
   MIN_SHADOW_OPENCLAW_VERSION,
   SHADOW_CORRELATION_WINDOW,
@@ -11,6 +11,7 @@ import {
   SHADOW_RELEASE,
 } from "./constants.mjs";
 import { createShadowEvidenceWriter } from "./evidence.mjs";
+import { createArgumentDigester } from "./argument-digest.mjs";
 import { correlationIdentity, normalizeShadowRequest } from "./normalize.mjs";
 import { ShadowDecisionWindow, validateShadowResponse } from "./response.mjs";
 import { createShadowTransport } from "./transport.mjs";
@@ -84,7 +85,11 @@ export function createShadowRuntime({
   nowIso = () => new Date().toISOString(),
   makeRequestId = randomUUID,
   decisionTimeoutMs = SHADOW_DECISION_TIMEOUT_MS,
+  argumentDigester = null,
 } = {}) {
+  // Q-44: keyed argument digest under a dedicated per-installation key. The
+  // key is loaded lazily on the first governed request that passes the gate.
+  const digester = argumentDigester ?? createArgumentDigester(config.stateDir);
   const writer = evidenceWriter ?? createShadowEvidenceWriter(
     join(config.receiptDir, SHADOW_EVIDENCE_FILE),
   );
@@ -110,6 +115,7 @@ export function createShadowRuntime({
     passPrincipal: 0,
     duplicateHooks: 0,
     correlationConflicts: 0,
+    notEvaluated: 0,
   };
 
   const base = () => ({
@@ -124,6 +130,31 @@ export function createShadowRuntime({
     runtime_instance_id: runtimeInstanceId,
   });
   const emit = (record) => safeAppend(writer, { ts: nowIso(), ...base(), ...record });
+
+  // Q-44: the single local observation gate for every shadow activity
+  // entrypoint (before/after tool call, diagnostics, and again at the Hosted
+  // boundary and before any decision record). It follows the connector-wide
+  // contract in hook.mjs: operational DISABLED (`observa stop`/`disable`,
+  // source configuration disabled) is INERT — no activity evidence record and
+  // no Hosted contact. (A call already admitted when stop lands may leave
+  // transient in-memory counters/correlation; nothing is persisted or sent.)
+  // Kill switch and system lock keep their documented behaviour of
+  // refusing Hosted contact while still recording locally. Any abnormal
+  // control answer (throwing inspector, malformed result, unknown blocked
+  // priority) fails closed to INERT.
+  const LOCAL_ONLY_PRIORITIES = new Set(["KILL_SWITCH", "SYSTEM_LOCK"]);
+  // Operational controls only (stop/disable, config, abnormal control state).
+  function controlsGate() {
+    if (config?.enabled !== true) return Object.freeze({ inert: true, controls: null });
+    const controls = inspectHostedOutboundControls(() => controlInspector(config));
+    const inert = controls.blocked === true && !LOCAL_ONLY_PRIORITIES.has(controls.priority);
+    return Object.freeze({ inert, controls });
+  }
+  // Admission gate: a closed (shutting down) runtime admits no new activity.
+  function observationGate() {
+    if (closed) return Object.freeze({ inert: true, controls: null });
+    return controlsGate();
+  }
 
   function runtimeRefusal(entry) {
     if (seam === false || seam === null) {
@@ -148,6 +179,11 @@ export function createShadowRuntime({
   function terminal(entry, action, extra = {}) {
     if (entry.terminal) return;
     entry.terminal = true;
+    // A stop that lands while a Hosted evaluation is in flight suppresses the
+    // decision record too: nothing is written once observation is stopped.
+    // Ordinary shutdown (close) is NOT a stop: an admitted in-flight call still
+    // settles with its decision record, as in v0.8.0, before the writer closes.
+    if (controlsGate().inert) return;
     entry.action = action;
     if (action === "ERROR") totals.errors += 1;
     else totals.decisions += 1;
@@ -158,6 +194,7 @@ export function createShadowRuntime({
       request_hash: entry.request?.request_hash ?? null,
       correlation_ref: entry.request?.correlation_ref ?? null,
       tool_name: entry.request?.tool_name ?? entry.tool_name ?? null,
+      executable_class: entry.executableClass ?? null,
       tool_call_id: entry.tool_call_id ?? null,
       run_id: entry.run_id ?? null,
       agent_id: entry.request?.agent_id ?? config.agentId,
@@ -168,8 +205,15 @@ export function createShadowRuntime({
 
   async function evaluate(entry, normalized) {
     try {
+      // Re-check at the Hosted boundary: a stop that lands after the hook
+      // entered leaves no record at all; kill switch/lock record locally only.
+      const gate = observationGate();
+      if (gate.inert) {
+        entry.terminal = true;
+        return;
+      }
       if (runtimeRefusal(entry)) return;
-      const controls = controlInspector(config);
+      const controls = gate.controls;
       if (controls?.blocked) {
         terminal(entry, "INDETERMINATE", {
           reason_code: "kill_state",
@@ -230,7 +274,6 @@ export function createShadowRuntime({
   }
 
   async function beforeToolCallInner(event, ctx) {
-    if (closed || config.enabled !== true) return undefined;
     const requestId = makeRequestId();
     const normalized = normalizeShadowRequest({
       event,
@@ -241,6 +284,7 @@ export function createShadowRuntime({
       runtimeInstanceId,
       requestId,
       observedAt: nowIso(),
+      argumentDigest: (params) => digester.digest(params),
     });
     if (!normalized.ok) {
       const scope = normalized.scope?.scope;
@@ -250,6 +294,22 @@ export function createShadowRuntime({
       } else if (scope === "PASS_OUT_OF_SCOPE_PRINCIPAL") {
         totals.passPrincipal += 1;
         emit({ kind: "SHADOW_DECISION", action: "PASS_OUT_OF_SCOPE_PRINCIPAL", tool_name: normalized.scope.tool_name, execution_effect: "NONE" });
+      } else if (normalized.notEvaluated === true) {
+        // Q-44: sanitized coverage limitation. Observa did not evaluate this
+        // action; it is never presented as a decision, approval or coverage.
+        totals.notEvaluated += 1;
+        const ids = correlationIdentity(event, ctx);
+        emit({
+          kind: "SHADOW_DECISION",
+          action: "NOT_EVALUATED",
+          coverage: "NOT_EVALUATED",
+          reason_code: normalized.reason,
+          tool_name: normalized.scope?.tool_name ?? null,
+          tool_call_id: ids.tool_call_id,
+          run_id: ids.run_id,
+          agent_id: config.agentId,
+          execution_effect: "NONE",
+        });
       } else {
         totals.errors += 1;
         const ids = correlationIdentity(event, ctx);
@@ -278,6 +338,7 @@ export function createShadowRuntime({
     }
     const entry = {
       fingerprint: normalized.fingerprint,
+      executableClass: normalized.executableClass ?? null,
       request: normalized.request,
       tool_call_id: normalized.correlation.tool_call_id,
       run_id: normalized.correlation.run_id,
@@ -292,6 +353,7 @@ export function createShadowRuntime({
   }
 
   async function beforeToolCall(event, ctx) {
+    if (observationGate().inert) return undefined;
     try {
       return await beforeToolCallInner(event, ctx);
     } catch (error) {
@@ -312,6 +374,7 @@ export function createShadowRuntime({
 
   function onDiagnosticEvent(event, metadata = {}) {
     if (!metadata.trusted || !EXECUTION_EVENTS.has(event?.type)) return;
+    if (observationGate().inert) return;
     const ids = correlationIdentity(event, event);
     const action = lifecycleAction(event);
     const eventKey = `${ids.key ?? "none"}\n${event.type}\n${event.seq ?? "none"}`;
@@ -338,6 +401,7 @@ export function createShadowRuntime({
   }
 
   function afterToolCall(event, ctx) {
+    if (observationGate().inert) return;
     const ids = correlationIdentity(event, ctx);
     const key = ids.key ?? `${ids.tool_call_id ?? "none"}\n${ids.run_id ?? "none"}`;
     if (resultKeys.has(key)) return;
@@ -373,6 +437,8 @@ export function createShadowRuntime({
   }
 
   function onGatewayStart() {
+    // Lifecycle-only attestation (no tool activity), like the connector's
+    // gateway_start lifecycle receipt; deliberately not behind the activity gate.
     if (startupRecorded) return;
     startupRecorded = true;
     emit({
@@ -397,6 +463,7 @@ export function createShadowRuntime({
       ]);
     } catch { /* shutdown cannot affect OpenClaw */ }
     try { client.close?.(); } catch { /* transport cleanup is observational */ }
+    try { digester.close?.(); } catch { /* key material is zeroed best-effort */ }
     try { await writer.close?.(); } catch { /* evidence cleanup is observational */ }
   }
 

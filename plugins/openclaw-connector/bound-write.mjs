@@ -4,7 +4,7 @@ import { readJson, assertPath } from '../../cli/safe-local.mjs';
 import { writeExclusiveSecureFile } from './secure-files.mjs';
 import { normalizeOpenClawToolHook } from './hook-adapter.mjs';
 import { digest } from './native-ledger.mjs';
-import { inspectNetworkControls } from './controls.mjs';
+import { inspectHostedOutboundControls, inspectObservationControls } from './controls.mjs';
 import { buildEnvelope, buildEvaluationContext, buildApprovalVerification, evaluate, ENFORCEMENT_ENGINE_VERSION } from './v7/packages/enforcement-core/index.mjs';
 
 export const BOUND_WRITE_TOOL = 'observa_bound_write';
@@ -26,6 +26,20 @@ export function registerBoundWrite(api, { config, ledger, now = Date.now }) {
   const policyPath = join(config.stateDir, 'bound-policy.json');
   let stopped = false;
   const pending = new Map();
+  // Q-44: one fail-closed control reading for every bound-write path. Effects
+  // are refused on ANY block (stop/disable, config enabled:false, kill switch,
+  // system lock, unreadable or invalid control state). Ordinary recording is
+  // additionally suppressed when observation is explicitly stopped/disabled or
+  // the control state is abnormal; kill switch and system lock keep their
+  // documented local refusal records. A refusal is never turned into an effect.
+  const LOCAL_RECORDING_PRIORITIES = new Set(['KILL_SWITCH', 'SYSTEM_LOCK']);
+  const controls = () => inspectHostedOutboundControls(() => inspectObservationControls(config));
+  const blocked = () => stopped || controls().blocked;
+  const silent = () => {
+    if (stopped) return true;
+    const c = controls();
+    return c.blocked && !LOCAL_RECORDING_PRIORITIES.has(c.priority);
+  };
   const policy = () => {
     const b = readJson(config.stateDir, policyPath, { maxBytes: 128 * 1024 });
     if (!b || b.schema !== 'observa-openclaw-bound-policy/v1' || b.deployment_id !== config.deploymentId
@@ -38,7 +52,7 @@ export function registerBoundWrite(api, { config, ledger, now = Date.now }) {
     && /^[a-z0-9][a-z0-9_-]{0,47}\.txt$/.test(p.name) && typeof p.content === 'string' && Buffer.byteLength(p.content) <= 1024;
   const decision = (entry, approvals = [], verifications = []) => {
     const current = policy();
-    if (digest(current) !== entry.policyHash || stopped || entry.abortSignal?.aborted || inspectNetworkControls(config.stateDir).blocked) refuse();
+    if (digest(current) !== entry.policyHash || entry.abortSignal?.aborted || blocked()) refuse();
     const context = buildEvaluationContext({ evaluated_at: new Date(now()).toISOString(), engine_version: ENFORCEMENT_ENGINE_VERSION,
       approval_verifications: verifications, consumed_approval_ids: [] });
     const record = evaluate(entry.envelope, current.bundle, approvals, context);
@@ -48,6 +62,7 @@ export function registerBoundWrite(api, { config, ledger, now = Date.now }) {
     return record;
   };
   const refusal = (event, ctx, reason) => {
+    if (silent()) return block(); // refused, and nothing is recorded after stop
     try {
       const n = normalizeOpenClawToolHook(event, ctx, 'before_tool_call');
       ledger.append({ kind: 'BOUND_REFUSAL', at: new Date(now()).toISOString(), reason,
@@ -60,7 +75,7 @@ export function registerBoundWrite(api, { config, ledger, now = Date.now }) {
     if (event?.toolName !== BOUND_WRITE_TOOL) return;
     try {
       const n = normalizeOpenClawToolHook(event, ctx, 'before_tool_call');
-      if (stopped || ctx?.abortSignal?.aborted || inspectNetworkControls(config.stateDir).blocked || !n.accepted || !n.agentId || !n.runId || !n.toolCallId || !validParams(n.params)) return refusal(event, ctx, 'INVALID_NATIVE_IDENTITY_OR_REQUEST');
+      if (ctx?.abortSignal?.aborted || blocked() || !n.accepted || !n.agentId || !n.runId || !n.toolCallId || !validParams(n.params)) return refusal(event, ctx, 'INVALID_NATIVE_IDENTITY_OR_REQUEST');
       for (const [key, value] of pending) if (now() >= value.deadline) {
         ledger.append({ kind: 'BOUND_APPROVAL_EXPIRED', at: new Date(now()).toISOString(), correlation_ref: value.correlation, operation_ref: value.operation });
         pending.delete(key);
@@ -91,6 +106,8 @@ export function registerBoundWrite(api, { config, ledger, now = Date.now }) {
         description: `Authorize one exact synthetic operation (${operation}). No business outcome is implied.`,
         allowedDecisions: ['allow-once', 'deny'], timeoutMs: 60000,
         onResolution(resolution) {
+          // A host callback arriving after stop records nothing and permits nothing.
+          if (silent()) { entry.permit = false; pending.delete(n.toolCallId); return; }
           try {
             ledger.append({ kind: 'HOST_APPROVAL_RESOLUTION', at: new Date(now()).toISOString(), operation_ref: operation,
               correlation_ref: correlation, resolution: ['allow-once', 'allow-always', 'deny', 'timeout', 'cancelled'].includes(resolution) ? resolution : 'UNKNOWN' });
@@ -125,5 +142,5 @@ export function registerBoundWrite(api, { config, ledger, now = Date.now }) {
         operation_ref: entry.operation, decision_id: record.decision_id, outcome: 'COMPLETED', business_outcome: 'UNRESOLVED' });
       return { content: [{ type: 'text', text: 'Synthetic file created.' }] };
     } }, { name: BOUND_WRITE_TOOL });
-  return { stop() { stopped = true; pending.clear(); }, status: () => ({ enabled: !stopped && !inspectNetworkControls(config.stateDir).blocked, mode: 'SYNTHETIC', production_authorization: false, tools: [BOUND_WRITE_TOOL] }) };
+  return { stop() { stopped = true; pending.clear(); }, status: () => ({ enabled: !blocked(), mode: 'SYNTHETIC', production_authorization: false, tools: [BOUND_WRITE_TOOL] }) };
 }

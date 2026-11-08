@@ -328,6 +328,7 @@ export async function runObserva(argv, { packageRoot = dirname(dirname(fileURLTo
       human = `${command === 'credential' ? `Credential ${args[0]}` : command} completed.${result.configUpdated ? ' Host config updated; a gateway reload may be needed.' : ''}${command === 'uninstall' ? (result.cliEntrypointRemoved ? ' The observa command this plugin created was removed.' : ' No observa command owned by this plugin was removed; any other observa command was left unchanged.') : ''} SHADOW ONLY / AUTHORITY NONE / ENFORCEMENT OFF / ACTIVE OFF`;
     }
     if (view.evidence?.problems.length && ['status', 'agents', 'agent', 'activity', 'decisions'].includes(command)) human += `\nLocal evidence warning: ${view.evidence.problems.join(', ')}.`;
+    if (view.evidence?.not_evaluated?.count && ['status', 'agents', 'agent', 'decisions'].includes(command)) human += `\nCoverage limitation: Observa did not evaluate ${view.evidence.not_evaluated.count} governed action(s) (${Object.entries(view.evidence.not_evaluated.reasons).map(([k, v]) => `${k}: ${v}`).join(', ')}). These actions ran normally in OpenClaw and are NOT covered, verified or approved by Observa.`;
     if (['agents', 'agent', 'activity', 'decisions'].includes(command)) human += `\n\n${guidance(UPGRADE)}`;
     // Legacy status keeps its existing top-level fields, now sourced from the
     // profile. New structured views always use the versioned common envelope.

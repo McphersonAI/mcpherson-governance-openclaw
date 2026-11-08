@@ -5,9 +5,11 @@ import {
   SHADOW_RELEASE,
   SHADOW_REQUEST_SCHEMA,
 } from "./constants.mjs";
+import { canonicalExecutable, EXECUTABLE_CLASS_UNLISTED } from "./executables.mjs";
 
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const SAFE_REF_PART = /^[A-Za-z0-9._:-]{1,80}$/;
+const KEYED_DIGEST = /^sha256:[a-f0-9]{64}$/;
 
 export function stableStringify(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -20,10 +22,79 @@ export function sha256(value) {
   return `sha256:${createHash("sha256").update(String(value)).digest("hex")}`;
 }
 
+// Q-44: the shadow request is metadata-only, so the executable identity is
+// derived structurally and never copied verbatim from the command string.
+// Leading POSIX environment assignments (`API_KEY=value cmd`) are skipped
+// without being retained, only the executable basename is considered, and the
+// result must be a conservative executable-name token. Anything else is
+// UNRECOGNIZED and is refused locally before a Hosted request exists.
+//
+// Words are split only on the default shell IFS (space, tab, newline). The
+// parse is ALLOWLIST-only, never a denylist of shell syntax:
+//   - a leading `NAME=value` word is skipped only when its value consists
+//     solely of literal-safe characters (no quoting, escaping, expansion,
+//     arrays, redirections, heredocs, globs, separators or non-ASCII). Such a
+//     value cannot extend past the next IFS character and cannot turn the
+//     following word into data, so the next word really is the next word.
+//     Any other `NAME=` word makes the whole command UNRECOGNIZED;
+//   - the executable word itself must be entirely path-safe before its
+//     basename is taken, so redirection/glob prefixes (`>/run/secrets/x`)
+//     cannot smuggle a filename into argv0.
+//
+// The command word's basename is then mapped through the reviewed canonical
+// executable list (executables.mjs). Listed names travel verbatim; every other
+// executable travels only as the coarse class EXECUTABLE_CLASS_UNLISTED, so a
+// secret used as a command word is never transmitted.
+//
+// Carriage returns are NOT normalized: OpenClaw passes the command verbatim to
+// `$SHELL -c`, and bash/zsh/sh treat CR as a word character (`ls\r` is a
+// different, normally nonexistent, command). Such a command is reported as a
+// sanitized NOT_EVALUATED coverage limitation instead.
+const SHELL_IFS = /[ \t\n]+/u;
+const ASSIGNMENT_PREFIX = /^[A-Za-z_][A-Za-z0-9_]*=/u;
+const LITERAL_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9._:/@%+,=~-]*$/u;
+const PATH_SAFE_WORD = /^[A-Za-z0-9._/~+-]+$/u;
+const SAFE_EXECUTABLE = /^[A-Za-z0-9_][A-Za-z0-9._+-]{0,63}$/u;
+
+/** Bounded, sanitized reasons Observa did not evaluate a command. */
+export const COMMAND_COVERAGE_REASONS = Object.freeze({
+  ASSIGNMENT_SYNTAX: "assignment_syntax_unsupported",
+  ASSIGNMENTS_ONLY: "assignments_only",
+  COMMAND_WORD_SYNTAX: "command_word_syntax_unsupported",
+  COMMAND_WORD_CR: "command_word_carriage_return",
+});
+
+const unsupported = (reason) => Object.freeze({ status: "UNRECOGNIZED", argv0: null, executableClass: null, reason });
+
+export function classifyCommand(command) {
+  if (typeof command !== "string") return Object.freeze({ status: "MISSING", argv0: null, executableClass: null, reason: null });
+  const tokens = command.split(SHELL_IFS).filter(Boolean);
+  if (tokens.length === 0) return Object.freeze({ status: "MISSING", argv0: null, executableClass: null, reason: null });
+  let index = 0;
+  while (index < tokens.length && ASSIGNMENT_PREFIX.test(tokens[index])) {
+    if (!LITERAL_ASSIGNMENT.test(tokens[index])) return unsupported(COMMAND_COVERAGE_REASONS.ASSIGNMENT_SYNTAX);
+    index += 1;
+  }
+  const token = tokens[index];
+  if (token === undefined) return unsupported(COMMAND_COVERAGE_REASONS.ASSIGNMENTS_ONLY);
+  if (!PATH_SAFE_WORD.test(token)) {
+    return unsupported(token.endsWith("\r") && PATH_SAFE_WORD.test(token.slice(0, -1))
+      ? COMMAND_COVERAGE_REASONS.COMMAND_WORD_CR
+      : COMMAND_COVERAGE_REASONS.COMMAND_WORD_SYNTAX);
+  }
+  const basename = token.slice(token.lastIndexOf("/") + 1);
+  if (!SAFE_EXECUTABLE.test(basename)) return unsupported(COMMAND_COVERAGE_REASONS.COMMAND_WORD_SYNTAX);
+  const argv0 = canonicalExecutable(basename);
+  return Object.freeze({
+    status: "OK",
+    argv0,
+    executableClass: argv0 === EXECUTABLE_CLASS_UNLISTED ? "UNLISTED" : "CANONICAL",
+    reason: null,
+  });
+}
+
 export function extractArgv0(command) {
-  if (typeof command !== "string") return null;
-  const first = command.trim().split(/\s+/u)[0];
-  return first || null;
+  return classifyCommand(command).argv0;
 }
 
 function resourceRef(argv0) {
@@ -97,12 +168,20 @@ export function normalizeShadowRequest({
   runtimeInstanceId,
   requestId = randomUUID(),
   observedAt = new Date().toISOString(),
+  // Q-44: keyed digester (argument-digest.mjs). Required: without it no
+  // request is built; there is no unkeyed fallback.
+  argumentDigest = null,
 }) {
   const scope = classifyShadowScope({ event, ctx, agentId });
   if (scope.scope !== "GOVERNED") return Object.freeze({ ok: false, scope });
   const correlation = correlationIdentity(event, ctx);
-  const command = event?.params?.command;
-  const argv0 = extractArgv0(command);
+  const commandIdentity = classifyCommand(event?.params?.command);
+  if (commandIdentity.status === "UNRECOGNIZED") {
+    // Coverage limitation for Observa telemetry only; the OpenClaw command
+    // itself is untouched. The reason is a fixed enum, never command text.
+    return Object.freeze({ ok: false, scope, notEvaluated: true, reason: commandIdentity.reason, missing: [] });
+  }
+  const argv0 = commandIdentity.argv0;
   const missing = [];
   if (!argv0) missing.push("event.params.command");
   if (!correlation.tool_call_id) missing.push("toolCallId");
@@ -114,6 +193,15 @@ export function normalizeShadowRequest({
   if (!Number.isFinite(Date.parse(observedAt))) missing.push("observedAt");
   if (missing.length > 0) {
     return Object.freeze({ ok: false, scope, reason: "identity_incomplete", missing });
+  }
+  let argumentDigestValue = null;
+  try {
+    argumentDigestValue = typeof argumentDigest === "function" ? argumentDigest(event.params) : null;
+  } catch {
+    argumentDigestValue = null;
+  }
+  if (typeof argumentDigestValue !== "string" || !KEYED_DIGEST.test(argumentDigestValue)) {
+    return Object.freeze({ ok: false, scope, notEvaluated: true, reason: "argument_digest_key_unavailable", missing: [] });
   }
 
   const request = {
@@ -130,7 +218,7 @@ export function normalizeShadowRequest({
     resource_class: scope.governed.resource_class,
     resource_ref: resourceRef(argv0),
     argv0,
-    argument_digest: sha256(stableStringify(event.params)),
+    argument_digest: argumentDigestValue,
     correlation_ref: executionCorrelationRef({
       runtimeInstanceId, runId: correlation.run_id,
       toolCallId: correlation.tool_call_id,
@@ -155,6 +243,7 @@ export function normalizeShadowRequest({
     scope,
     correlation,
     request: Object.freeze(request),
+    executableClass: commandIdentity.executableClass,
     body: bytes,
     fingerprint: `${scope.tool_name}\n${agentId}\n${request.argument_digest}`,
   });
