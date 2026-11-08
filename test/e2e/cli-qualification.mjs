@@ -92,7 +92,7 @@ try {
   const proofBefore = createHash('sha256').update(readFileSync(credentialFile)).digest('hex');
   result = await cli(['stop']); privateOutput(result.output); assert.equal(result.code, 0); assert.equal(createHash('sha256').update(readFileSync(credentialFile)).digest('hex'), proofBefore);
   results.push({ case: 'stop preserves paired credential and admission receipt', status: 'PASS' });
-  const report = { status: 'PASS', profile, package_version: '0.8.0', results };
+  const report = { status: 'PASS', profile, package_version: '0.8.1', results };
   const evidence = process.env.OBSERVA_LAB_EVIDENCE ?? join(lab, 'evidence/candidate5'); assert.ok(evidence.startsWith(lab + '/'));
   writeFileSync(join(evidence, 'cli-results.json'), JSON.stringify(report, null, 2)); console.log(JSON.stringify({ status: 'PASS', cases: results.length }));
 } finally { server.closeAllConnections(); await new Promise(ok => server.close(ok)); fixture.close(); }

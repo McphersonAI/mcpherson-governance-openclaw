@@ -59,7 +59,7 @@ describe("the packed successor artifact", () => {
   it("observa --version / --help come from the installed package", () => {
     const version = observa(["--version"]);
     assert.equal(version.status, 0, version.stderr);
-    assert.equal(version.stdout.trim(), "Observa 0.8.0");
+    assert.equal(version.stdout.trim(), "Observa 0.8.1");
     const help = observa(["--help"]);
     assert.equal(help.status, 0);
     assert.match(help.stdout, /request-access[\s\S]*request-status[\s\S]*pair[\s\S]*hosted-health[\s\S]*identify/);

@@ -1,7 +1,7 @@
-# Observa local CLI — 0.8.0
+# Observa local CLI — 0.8.1
 
 Observa connects supported OpenClaw runtime events to local evidence and Hosted
-Observa. Version 0.8.0 is qualified for **OpenClaw 2026.10.9** within the runtime,
+Observa. Version 0.8.1 (a security patch of 0.8.0) is qualified for **OpenClaw 2026.10.9** within the runtime,
 evidence and enforcement limits below; see `CANDIDATE-PROVENANCE.json`.
 
 ## Start here
@@ -46,13 +46,43 @@ credentials, evidence and pending delivery. Other OpenClaw tools continue to
 operate. If the isolated synthetic bound tool was explicitly configured, it
 refuses new effects while observation controls are stopped.
 
+## Security changes in 0.8.1
+
+0.8.1 remediates the two findings of the ClawHub scan of 0.8.0:
+
+- **Command secrets.** Hosted SHADOW evaluation no longer receives command text.
+  Leading `NAME=value` assignments are skipped only when literal-safe and are
+  never sent. Executable names travel only as a reviewed canonical name (for
+  example `ls`, `curl`, `touch`) or as the class `observa:unlisted-executable`.
+  The argument digest is an HMAC under a per-installation key that stays on
+  this machine (`shadow-argument-digest.key`, mode 0600).
+- **Stop.** After `observa stop` (or `enabled: false`, or an unreadable control
+  file), no new activity is recorded locally and nothing is sent to Hosted,
+  including for calls already in progress. Kill switch and system lock keep
+  their documented behaviour (no Hosted contact, local records retained).
+
+Known limitations:
+
+- Shadow evaluation classifies only the first command word: `touch x; rm y` is
+  evaluated as `touch`, and wrappers such as `env` or `sh` are evaluated as the wrapper.
+- Commands Observa cannot safely parse (quoting, expansion, redirection, Unicode
+  or control characters, a carriage return in the command word) are recorded
+  locally as `NOT_EVALUATED`. `observa status` reports them as a coverage
+  limitation; they are not covered, verified or approved. The OpenClaw command
+  itself always runs normally.
+- A Hosted request already sent when stop lands cannot be recalled; its delivery
+  acknowledgement may still be recorded locally.
+- If the argument-digest key file becomes unreadable or invalid, Observa stops
+  sending evaluations (reported as `argument_digest_key_unavailable`) until an
+  operator removes the file; it is never silently replaced.
+
 ## Installation and CLI collisions
 
 The existing OpenClaw distribution channel is ClawHub's **code-plugin** package
 `@mcphersonai/mcpherson-governance-openclaw`. The established install command is:
 
 ```sh
-openclaw plugins install clawhub:@mcphersonai/mcpherson-governance-openclaw@0.8.0
+openclaw plugins install clawhub:@mcphersonai/mcpherson-governance-openclaw@0.8.1
 ```
 
 Use the release's verified version and artifact identity when performing an

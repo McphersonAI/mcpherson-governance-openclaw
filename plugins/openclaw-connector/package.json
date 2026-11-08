@@ -1,6 +1,6 @@
 {
   "name": "mcpherson-governance-connector",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Observa native evidence adapter for OpenClaw 2026.10.9; enforcement disabled by default, optional isolated V7 synthetic binding.",
   "type": "module",
   "license": "Apache-2.0",

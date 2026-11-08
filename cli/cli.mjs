@@ -7,7 +7,7 @@ import { parseArgs } from 'node:util';
 import { createOpenClawProvider } from './providers/openclaw.mjs';
 import { agentId, readBounded, refuse } from './safe-local.mjs';
 
-export const CLI_VERSION = '0.8.0';
+export const CLI_VERSION = '0.8.1';
 export const POSTURE = Object.freeze({ mode: 'SHADOW', authority: 'NONE', enforcement: 'OFF', active: false });
 // A provider supplies a projected metadata snapshot and bounded control/pair
 // dispatch. No runtime registry, dynamic plugin loading or tool execution API.
