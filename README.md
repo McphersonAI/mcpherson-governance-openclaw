@@ -56,25 +56,29 @@ refuses new effects while observation controls are stopped.
   example `ls`, `curl`, `touch`) or as the class `observa:unlisted-executable`.
   The argument digest is an HMAC under a per-installation key that stays on
   this machine (`shadow-argument-digest.key`, mode 0600).
-- **Stop.** After `observa stop` (or `enabled: false`, or an unreadable control
-  file), no new activity is recorded locally and nothing is sent to Hosted,
-  including for calls already in progress. Kill switch and system lock keep
-  their documented behaviour (no Hosted contact, local records retained).
+- **Stop.** After `observa stop` (or `enabled: false`, or an unreadable or invalid
+  stop/disable control file), no new activity is recorded locally and nothing is
+  sent to Hosted, including for calls already in progress. Kill switch and system
+  lock keep their documented behaviour (no Hosted contact, local records
+  retained); an unreadable kill-switch or lock file is treated as active and
+  behaves the same way.
 
 Known limitations:
 
 - Shadow evaluation classifies only the first command word: `touch x; rm y` is
   evaluated as `touch`, and wrappers such as `env` or `sh` are evaluated as the wrapper.
-- Commands Observa cannot safely parse (quoting, expansion, redirection, Unicode
-  or control characters, a carriage return in the command word) are recorded
-  locally as `NOT_EVALUATED`. `observa status` reports them as a coverage
+- Commands whose leading `NAME=value` assignments or command word Observa cannot
+  safely parse (quoting, expansion, redirection, Unicode or control characters, a
+  carriage return in the command word) are recorded locally as `NOT_EVALUATED`.
+  Arguments after the command word are never parsed or sent. `observa status` reports them as a coverage
   limitation; they are not covered, verified or approved. The OpenClaw command
   itself always runs normally.
 - A Hosted request already sent when stop lands cannot be recalled; its delivery
   acknowledgement may still be recorded locally.
-- If the argument-digest key file becomes unreadable or invalid, Observa stops
-  sending evaluations (reported as `argument_digest_key_unavailable`) until an
-  operator removes the file; it is never silently replaced.
+- If the argument-digest key file is unreadable or invalid when Observa first
+  needs it, Observa sends no evaluations (reported as
+  `argument_digest_key_unavailable`) until the file is valid again or an operator
+  removes it so a new key is created; an invalid file is never silently replaced.
 
 ## Installation and CLI collisions
 
