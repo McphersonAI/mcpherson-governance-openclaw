@@ -198,6 +198,10 @@ export class ConnectorHookController {
     if (normalized.outcome === "UNKNOWN") return undefined; // Native ledger retains explicit UNKNOWN. Legacy completion contract cannot carry it.
     const observed = { outcome: normalized.outcome, errorCategory: normalized.outcome === "TIMED_OUT" ? "TOOL_TIMEOUT" : normalized.outcome === "FAILED" ? "TOOL_ERROR" : null };
     const task = pending.attemptPromise.then((attempt) => {
+      // Q-44: re-checked at write time. A stop that lands while the attempt is
+      // still in flight leaves no completion receipt (matching the pipeline's
+      // settle-time suppression of the attempt receipt).
+      if (this.#controlInspector().priority === "DISABLED") return;
       const receipt = makeCompletionReceipt({
         decisionId: attempt.decision_id ?? pending.decisionId,
         requestHash: pending.requestHash,

@@ -26,7 +26,9 @@ function lab() {
   let before; let tool; let clock = Date.now();
   const api = { pluginConfig: { boundNode: { enabled: true, mode: 'SYNTHETIC', customerAuthorization: false } },
     on(name, fn) { assert.equal(name, 'before_tool_call'); before = fn; }, registerTool(value) { tool = value; } };
-  const config = { stateDir: root, deploymentId: 'deployment-test' };
+  // The real plugin always passes a loaded connector config, which carries
+  // `enabled`; Q-44 makes bound-write honour enabled:false like every other path.
+  const config = { enabled: true, stateDir: root, deploymentId: 'deployment-test' };
   const handle = registerBoundWrite(api, { config, ledger, now: () => clock });
   const event = (name, call = name) => ({ toolName: BOUND_WRITE_TOOL, params: { name, content: 'synthetic-content-private-sentinel' }, runId: 'run-test', toolCallId: call });
   const ctx = { toolName: BOUND_WRITE_TOOL, agentId: 'main', sessionId: 'session-test' };

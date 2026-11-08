@@ -21,8 +21,8 @@ describe("help and version", () => {
       assert.equal(result.code, 0);
       assert.equal(result.stdout, `Observa ${CLI_VERSION}`);
     }
-    assert.equal(CLI_VERSION, "0.8.0");
-    assert.equal(json(await cli(["--version", "--json"])).version, "0.8.0");
+    assert.equal(CLI_VERSION, "0.8.1");
+    assert.equal(json(await cli(["--version", "--json"])).version, "0.8.1");
   });
 
   it("--help groups commands local-first and puts the Hosted funnel up front", async () => {
@@ -60,7 +60,7 @@ describe("local commands work with or without Hosted, and never contact it", () 
     const { home } = makeProfileHome();
     const result = await cli(["status", "--profile-home", home], { dependencies: noNetwork });
     assert.equal(result.code, 0, result.stderr);
-    assert.match(result.stdout, /^Observa 0\.8\.0/);
+    assert.match(result.stdout, /^Observa 0\.8\.1/);
     assert.match(result.stdout, /Paired\s+YES/);
     assert.match(result.stdout, /Enabled\s+YES/);
     assert.match(result.stdout, /Observing\s+STALE_LOCAL_EVIDENCE/);

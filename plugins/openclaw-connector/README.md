@@ -1,4 +1,4 @@
-# Observa OpenClaw plugin v0.8.0
+# Observa OpenClaw plugin v0.8.1
 
 Thin native adapter qualified for the exact OpenClaw 2026.10.9 plugin contract.
 See the distribution's root README for onboarding,

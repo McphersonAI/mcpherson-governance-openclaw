@@ -8,7 +8,10 @@ import { agentId, assertPath, inside, readBounded, readJson, refuse, timestamp, 
 import { withLeastPrivilegeHookPolicy } from '../../pairing/openclaw-profile-pairing.mjs';
 
 const PLUGIN = 'mcpherson-governance-connector';
-const ACTIONS = Object.freeze({ SHADOW_WOULD_ALLOW: 'WOULD_ALLOW', SHADOW_WOULD_DENY: 'WOULD_DENY', SHADOW_WOULD_REQUIRE_APPROVAL: 'WOULD_REQUIRE_APPROVAL', ABSTAIN: 'ABSTAIN', INDETERMINATE: 'INDETERMINATE', ERROR: 'ERROR' });
+const ACTIONS = Object.freeze({ SHADOW_WOULD_ALLOW: 'WOULD_ALLOW', SHADOW_WOULD_DENY: 'WOULD_DENY', SHADOW_WOULD_REQUIRE_APPROVAL: 'WOULD_REQUIRE_APPROVAL', ABSTAIN: 'ABSTAIN', INDETERMINATE: 'INDETERMINATE', ERROR: 'ERROR', NOT_EVALUATED: 'NOT_EVALUATED' });
+// Q-44: bounded reasons a governed action was NOT evaluated by Observa (coverage
+// limitation). Anything else is reported as 'other'; raw command text never is.
+const COVERAGE_REASONS = new Set(['assignment_syntax_unsupported', 'assignments_only', 'command_word_syntax_unsupported', 'command_word_carriage_return', 'argument_digest_key_unavailable']);
 const VERSION = /^\d{1,4}\.\d{1,3}\.\d{1,3}(?:[-+][a-z0-9.-]{1,32})?$/i;
 
 export function resolveProfile(flags, env = process.env, home = homedir()) {
@@ -106,6 +109,7 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
   };
   const activities = [];
   const decisions = [];
+  const notEvaluated = { count: 0, reasons: {} };
   let lifecycle = null;
   let runtimeVersion = null;
   let versionAt = '';
@@ -143,6 +147,11 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
     const agent = row.agent_id == null ? null : toolId(row.agent_id) && agentId(row.agent_id);
     const tool = row.tool_name == null ? null : toolId(row.tool_name);
     if ((row.agent_id != null && !agent) || (row.tool_name != null && !tool)) { problems.push('EVIDENCE_LABEL_INVALID'); continue; }
+    if (row.action === 'NOT_EVALUATED') {
+      const reason = COVERAGE_REASONS.has(row.reason_code) ? row.reason_code : 'other';
+      notEvaluated.count += 1; notEvaluated.reasons[reason] = (notEvaluated.reasons[reason] ?? 0) + 1;
+      continue; // a coverage limitation is never listed as a (counterfactual) decision
+    }
     decisions.push({ at, agent_id: agent, capability: tool, decision: ACTIONS[row.action], source: 'shadow_evidence' });
   }
   const newest = (a, b) => b.at.localeCompare(a.at) || JSON.stringify(a).localeCompare(JSON.stringify(b));
@@ -184,7 +193,7 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
   const nativeEvidence = readNativeEvidenceStatus(stateDir);
   if (nativeEvidence.health === 'UNREADABLE_OR_INVALID') problems.push('NATIVE_EVIDENCE_UNREADABLE_OR_INVALID');
   if (nativeEvidence.runtime_version) runtimeVersion = nativeEvidence.runtime_version;
-  const evidenceHealth = problems.length ? 'DEGRADED' : activities.length || decisions.length || nativeEvidence.records > 0 ? 'AVAILABLE' : 'EMPTY';
+  const evidenceHealth = problems.length ? 'DEGRADED' : activities.length || decisions.length || notEvaluated.count || nativeEvidence.records > 0 ? 'AVAILABLE' : 'EMPTY';
   const summary = {
     pluginId: PLUGIN, ...status, pipeline: null, receipts: null,
     pairing: { paired: status.pairing.paired, credentialId: status.pairing.credentialId, fingerprint: status.pairing.fingerprint, ...(status.pairing.error ? { error: 'CREDENTIAL_UNREADABLE' } : {}) },
@@ -198,7 +207,7 @@ export async function createOpenClawProvider({ flags = {}, env = process.env, ho
     cli_entrypoint: cliEntrypoint,
     configured_agent_count: roster === null ? null : configured.size,
     hosted_connection: status.pairing.paired ? 'PAIRED_CONNECTION_NOT_PROBED' : 'UNPAIRED',
-    evidence: { health: evidenceHealth, bounded: true, truncated, activity_count: activities.length, decision_count: decisions.length, problems: [...new Set(problems)].sort() },
+    evidence: { health: evidenceHealth, bounded: true, truncated, activity_count: activities.length, decision_count: decisions.length, not_evaluated: { count: notEvaluated.count, reasons: notEvaluated.reasons, meaning: 'Observa did not evaluate these actions; they are not covered, verified or approved.' }, problems: [...new Set(problems)].sort() },
   };
   return {
     id: 'openclaw',

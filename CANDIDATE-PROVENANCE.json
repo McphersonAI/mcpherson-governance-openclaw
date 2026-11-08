@@ -1,20 +1,39 @@
 {
   "schema": "observa-openclaw-bound-node-candidate/v1",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "authorized_base": {
-    "head": "a4038550796dbcaf51894ae1646d78d9da9553d9",
-    "tree": "2b544c809b38df1ab584dfc70fff69891e0d0cbd"
+    "head": "96e8fb36fe2de9958d3d511439689b39902d9986",
+    "tree": "2e1922faab0f7515703d42e8e1f8e90ee9caec5f",
+    "release": "v0.8.0"
   },
   "immutable_runtime_input": {
     "version": "0.7.1-beta.1",
     "sha256": "bca0b9715a0e537bc39b0939610c047799f7450a5ac767b41a09a2bd2c8c6fb2"
   },
-  "scope": "OpenClaw 2026.10.9 native evidence adapter, access CLI, and disabled-by-default synthetic pre-action V7 binding. Independently accepted for the documented connector scope; known upstream dependency and Hosted continuity limitations remain.",
+  "scope": "Security patch of 0.8.0 (Q-44): remediates the ClawHub 0.8.0 findings (command-token exposure to Hosted; local recording after stop) and hardens the keyed argument digest, executable-name classification, bound-write stop handling and coverage reporting. No feature, compatibility or license-term change; same OpenClaw 2026.10.9 contract.",
   "accepted_engineering_candidate": {
-    "commit": "607bdd93a01437d1e799697b622f085fcb2a3102",
-    "tree": "3c87883b6f5eb27c7612d046df2175bc0a107b5b",
-    "artifact_sha256": "4882a15438ab1481a3b3f2f340f51b26230ed8f3c0ef49f8ad395038ece94fa5",
+    "commit": "7a82d74591d3e0622b44a1be5b6acdf2590e73c1",
+    "tree": "e0a425e6805d739f3b053ca837678fd1c07d0e76",
+    "artifact_sha256_at_version_0_8_0": "e86335b6de3facfabf053f4fd2e60c0917c6ffa4138588e5379032898b6b8923",
+    "independent_review": "ACCEPT",
     "preserved": true
+  },
+  "security_remediation": {
+    "id": "Q-44",
+    "clawhub_scan_of": {
+      "version": "0.8.0",
+      "verdict": "suspicious",
+      "findings": [
+        "purpose_capability",
+        "instruction_scope"
+      ]
+    },
+    "known_limitations": [
+      "Shadow evaluation classifies only the first command word (e.g. `touch x; rm y` is evaluated as touch).",
+      "Executables outside the reviewed canonical list are sent only as the class observa:unlisted-executable.",
+      "Unsupported command syntax is reported locally as NOT_EVALUATED, not evaluated by Hosted.",
+      "A Hosted request already in flight when stop lands cannot be recalled; its delivery acknowledgement may still be recorded locally."
+    ]
   },
   "v7_license_authorization": {
     "approved_on": "2026-10-30",
@@ -31,12 +50,21 @@
     "active": false
   },
   "prior_authorized_base": {
-    "head": "1237c59a70eb2c81318abc4b29d4724d0ad4d8ea",
-    "tree": "01e9d3b0c67f6c76a68b211dec3907c96044c8a2"
+    "head": "a4038550796dbcaf51894ae1646d78d9da9553d9",
+    "tree": "2b544c809b38df1ab584dfc70fff69891e0d0cbd"
   },
   "upstream": {
     "version": "2026.10.9",
     "commit": "8b18b5578f66eab1501cba4cef2310d88bfb9a41",
     "npm_integrity": "sha512-KbIl0/7an0/nKBo92FnJg7LFcEpFVQyOgSRfHNE9yxELg1Ebql7BmBsdLL+1dDOLZnQtuwjt6Hy45CCrmYdJNA=="
+  },
+  "previous_release": {
+    "version": "0.8.0",
+    "accepted_engineering_candidate": {
+      "commit": "607bdd93a01437d1e799697b622f085fcb2a3102",
+      "tree": "3c87883b6f5eb27c7612d046df2175bc0a107b5b",
+      "artifact_sha256": "4882a15438ab1481a3b3f2f340f51b26230ed8f3c0ef49f8ad395038ece94fa5",
+      "preserved": true
+    }
   }
 }

@@ -11,9 +11,9 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const read = (path) => readFileSync(join(ROOT, path), "utf8");
 const json = (path) => JSON.parse(read(path));
 
-export const VERSION = "0.8.0";
+export const VERSION = "0.8.1";
 
-describe("every current-facing version surface says 0.8.0", () => {
+describe("every current-facing version surface says 0.8.1", () => {
   const surfaces = [
     ["package.json", () => json("package.json").version],
     ["plugins/openclaw-connector/package.json", () => json("plugins/openclaw-connector/package.json").version],
@@ -95,9 +95,9 @@ describe("the manifests are valid and internally consistent", () => {
 
   it("records the exact authorized base this candidate was cut from", () => {
     const provenance = json("CANDIDATE-PROVENANCE.json");
-    // The exact commit the public v0.7.3 tag targets.
-    assert.equal(provenance.authorized_base.head, "a4038550796dbcaf51894ae1646d78d9da9553d9");
-    assert.equal(provenance.authorized_base.tree, "2b544c809b38df1ab584dfc70fff69891e0d0cbd");
+    // The exact commit the public v0.8.0 tag targets (0.8.1 is cut from it).
+    assert.equal(provenance.authorized_base.head, "96e8fb36fe2de9958d3d511439689b39902d9986");
+    assert.equal(provenance.authorized_base.tree, "2e1922faab0f7515703d42e8e1f8e90ee9caec5f");
     assert.deepEqual(provenance.posture, {
       mode: "SHADOW", authority: "NONE", enforcement: "OFF", active: false,
     });
@@ -113,7 +113,7 @@ describe("the packed artifact carries exactly the release surface", () => {
   it("names the artifact for this version", () => {
     assert.equal(packed.name, "@mcphersonai/mcpherson-governance-openclaw");
     assert.equal(packed.version, VERSION);
-    assert.equal(packed.filename, "mcphersonai-mcpherson-governance-openclaw-0.8.0.tgz");
+    assert.equal(packed.filename, "mcphersonai-mcpherson-governance-openclaw-0.8.1.tgz");
   });
 
   it("includes every file the plugin needs at runtime", () => {
